@@ -3,21 +3,18 @@
  *
  * Секция высокая, внутри — липкий экран. Прокрутка переводится в прогресс 0..1:
  * по нему радужка заливается по часовой стрелке, а в зрачке сменяются строки.
- * Один навык = одна восьмая круга; на смене зрачок коротко сужается.
+ * Один навык = одна доля круга; на смене зрачок коротко сужается.
+ * Навыков четыре: больше — и блок листается дольше, чем его читают.
  *
  * Прокрутка, а не таймер: зритель сам задаёт темп и может вернуться назад.
  */
 import { Iris } from './iris.js';
 
 export const SKILLS = [
-  { kind: 'Craft',    title: 'Design systems',      note: 'Tokens as the single source of truth' },
-  { kind: 'Craft',    title: 'Design engineering',  note: 'HTML, CSS, canvas and WebGL in production' },
-  { kind: 'Craft',    title: 'Figma architecture',  note: 'Variables, components, scripted at scale' },
-  { kind: 'Craft',    title: 'Brand identity',      note: 'Marks, type systems, art direction' },
-  { kind: 'Practice', title: 'Accessibility',       note: 'Contrast, focus and motion — measured, not assumed' },
-  { kind: 'Practice', title: 'Release discipline',  note: 'SemVer, CI checks, changelogs that say why' },
-  { kind: 'Practice', title: 'Developer handoff',   note: 'Specs a front-end can build from' },
-  { kind: 'People',   title: 'Leading a team',      note: 'Seven people shipping, in English and Spanish' },
+  { title: 'Design Systems & Engineering', note: 'Tokens as the single source of truth' },
+  { title: 'Brand Systems',                note: 'Marks, type and art direction that scale' },
+  { title: 'Design Strategy',              note: 'Measured decisions, the why on record' },
+  { title: 'AI Workflows',                 note: 'Figma, code and AI agents in one pipeline' },
 ];
 
 const CHAR_STAGGER = 18; // мс между буквами при смене строки
@@ -99,7 +96,9 @@ export class SkillsWheel {
     this.index = i;
 
     const skill = SKILLS[i];
-    if (this.kindEl) this.kindEl.textContent = skill.kind;
+    // над строкой — счётчик: при четырёх пунктах он читается лучше рубрики
+    const pad = (n) => String(n).padStart(2, '0');
+    if (this.kindEl) this.kindEl.textContent = `${pad(i + 1)} / ${pad(SKILLS.length)}`;
     this._setLine(skill.title);
     this.iris.pulse();
 

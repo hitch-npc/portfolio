@@ -2,7 +2,7 @@
 
 .skills {
   position: relative;
-  height: calc(var(--steps, 8) * 100svh);
+  height: calc(var(--steps, 4) * 100svh);
   background: var(--brand-ground);
 }
 
