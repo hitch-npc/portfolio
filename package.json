@@ -15,9 +15,6 @@
     "build:tts": "node tooling/build-tts.mjs",
     "fetch:fonts": "node tooling/fetch-fonts.mjs"
   },
-  "dependencies": {
-    "three": "^0.186.0"
-  },
   "devDependencies": {
     "vite": "^8.3.0",
     "vite-plugin-singlefile": "^2.3.3"
