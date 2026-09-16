@@ -5,15 +5,16 @@
   "type": "module",
   "description": "Портфолио TBCS™ (Eldar Swartz). Токены — единый источник истины, деплой на GitHub Pages.",
   "scripts": {
-    "dev": "npm run build:tokens && npm run build:tts && vite",
+    "dev": "npm run build:tokens && npm run build:tts && npm run fetch:fontshare && vite",
     "build:tokens": "node tooling/build-tokens.mjs",
-    "build": "npm run build:tokens && npm run build:tts && vite build",
+    "build": "npm run build:tokens && npm run build:tts && npm run fetch:fontshare && vite build",
     "preview": "vite preview",
     "lint": "node tooling/guardrail.mjs",
     "check": "node tooling/build-tokens.mjs --check && node tooling/guardrail.mjs",
     "build:sandbox": "npm run build && node tooling/build-sandbox.mjs",
     "build:tts": "node tooling/build-tts.mjs",
-    "fetch:fonts": "node tooling/fetch-fonts.mjs"
+    "fetch:fonts": "node tooling/fetch-fonts.mjs",
+    "fetch:fontshare": "node tooling/fetch-fontshare.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0",

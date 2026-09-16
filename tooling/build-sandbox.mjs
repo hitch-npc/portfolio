@@ -18,9 +18,12 @@ const SRC = join(ROOT, 'dist', 'index.html');
 const OUT = join(ROOT, 'dist', 'sandbox.html');
 
 // шрифты витрины лежат файлами рядом, а песочница — один файл:
-// встраиваем их data-URI, предзагрузку снимаем
+// OFL-шрифты встраиваем data-URI, предзагрузку снимаем. Gambarino и Switzer
+// (ITF FFL) не встраиваем: лицензия не разрешает копию, которую можно извлечь.
+// Их @font-face убираем — песочница покажет запасные гарнитуры
 const html = readFileSync(SRC, 'utf8')
   .replace(/<link\s+rel=["']preload["'][^>]*as=["']font["'][^>]*>\s*/gi, '')
+  .replace(/@font-face\s*\{[^}]*fonts\/fontshare\/[^}]*\}/g, '')
   .replace(/url\((['"]?)\.\/fonts\/([\w.-]+\.woff2)\1\)/g, (_, _q, name) => {
     const b64 = readFileSync(join(ROOT, 'dist', 'fonts', name)).toString('base64');
     return `url(data:font/woff2;base64,${b64})`;

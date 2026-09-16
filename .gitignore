@@ -6,3 +6,6 @@ dist/
 .env.*
 *.pem
 *.key
+# Gambarino и Switzer (ITF FFL): на сайте можно, в публичном репозитории — нет.
+# Сборка скачивает их сама: npm run fetch:fontshare
+public/fonts/fontshare/

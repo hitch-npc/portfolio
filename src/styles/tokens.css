@@ -52,7 +52,8 @@
 
   /* font.stack */
   --f-display:        'Archivo', 'Archivo Expanded', system-ui, sans-serif;
-  --f-ui:             'Archivo', system-ui, sans-serif;
+  --f-serif:          'Gambarino', 'Cormorant Garamond', Georgia, serif;
+  --f-ui:             'Switzer', 'Archivo', system-ui, sans-serif;
   --f-mono:           'Archivo', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* font.weight */

@@ -1,0 +1,29 @@
+/* Gambarino и Switzer (Fontshare, ITF FFL 2.0). Файлы в репозиторий не
+   входят: их скачивает сборка — tooling/fetch-fontshare.mjs. Шрифты берутся
+   как есть, без подмножеств: лицензия запрещает менять файлы. */
+
+/* Gambarino — одно начертание: крупные заголовки, названия проектов */
+@font-face {
+  font-family: 'Gambarino';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fontshare/gambarino-regular.woff2') format('woff2');
+}
+
+/* Switzer — переменный 100–900: интерфейс и текст */
+@font-face {
+  font-family: 'Switzer';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fontshare/switzer-variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Switzer';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fontshare/switzer-variable-italic.woff2') format('woff2');
+}
