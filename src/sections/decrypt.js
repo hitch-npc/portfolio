@@ -16,11 +16,12 @@ const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 /**
  * @param {HTMLElement} el куда писать
  * @param {string} text итоговая строка
- * @param {{stagger?:number, settle?:number, swap?:number}} [opts]
+ * @param {{stagger?:number, settle?:number, swap?:number, alive?:() => boolean}} [opts]
+ *   alive — пока true, перебор идёт; false — останавливается, не трогая текст
  * @returns {Promise<void>}
  */
 export function decrypt(el, text, opts = {}) {
-  const { stagger = 34, settle = 260, swap = 45 } = opts;
+  const { stagger = 34, settle = 260, swap = 45, alive = () => true } = opts;
   const chars = [...text];
 
   if (reduced()) {
@@ -35,6 +36,7 @@ export function decrypt(el, text, opts = {}) {
     let frame = '';
 
     const tick = (now) => {
+      if (!alive()) { resolve(); return; }
       const t = now - start;
       const churn = now - lastSwap > swap;
       if (churn) lastSwap = now;

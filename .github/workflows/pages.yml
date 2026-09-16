@@ -9,10 +9,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Права по минимуму и по задачам: сборка ставит чужие пакеты и прав
+# на публикацию не получает, публикация чужого кода не запускает.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -21,13 +21,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # скрипты установки пакетам не нужны, а чужой postinstall — вектор атаки
+      - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
@@ -37,6 +40,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      actions: read     # скачать артефакт сборки
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

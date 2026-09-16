@@ -12,7 +12,11 @@ import { mountTape } from './brand/vhs.js';
 import { SkillsWheel } from './sections/skills.js';
 import { Gate } from './sections/gate.js';
 import { mountCase } from './sections/case.js';
-import { mountTunePanel } from './brand/tune.js';
+
+// Отладочные ручки — только в dev. В сборке import.meta.env.DEV = false,
+// и всё, что под ним, вырезается: ни панели, ни window.__* на витрине.
+const DEV = import.meta.env.DEV;
+const expose = (name, value) => { if (DEV) window[name] = value; };
 
 /** Шрифт должен быть готов до построения маски — иначе знак соберётся из системного. */
 async function waitForDisplayFont() {
@@ -109,7 +113,7 @@ async function boot() {
     if (tm) field.attachSatellite(tm);
     field.resize();
     field.start();
-    window.__field = field;
+    expose('__field', field);
 
     bindVisibility(hero, [field]);
     bindHeroFade(hero);
@@ -130,20 +134,25 @@ async function boot() {
 
   const skillsSection = document.querySelector('[data-skills]');
   if (skillsSection) {
-    window.__skills = new SkillsWheel(skillsSection);
+    const skills = new SkillsWheel(skillsSection);
+    expose('__skills', skills);
     // зрачок не крутится, пока блок за экраном
-    bindVisibility(skillsSection, [window.__skills.iris]);
+    bindVisibility(skillsSection, [skills.iris]);
   }
 
   const muteTape = bindTapeMute(tape);
   const gate = document.querySelector('[data-gate]');
   const cover = document.querySelector('[data-case-cover]');
-  if (gate && cover) window.__gate = new Gate(gate, cover, () => muteTape(true));
-  window.__muteTape = muteTape;
+  if (gate && cover) expose('__gate', new Gate(gate, cover, () => muteTape(true)));
+  expose('__muteTape', muteTape);
   mountCase(document.querySelector('[data-tts]'));
 
-  // панель настройки параметров знака: появляется только по ?tune в адресе
-  if (new URLSearchParams(location.search).has('tune')) mountTunePanel(window.__field);
+  // панель настройки параметров знака: dev-сервер и ?tune в адресе.
+  // Динамический импорт под DEV — модуль панели в сборку не попадает вовсе
+  if (DEV && new URLSearchParams(location.search).has('tune')) {
+    const { mountTunePanel } = await import('./brand/tune.js');
+    mountTunePanel(window.__field);
+  }
 }
 
 boot();

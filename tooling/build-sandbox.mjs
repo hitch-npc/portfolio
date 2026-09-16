@@ -22,10 +22,12 @@ const html = readFileSync(SRC, 'utf8');
 const head = html.match(/<head>([\s\S]*?)<\/head>/i)?.[1] ?? '';
 const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? '';
 
-// charset и viewport ставит сам хост; заголовок в галерее песочницы — имя, а не описание
+// charset и viewport ставит сам хост; заголовок в галерее песочницы — имя, а не описание.
+// CSP витрины снимаем: у песочницы своя политика, а скрипт темы ниже не прошёл бы по хэшу
 const headKept = head
   .replace(/<title>[\s\S]*?<\/title>/i, '<title>TBCS Arrow Field</title>')
   .replace(/<meta\s+charset=[^>]*>/gi, '')
+  .replace(/<meta\s+http-equiv=["']Content-Security-Policy["'][^>]*>/gi, '')
   .replace(/<meta\s+name=["']viewport["'][^>]*>/gi, '')
   .trim();
 
