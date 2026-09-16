@@ -19,6 +19,10 @@
 npm run dev      # сборка токенов + ядра кейса, затем vite
 npm run check    # сверка tokens.css с tokens.json + страж
 npm run build    # сборка в один файл: dist/index.html
+npm run fetch:fonts  # один раз на смену набора: шрифты с Google → public/fonts
 ```
+
+Шрифты лежат на сайте (`public/fonts`, лицензии OFL рядом): браузер зрителя
+к Google не ходит. Политика CSP в сборке разрешает только свой домен.
 
 Деплой — GitHub Actions (`.github/workflows/pages.yml`) на GitHub Pages.

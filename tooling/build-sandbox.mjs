@@ -17,7 +17,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'dist', 'index.html');
 const OUT = join(ROOT, 'dist', 'sandbox.html');
 
-const html = readFileSync(SRC, 'utf8');
+// шрифты витрины лежат файлами рядом, а песочница — один файл:
+// встраиваем их data-URI, предзагрузку снимаем
+const html = readFileSync(SRC, 'utf8')
+  .replace(/<link\s+rel=["']preload["'][^>]*as=["']font["'][^>]*>\s*/gi, '')
+  .replace(/url\((['"]?)\.\/fonts\/([\w.-]+\.woff2)\1\)/g, (_, _q, name) => {
+    const b64 = readFileSync(join(ROOT, 'dist', 'fonts', name)).toString('base64');
+    return `url(data:font/woff2;base64,${b64})`;
+  });
 
 const head = html.match(/<head>([\s\S]*?)<\/head>/i)?.[1] ?? '';
 const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? '';

@@ -8,17 +8,9 @@
       name="description"
       content="The Black Cat Studio. Eldar Swartz — design systems designer and design engineer. Tokens as a single source of truth, and the pipeline that keeps design and code from drifting apart."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Гарнитуры кейса TTS: система показывается своим набором, а не подменой -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Oranienbaum&family=Forum&family=Manrope:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Шрифты лежат на сайте (public/fonts), Google не участвует.
+         Archivo грузим заранее: из него собирается знак на первом экране -->
+    <link rel="preload" href="/fonts/archivo-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>

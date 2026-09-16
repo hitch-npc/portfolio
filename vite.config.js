@@ -10,7 +10,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
  * разрешаем ровно то, что собрали: sha256 каждого <script> после инлайна.
  * Любой внедрённый скрипт не совпадёт по хэшу и не выполнится. Стили
  * встроенные и в атрибутах — им 'unsafe-inline', исполняемого в них нет.
- * Сетевых запросов у страницы нет, кроме шрифтов Google.
+ * Сетевых запросов у страницы нет: шрифты лежат рядом, Google не участвует.
  *
  * Только для сборки: dev-сервер Vite сам вставляет скрипты и держит сокет.
  */
@@ -30,8 +30,8 @@ function csp() {
         const policy = [
           "default-src 'none'",
           `script-src ${hashes.join(' ')}`,
-          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-          'font-src https://fonts.gstatic.com',
+          "style-src 'self' 'unsafe-inline'",
+          "font-src 'self'",
           "img-src 'self' data:",
           "base-uri 'none'",
           "form-action 'none'",
