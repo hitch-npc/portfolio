@@ -1,0 +1,597 @@
+/* Кейсы — колода карт. Карта на токенах портфолио, первый экран продукта
+   внутри неё — на токенах TTS (контейнер .tts, см. tts-case.css). */
+
+.work {
+  position: relative;
+  z-index: 1;
+  /* раздел наезжает на хвост навыков: заголовок поднимается, пока зрачок
+     ещё разлетается. Фон прозрачный — иначе он закрыл бы этот пролёт */
+  margin-top: -50svh;
+  padding-top: var(--sp-20);
+}
+
+.work__head,
+.deck {
+  max-width: calc(var(--content-max) + 2 * var(--page-pad));
+  margin-inline: auto;
+  padding-inline: var(--page-pad);
+}
+
+/* Заголовок приезжает из глубины: крупнее и прозрачнее, пока не встанет.
+   --head ставит work.js */
+.work__head {
+  --head: 1;
+  display: grid;
+  gap: var(--sp-3);
+  opacity: var(--head);
+  transform: translateY(calc((1 - var(--head)) * 64px)) scale(calc(1.14 - var(--head) * 0.14));
+  transform-origin: 0 100%;
+}
+
+.work__title {
+  font-family: var(--f-serif);
+  font-size: clamp(2.75rem, 8vw, 6.5rem);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+  color: var(--brand-mark);
+}
+
+.work__hint {
+  color: var(--brand-veil);
+  font-size: 1rem;
+}
+
+/* ── Колода ──────────────────────────────────────────────────────────── */
+
+/* Карта липнет под строкой студии, каждая следующая — на ступеньку ниже:
+   край предыдущей остаётся виден, как у стопки */
+.deck {
+  --top: calc(var(--sp-20) + var(--sp-4));
+  --step: var(--sp-3);
+  padding-top: var(--sp-8);
+  perspective: 1600px;
+}
+
+/* Распорка после последней карты: липкий элемент держится только внутри
+   содержимого родителя, отступ снизу не в счёт. Без неё последняя карта
+   не встаёт в стопку, а сразу уезжает вверх */
+.deck::after {
+  content: '';
+  display: block;
+  height: 16svh;
+}
+
+/* Глубина карты. --rise: 1 — карта только показалась снизу и лежит
+   наклонённой вдали, 0 — встала в стопку. --cover: насколько её накрыла
+   следующая — накрытая уходит вниз стопки. Оба ставит work.js */
+.work-card {
+  --rise: 0;
+  --cover: 0;
+  position: sticky;
+  top: calc(var(--top) + var(--i, 0) * var(--step));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  height: min(calc(100svh - var(--top) - var(--sp-12)), 760px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-sunk);
+  transform:
+    translateY(calc(var(--cover) * -18px))
+    rotateX(calc(var(--rise) * -14deg))
+    scale(calc(1 - var(--rise) * 0.14 - var(--cover) * 0.08));
+  transform-origin: 50% 0;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+
+.work-card + .work-card { margin-top: 36svh; }
+
+/* Накрытая карта темнеет. Слой, а не filter: filter перерисовывал бы
+   всю карту на каждом кадре прокрутки */
+.work-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--brand-ground);
+  opacity: calc(var(--cover) * 0.7 + var(--rise) * 0.35);
+  pointer-events: none;
+}
+
+.work-card:has(.work-card__open:hover) { border-color: var(--fg-faint); }
+
+/* ── Описание ──────────────────────────────────────────────────────────
+   Читается за секунду: что я делал (теги) → что за проект → одна строка →
+   три цифры → роль → кнопка. Без капса с разрядкой: его не читают бегло */
+
+.work-card__info {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-3);
+  padding: var(--sp-6);
+}
+
+.work-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-card__tags li {
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--fg);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-medium);
+  line-height: 1.5;
+}
+
+.work-card__title {
+  min-height: 1em;
+  margin: var(--sp-2) 0 0;
+  font-family: var(--f-serif);
+  font-size: clamp(2.5rem, 4.8vw, 4.25rem);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  /* пока название дешифруется, пробелы на месте ещё не вставших букв
+     держат ширину строки */
+  white-space: pre-wrap;
+  color: var(--brand-mark);
+}
+
+.work-card__lead {
+  max-width: 30ch;
+  color: var(--brand-veil);
+  font-size: 1.0625rem;
+  line-height: 1.45;
+}
+
+/* Цифры: число крупно, подпись под ним. В разметке dt идёт первым — так велит dl */
+.work-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+  margin: var(--sp-2) 0 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+
+.work-card__stats div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.work-card__stats dd {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.work-card__stats dt {
+  margin-top: var(--sp-1);
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+.work-card__role {
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+/* Вся карта нажимается: невидимый слой кнопки растянут на карту */
+.work-card__open {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  padding: var(--sp-3) var(--sp-6);
+  border: 0;
+  border-radius: var(--r-sm);
+  /* фирменный кобальт, а не светлый --accent тёмной темы: у того с белым
+     текстом 4,4:1 — ниже нормы. У кобальта 6,3:1 */
+  background: var(--cobalt);
+  color: var(--on-accent);
+  font-family: var(--f-ui);
+  font-size: 1rem;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out);
+}
+
+.work-card__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.work-card__open:hover { background: var(--cobalt-hover); }
+
+.work-card__arrow {
+  width: 20px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.work-card__open:hover .work-card__arrow { transform: translateX(4px); }
+
+.work-card__soon {
+  justify-self: start;
+  margin-top: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px dashed var(--fg-faint);
+  border-radius: var(--r-sm);
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+
+/* ── Превью ──────────────────────────────────────────────────────────── */
+
+.work-card__shot {
+  min-height: 0;
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.work-card__frame {
+  height: 100%;
+  overflow: hidden;
+  /* ширина рамки не зависит от макета внутри: иначе макет в 1180px
+     распирает колонку, а масштаб считается уже от распёртой */
+  contain: inline-size;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  transition: transform var(--dur-slow) var(--ease-slow);
+}
+
+.work-card:has(.work-card__open:hover) .work-card__frame { transform: translateY(calc(var(--sp-1) * -1)); }
+
+.work-card__blank {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: radial-gradient(circle, var(--fg-faint) 1px, transparent 1.5px) 0 0 / var(--sp-4) var(--sp-4);
+}
+
+.work-card__blank-mark {
+  font-family: var(--f-display);
+  font-size: clamp(5rem, 16vw, 14rem);
+  font-weight: var(--fw-black);
+  letter-spacing: var(--tr-tight);
+  line-height: 1;
+  color: var(--brand-ground);
+  -webkit-text-stroke: 1px var(--fg-faint);
+}
+
+/* ── Первый экран Ticket to Show ─────────────────────────────────────
+   Главная редизайна, desktop, в натуральную ширину 1180px. Масштаб --k
+   ставит скрипт по ширине рамки; на узкой рамке масштаб не падает ниже
+   читаемого, и правая часть экрана уходит за край. Значения в px —
+   размеры макета. */
+
+.ttsm {
+  width: 1180px;
+  zoom: var(--k, 0.5);
+  color: var(--n100);
+  font-family: var(--font);
+}
+
+.ttsm-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--n850);
+}
+
+.ttsm-logo {
+  flex: none;
+  width: 70px;
+  height: 20px;
+  color: var(--n100);
+}
+
+.ttsm-nav {
+  display: flex;
+  gap: 22px;
+  margin-left: 24px;
+  color: var(--n300);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ttsm-nav .is-on { color: var(--n100); }
+
+.ttsm-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 517px;
+  height: 35px;
+  margin-left: auto;
+  padding: 0 4px 0 14px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-md);
+  color: var(--n600);
+  font-size: 12px;
+}
+
+.ttsm-search svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.ttsm-q {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ttsm-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-sm);
+  color: var(--n100);
+  font-weight: 500;
+}
+
+.ttsm-filter svg { width: 13px; height: 13px; }
+
+.ttsm-city {
+  padding: 8px 14px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ttsm-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  padding: 48px 32px 56px;
+}
+
+.ttsm-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ttsm-date {
+  margin: 0 0 20px;
+  color: var(--accent-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.ttsm-title {
+  margin: 0 0 22px;
+  font-family: var(--f-thin);
+  font-size: 60px;
+  font-weight: 500;
+  line-height: 1.04;
+}
+
+.ttsm-lead {
+  max-width: 400px;
+  margin: 0 0 44px;
+  color: var(--n300);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ttsm-cta {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.ttsm-buy {
+  padding: 14px 26px;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.ttsm-when {
+  color: var(--n400);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.ttsm-poster {
+  min-height: 360px;
+  border-radius: var(--r-sm);
+  background:
+    radial-gradient(circle at 68% 28%, var(--blob-core) 0%, transparent 55%),
+    radial-gradient(circle at 25% 78%, var(--blob-purple) 0%, transparent 50%),
+    var(--n900);
+}
+
+.ttsm-cats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 0 32px 48px;
+}
+
+.ttsm-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 20px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-sm);
+  background:
+    radial-gradient(circle at 85% 15%, var(--glow) 0%, transparent 55%),
+    var(--n950);
+  font-family: var(--f-head);
+  font-size: 19px;
+  letter-spacing: 0.08em;
+}
+
+.ttsm-cat i {
+  color: var(--n400);
+  font-family: var(--font);
+  font-style: normal;
+}
+
+.ttsm-cat--cool { --glow: var(--blob-core-cool); }
+.ttsm-cat--warm { --glow: var(--blob-core-warm); }
+.ttsm-cat--purple { --glow: var(--blob-purple); }
+.ttsm-cat--green { --glow: var(--blob-core-green); }
+
+.ttsm-dates { padding: 0 32px 40px; }
+
+.ttsm-dates-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: var(--n400);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+
+.ttsm-month {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--n600);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+
+.ttsm-month i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--n850);
+  border-radius: var(--r-sm);
+  color: var(--n700);
+  font-style: normal;
+  font-size: 13px;
+}
+
+.ttsm-month i:first-of-type { margin-left: 8px; }
+.ttsm-month i.is-on { border-color: var(--n800); color: var(--n300); }
+
+.ttsm-days {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-sm);
+  background: var(--ink);
+}
+
+.ttsm-day {
+  padding: 13px 0 11px;
+  border-left: 1px solid var(--n850);
+  text-align: center;
+}
+
+.ttsm-day:first-child { border-left: 0; }
+.ttsm-day.is-month { border-left-color: var(--n700); }
+
+.ttsm-day b {
+  display: block;
+  color: var(--n500);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+.ttsm-day span {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--f-num);
+  font-size: 21px;
+}
+
+.ttsm-day.is-off span { color: var(--n600); }
+
+.ttsm-day.is-today {
+  background: var(--accent-ghost);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.ttsm-day.is-today b {
+  color: var(--accent-soft);
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.ttsm-day.is-today span { color: var(--accent-soft); }
+
+/* ── Десктоп: описание слева, продукт справа ─────────────────────────── */
+
+@media (min-width: 900px) {
+  .deck { --step: var(--sp-4); }
+
+  .work-card {
+    grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.6fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* всё описание сверху, кнопка — у нижнего края карты */
+  .work-card__info {
+    padding: var(--sp-8);
+    align-content: stretch;
+    grid-template-rows: repeat(5, auto) 1fr;
+  }
+
+  .work-card__open { align-self: end; }
+
+  .work-card__shot { padding: var(--sp-6) var(--sp-6) var(--sp-6) 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-card,
+  .work-card__open,
+  .work-card__arrow,
+  .work-card__frame { transition: none; }
+
+  .work-card { transform: none; }
+  .work-card::after { opacity: 0; }
+  .work__head { opacity: 1; transform: none; }
+  .work-card:has(.work-card__open:hover) .work-card__frame { transform: none; }
+}

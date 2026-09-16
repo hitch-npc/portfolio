@@ -1,43 +1,169 @@
-/* Блок навыков: липкий экран со зрачком, который собирается прокруткой. */
+/* Блок навыков: липкий экран — заголовок, список навыков и зрачок,
+   который собирается прокруткой. Список — содержимое, зрачок — отклик. */
 
+/* --tail — хвост в экранах после последнего навыка: пролёт сквозь зрачок.
+   --enter и --exit ставит skills.js: 0→1 на входе и на выходе */
 .skills {
+  --tail: 0.9;
+  --enter: 1;
+  --exit: 0;
   position: relative;
-  height: calc(var(--steps, 4) * 100svh);
+  height: calc((var(--steps, 4) + var(--tail)) * 100svh);
   background: var(--brand-ground);
 }
 
+/* Мобильный порядок: заголовок, зрачок, список. Размер зрачка — от остатка
+   высоты, иначе на коротком телефоне список уезжает за край. */
 .skills__sticky {
+  --stage: min(92vw, calc(100svh - 380px), 460px);
   position: sticky;
   top: 0;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--sp-4);
   height: 100svh;
-  padding: var(--sp-20) var(--page-pad);
+  /* сверху — место под строку студии */
+  padding: calc(var(--sp-20) + var(--sp-4)) var(--sp-4) var(--sp-6);
+}
+
+/* ── Заголовок ───────────────────────────────────────────────────────── */
+
+/* Текст приходит снизу и уходит вверх — глаз в это время приближается
+   и пролетает насквозь. Список догоняет заголовок с запаздыванием */
+.skills__head,
+.skills__list {
+  /* текст гаснет втрое быстрее глаза: разлетающиеся точки не должны
+     проходить сквозь читаемые строки */
+  opacity: calc(var(--enter) * max(0, 1 - var(--exit) * 3));
+  transform: translateY(calc((1 - var(--enter)) * 56px - var(--exit) * 40px));
+}
+
+.skills__list { transform: translateY(calc((1 - var(--enter)) * 96px - var(--exit) * 64px)); }
+
+.skills__head {
+  display: grid;
+  gap: var(--sp-2);
+  align-content: start;
+}
+
+.skills__title {
+  max-width: 14ch;
+  font-family: var(--f-serif);
+  font-size: clamp(1.9rem, 3.4vw, 3.25rem);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-wrap: balance;
+  color: var(--brand-mark);
+}
+
+/* ── Список ──────────────────────────────────────────────────────────── */
+
+.skills__list {
+  /* в разметке список идёт раньше зрачка — на телефоне он под ним */
+  grid-row: 3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--brand-line);
+}
+
+.skills__item {
+  position: relative;
+  border-bottom: 1px solid var(--brand-line);
+}
+
+/* Полоса слева у активного пункта: сколько прокрутки осталось до следующего */
+.skills__item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--brand-accent);
+  transform: scaleY(0);
+  transform-origin: top;
+}
+
+.skills__item.is-active::before { transform: scaleY(var(--step-progress, 0)); }
+
+.skills__jump {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-4);
+  border: 0;
+  background: none;
+  color: var(--brand-mark-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skills__num {
+  flex: none;
+  font-family: var(--f-ui);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tr-wide);
+}
+
+.skills__name {
+  font-family: var(--f-ui);
+  font-size: 1rem;
+  font-weight: var(--fw-medium);
+  line-height: 1.25;
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.skills__jump:hover .skills__name { color: var(--brand-veil); }
+.skills__item.is-active .skills__num { color: var(--brand-accent); }
+.skills__item.is-active .skills__name { color: var(--brand-mark); }
+
+/* Пояснение раскрывается только у активного пункта; на телефоне его нет —
+   там под строкой в зрачке стоят ключевые слова навыка */
+.skills__desc { display: none; }
+
+/* ── Зрачок ──────────────────────────────────────────────────────────── */
+
+.skills__stage {
+  grid-row: 2;
+  position: relative;
+  display: grid;
+  place-items: center;
+  place-self: center;
+  width: var(--stage);
+  height: var(--stage);
+  /* глубина: издалека на входе, сквозь зрачок на выходе. Только 2d —
+     3d-трансформ над холстом гасит его в композиторе */
+  opacity: calc(var(--enter) * (1 - var(--exit)));
+  transform: scale(calc((0.5 + 0.5 * var(--enter)) * (1 + 3.2 * var(--exit))));
 }
 
 /* Радужка. Зрачок — дыра в её середине, в ней и живёт текст,
    поэтому холст заметно крупнее текстового блока. */
 .skills__iris {
   grid-area: 1 / 1;
-  width: min(92vmin, 680px);
-  height: min(92vmin, 680px);
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   /* холст живёт внутри липкого экрана: без своего слоя композитор
      кэширует картинку и на экран перестаёт попадать свежий кадр */
   transform: translateZ(0);
 }
 
-/* Текст лежит на дне зрачка: он уведён вглубь и поворачивается вместе
-   с глазом — те же --gx/--gy/--lid, что и у точек. Смещение меньше, чем
-   у радужки: точка на оси вращения при повороте уходит слабее. */
+/* Текст лежит на дне зрачка и поворачивается вместе с глазом —
+   те же --gx/--gy/--lid, что и у точек. Ширина — от размера зрачка:
+   его диаметр 0.6 от холста, текст берёт чуть меньше. */
 .skills__center {
   grid-area: 1 / 1;
   display: grid;
   gap: var(--sp-2);
   justify-items: center;
+  max-width: calc(var(--stage) * 0.44);
   text-align: center;
-  /* текст держим внутри зрачка: радиус зрачка 0.58 от радиуса радужки */
-  max-width: min(40vmin, 300px);
   /* перспектива своя, а не на родителе: общий 3d-контекст на секции
      заставляет композитор сортировать слои и прячет холст радужки под ними */
   position: relative;
@@ -47,7 +173,8 @@
   transform:
     translate(var(--pcx, 0px), var(--pcy, 0px))
     scale(var(--sx, 1), var(--sy, 1));
-  opacity: calc(0.25 + 0.75 * var(--lid, 1));
+  /* моргание приглушает строку; на пролёте сквозь зрачок она гаснет первой */
+  opacity: calc((0.25 + 0.75 * var(--lid, 1)) * max(0, 1 - var(--exit) * 3));
 }
 
 /* Блик роговицы поверх строки: не отдельный слой, а псевдоэлемент внутри
@@ -66,22 +193,15 @@
   );
 }
 
-.skills__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--brand-mark-muted);
-}
-
-.skills__kind { color: var(--brand-veil); }
+.skills__meta { color: var(--brand-accent); }
 
 .skills__line {
   margin: 0;
-  font-family: var(--f-display);
-  font-size: clamp(1.25rem, 3.2vw, 2.15rem);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tr-tight);
-  line-height: 1.05;
+  font-family: var(--f-serif);
+  font-size: clamp(1.1rem, calc(var(--stage) * 0.058), 2.5rem);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.005em;
+  line-height: 1.02;
   text-wrap: balance;
   color: var(--brand-mark);
 }
@@ -104,25 +224,83 @@
 }
 
 .skills__note {
-  max-width: 26ch;
+  font-size: 0.625rem;
+  letter-spacing: var(--tr-wide);
+  line-height: 1.5;
+  text-wrap: balance;
   opacity: 0;
-  color: var(--brand-mark-muted);
+  color: var(--brand-veil);
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
-.skills__note.is-in { opacity: 0.72; }
+.skills__note.is-in { opacity: 0.8; }
 
-@media (max-width: 720px) {
-  .skills__sticky { padding: var(--sp-16) var(--sp-4); }
-  .skills__iris { width: min(96vmin, 460px); height: min(96vmin, 460px); }
-  .skills__center { max-width: min(44vmin, 215px); gap: var(--sp-2); }
-  .skills__line { font-size: clamp(1.15rem, 5.6vw, 1.75rem); }
-  .skills__note { max-width: 24ch; }
+/* ── Десктоп: список слева, зрачок справа ────────────────────────────── */
+
+@media (min-width: 900px) {
+  .skills__sticky {
+    --stage: min(calc(100svh - 180px), 640px, 48vw);
+    grid-template-columns: minmax(300px, 380px) 1fr;
+    grid-template-rows: auto 1fr;
+    column-gap: var(--sp-12);
+    row-gap: 0;
+    max-width: calc(var(--content-max) + 2 * var(--sp-20));
+    margin-inline: auto;
+    padding: calc(var(--sp-20) + var(--sp-4)) clamp(var(--sp-8), 5vw, var(--sp-20)) var(--sp-12);
+  }
+
+  .skills__head { grid-column: 1; grid-row: 1; }
+
+  .skills__list {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+  }
+
+  .skills__stage {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .skills__jump { padding: var(--sp-4) 0 var(--sp-4) var(--sp-4); }
+  .skills__name { font-size: clamp(1.05rem, 1.4vw, 1.3rem); }
+
+  .skills__desc {
+    display: block;
+    max-height: 0;
+    margin: 0;
+    padding: 0 0 0 calc(var(--sp-4) + var(--sp-3) + 1.6em);
+    overflow: hidden;
+    opacity: 0;
+    color: var(--brand-mark-muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    transition:
+      max-height var(--dur-slow) var(--ease-slow),
+      opacity var(--dur-slow) var(--ease-out),
+      padding var(--dur-slow) var(--ease-slow);
+  }
+
+  .skills__item.is-active .skills__desc {
+    max-height: 6em;
+    padding-bottom: var(--sp-4);
+    opacity: 1;
+  }
+
+  .skills__note {
+    font-size: 0.6875rem;
+    letter-spacing: var(--tr-caption);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skills__char { transition: none; opacity: 1; transform: none; }
-  .skills__note { transition: none; }
+  .skills__note,
+  .skills__name,
+  .skills__desc { transition: none; }
   .skills__center { transform: none; opacity: 1; }
+  .skills__stage,
+  .skills__head,
+  .skills__list { transform: none; opacity: 1; }
   .skills__center::after { display: none; }
 }

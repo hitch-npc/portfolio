@@ -1,114 +1,77 @@
-/* Заставка перехода и кейс TTS. */
+/* Окно кейса и стык кейса TTS со страницей. */
 
-/* ── Заставка ───────────────────────────────────────────────────────── */
+/* ── Окно ────────────────────────────────────────────────────────────
+   Нативный <dialog> во весь экран: своя прокрутка, фон страницы инертен.
+   Раскрытие из карты и сворачивание обратно анимирует work.js. */
 
-.gate {
-  display: grid;
-  place-items: center;
-  min-height: 100svh;
-  padding: var(--sp-20) var(--page-pad);
-  background: var(--brand-ground);
-  color: var(--brand-mark);
-  transition: opacity var(--dur-base) var(--ease-out);
-}
-
-.gate.is-spent { opacity: 0; pointer-events: none; }
-
-.gate__screen {
-  display: grid;
-  gap: var(--sp-4);
-  justify-items: center;
-  text-align: center;
-  transform-origin: 50% 50%;
-}
-
-.gate__meta { color: var(--brand-mark-muted); }
-
-.gate__title {
+.case-view {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   margin: 0;
-  min-height: 1em;
-  font-family: var(--f-display);
-  font-size: clamp(2rem, 7.5vw, 5rem);
-  font-weight: var(--fw-black);
-  letter-spacing: var(--tr-tight);
-  line-height: 1;
+  padding: 0;
+  border: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--ink);
+  color: var(--fg);
 }
 
-.gate__stats {
-  margin: 0;
-  min-height: 1.2em;
-  font-family: var(--f-display);
-  font-size: clamp(0.85rem, 1.7vw, 1.1rem);
-  letter-spacing: 0.14em;
-  color: var(--brand-veil);
+.case-view::backdrop {
+  background: color-mix(in srgb, var(--brand-ground) 72%, transparent);
+  animation: case-fade var(--dur-slow) var(--ease-out);
 }
 
-.gate__cue {
+@keyframes case-fade {
+  from { opacity: 0; }
+}
+
+/* Пока окно открыто, страница под ним не прокручивается.
+   Место полосы прокрутки держим всегда, чтобы страница не прыгала */
+html { scrollbar-gutter: stable; }
+html:has(.case-view[open]) { overflow: hidden; }
+
+/* Кнопка закрытия висит над кейсом всё время прокрутки: липкая полоса
+   нулевой высоты, чтобы не сдвигать обложку */
+.case-view__bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+}
+
+.case-view__close {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  margin-top: var(--sp-6);
-  padding: var(--sp-3) var(--sp-6);
-  border: 1px solid var(--brand-line);
+  height: max-content;
+  margin: var(--sp-4) var(--sp-4) 0 0;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--fg-faint);
   border-radius: var(--r-sm);
-  background: none;
-  color: var(--brand-mark);
-  font: inherit;
-  font-size: 0.72rem;
+  background: color-mix(in srgb, var(--brand-ground) 72%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--fg);
+  font-family: var(--f-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-bold);
   letter-spacing: var(--tr-caption);
   text-transform: uppercase;
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity var(--dur-slow) var(--ease-out),
-    transform var(--dur-slow) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-base) var(--ease-out);
 }
 
-.gate__cue.is-in { opacity: 1; transform: none; }
-.gate__cue:hover { border-color: var(--brand-mark); }
-.gate__cue:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
+.case-view__close:hover { border-color: var(--fg); }
 
-.gate__cue-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand-accent);
-  animation: gate-pulse 1.6s var(--ease-out) infinite;
-}
-
-@keyframes gate-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
-}
-
-/* Потеря сигнала: дрожь и расслоение цвета */
-.gate__screen.is-lost {
-  animation: gate-lost 0.38s steps(8) 1;
-  text-shadow:
-    2px 0 0 color-mix(in srgb, var(--brand-accent) 80%, transparent),
-    -2px 0 0 color-mix(in srgb, var(--brand-veil) 60%, transparent);
-}
-
-@keyframes gate-lost {
-  0% { transform: translate(0, 0) skewX(0); }
-  20% { transform: translate(-6px, 1px) skewX(-3deg); }
-  40% { transform: translate(5px, -2px) skewX(2deg); }
-  60% { transform: translate(-3px, 2px) skewX(-1deg); }
-  80% { transform: translate(4px, 0) skewX(3deg); }
-  100% { transform: translate(0, 0) skewX(0); }
-}
-
-/* Выключение экрана: вспышка, схлопывание в строку, точка */
-.gate__screen.is-off { animation: gate-off 0.42s var(--ease-out) forwards; }
-
-@keyframes gate-off {
-  0% { transform: scale(1); filter: brightness(1); opacity: 1; }
-  22% { transform: scale(1.02); filter: brightness(2.6); opacity: 1; }
-  55% { transform: scaleY(0.006) scaleX(1); filter: brightness(3); opacity: 1; }
-  80% { transform: scaleY(0.006) scaleX(0.22); filter: brightness(2); opacity: 0.9; }
-  100% { transform: scaleY(0.004) scaleX(0); filter: brightness(1); opacity: 0; }
+.case-view__close svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
 }
 
 /* ── Кейс ───────────────────────────────────────────────────────────
@@ -121,16 +84,11 @@
   z-index: 1;
 }
 
-/* Закреплённая строка студии перекрывала логотип TTS на обложке кейса */
-.case .cs-cover { padding-top: var(--sp-16); }
+/* Сверху висит кнопка закрытия — обложке нужен запас. Селектор сильнее
+   правила из tts-case.css: тот подключается позже и иначе перебил бы отступ */
+.case.tts .cs-cover { padding-top: var(--sp-16); }
 
 @media (prefers-reduced-motion: reduce) {
-  .gate,
-  .gate__cue { transition: none; }
-
-  .gate__cue-dot,
-  .gate__screen.is-lost,
-  .gate__screen.is-off { animation: none; }
-
-  .gate__cue { opacity: 1; transform: none; }
+  .case-view::backdrop { animation: none; }
+  .case-view__close { transition: none; }
 }

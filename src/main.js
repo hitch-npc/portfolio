@@ -1,9 +1,11 @@
 import './styles/fonts.css';
+import './styles/fonts-fontshare.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/preloader.css';
 import './styles/hero.css';
 import './styles/skills.css';
+import './styles/work.css';
 import './styles/case.css';
 import './styles/tts-case.css';
 import './styles/overlay.css';
@@ -11,7 +13,7 @@ import { GlyphField } from './brand/glyph-field.js';
 import { Preloader } from './brand/preloader.js';
 import { mountTape } from './brand/vhs.js';
 import { SkillsWheel } from './sections/skills.js';
-import { Gate } from './sections/gate.js';
+import { mountWork } from './sections/work.js';
 import { mountCase } from './sections/case.js';
 
 // Отладочные ручки — только в dev. В сборке import.meta.env.DEV = false,
@@ -78,9 +80,9 @@ function bindVisibility(hero, fields) {
 }
 
 /**
- * Плёнка живёт только вне кейса. Внутри кейса она гасится и ставится на паузу:
- * экраны продукта должны читаться без помех, да и «сигнал пропал» у заставки
- * означает ровно это. Возврат наверх — плёнка снова идёт.
+ * Плёнка живёт только вне кейса. Пока окно кейса открыто, она гасится и ставится
+ * на паузу: экраны продукта должны читаться без помех, а кадры незачем жечь.
+ * Кейс закрыт — плёнка снова идёт.
  */
 function bindTapeMute(tape) {
   const vhs = document.querySelector('.vhs');
@@ -92,8 +94,8 @@ function bindTapeMute(tape) {
     if (tape) tape.paused = on;
   };
 
-  // порог ровно 0: кейс выше экрана в разы, и доля его видимой площади
-  // физически не может дотянуться до сколько-нибудь заметной величины
+  // кейс живёт в <dialog>: закрытое окно не отрисовано и не пересекает экран.
+  // Порог ровно 0 — кейс выше экрана в разы, заметной доли не наберёт
   new IntersectionObserver(([e]) => mute(e.isIntersecting), { threshold: 0 }).observe(caseEl);
   return mute;
 }
@@ -142,11 +144,9 @@ async function boot() {
   }
 
   const muteTape = bindTapeMute(tape);
-  const gate = document.querySelector('[data-gate]');
-  const cover = document.querySelector('[data-case-cover]');
-  if (gate && cover) expose('__gate', new Gate(gate, cover, () => muteTape(true)));
   expose('__muteTape', muteTape);
   mountCase(document.querySelector('[data-tts]'));
+  expose('__work', mountWork(document.querySelector('[data-work]')));
 
   // панель настройки параметров знака: dev-сервер и ?tune в адресе.
   // Динамический импорт под DEV — модуль панели в сборку не попадает вовсе

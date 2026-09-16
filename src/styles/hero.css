@@ -36,18 +36,19 @@
   isolation: isolate;
 }
 
-/* Подложка под закреплённой строкой: ниже по странице под неё подъезжает
-   текст кейса, и без затемнения строки накладываются друг на друга */
+/* Подложка под закреплённой строкой: ниже по странице под неё подъезжают
+   навыки и карты, и без затемнения строки накладываются друг на друга.
+   Короткая: блоки ниже начинаются сразу под ней (--below-bar) */
 .topbar::before {
   content: '';
   position: absolute;
   inset: 0 0 auto;
-  height: calc(100% + var(--sp-12));
+  height: calc(100% + var(--sp-4));
   z-index: -1;
   background: linear-gradient(
     to bottom,
     var(--brand-ground) 0%,
-    var(--brand-ground) 62%,
+    var(--brand-ground) 72%,
     color-mix(in srgb, var(--brand-ground) 0%, transparent) 100%
   );
 }
@@ -120,10 +121,11 @@
 
 .hero__name {
   margin: 0;
-  font-size: 0.8125rem;
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tr-wide);
-  text-transform: uppercase;
+  font-family: var(--f-serif);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: var(--fw-regular);
+  letter-spacing: -0.01em;
+  line-height: 1;
   color: var(--brand-mark);
 }
 
@@ -178,6 +180,11 @@
   will-change: opacity, transform;
 }
 
+/* Знак на уходе не отъезжает, а надвигается: прокрутка проходит сквозь него */
+.hero__stage[data-hero-fade] {
+  transform: scale(calc(1 + (1 - var(--fade, 1)) * 0.6));
+}
+
 @media (max-width: 720px) {
   .topbar { padding: var(--sp-6) var(--sp-4); padding-top: calc(var(--sp-6) + env(safe-area-inset-top, 0px)); }
   .hero { padding: var(--sp-20) var(--sp-4) var(--sp-6); gap: var(--sp-4); }
@@ -188,4 +195,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cue__arrows svg { animation: none; opacity: 1; }
+  .hero__stage[data-hero-fade] { transform: none; }
 }
