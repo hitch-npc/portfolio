@@ -138,7 +138,7 @@ async function boot() {
   const muteTape = bindTapeMute(tape);
   const gate = document.querySelector('[data-gate]');
   const cover = document.querySelector('[data-case-cover]');
-  if (gate && cover) new Gate(gate, cover, () => muteTape(true));
+  if (gate && cover) window.__gate = new Gate(gate, cover, () => muteTape(true));
   window.__muteTape = muteTape;
   mountCase(document.querySelector('[data-tts]'));
 
