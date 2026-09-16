@@ -1,0 +1,60 @@
+/* Прелоадер: лента из линз, процент и сменяющиеся строки. */
+
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: var(--brand-ground);
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    visibility var(--dur-slow) var(--ease-out);
+}
+
+.preloader.is-done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.preloader__band {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: clamp(120px, 26vh, 260px);
+  display: block;
+}
+
+.preloader__line {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: var(--sp-8);
+  align-items: baseline;
+  margin: 0;
+  padding: 0 var(--page-pad);
+  font-family: var(--f-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-caption);
+  text-transform: uppercase;
+  color: var(--brand-ground);
+  mix-blend-mode: normal;
+}
+
+.preloader__phrase {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.preloader__phrase.is-in { opacity: 1; }
+
+.preloader__pct {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.preloader__pct::after { content: '%'; }
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader { display: none; }
+}

@@ -1,0 +1,128 @@
+/* Блок навыков: липкий экран со зрачком, который собирается прокруткой. */
+
+.skills {
+  position: relative;
+  height: calc(var(--steps, 8) * 100svh);
+  background: var(--brand-ground);
+}
+
+.skills__sticky {
+  position: sticky;
+  top: 0;
+  display: grid;
+  place-items: center;
+  height: 100svh;
+  padding: var(--sp-20) var(--page-pad);
+}
+
+/* Радужка. Зрачок — дыра в её середине, в ней и живёт текст,
+   поэтому холст заметно крупнее текстового блока. */
+.skills__iris {
+  grid-area: 1 / 1;
+  width: min(92vmin, 680px);
+  height: min(92vmin, 680px);
+  pointer-events: none;
+  /* холст живёт внутри липкого экрана: без своего слоя композитор
+     кэширует картинку и на экран перестаёт попадать свежий кадр */
+  transform: translateZ(0);
+}
+
+/* Текст лежит на дне зрачка: он уведён вглубь и поворачивается вместе
+   с глазом — те же --gx/--gy/--lid, что и у точек. Смещение меньше, чем
+   у радужки: точка на оси вращения при повороте уходит слабее. */
+.skills__center {
+  grid-area: 1 / 1;
+  display: grid;
+  gap: var(--sp-2);
+  justify-items: center;
+  text-align: center;
+  /* текст держим внутри зрачка: радиус зрачка 0.58 от радиуса радужки */
+  max-width: min(40vmin, 300px);
+  /* перспектива своя, а не на родителе: общий 3d-контекст на секции
+     заставляет композитор сортировать слои и прячет холст радужки под ними */
+  position: relative;
+  /* Строка лежит на дне зрачка: едет с его центром и сплющивается тем же
+     косинусом, что и сам зрачок. Трансформы только двумерные — 3d поднимает
+     строку в отдельный слой, и композитор гасит под ним холст радужки. */
+  transform:
+    translate(var(--pcx, 0px), var(--pcy, 0px))
+    scale(var(--sx, 1), var(--sy, 1));
+  opacity: calc(0.25 + 0.75 * var(--lid, 1));
+}
+
+/* Блик роговицы поверх строки: не отдельный слой, а псевдоэлемент внутри
+   того же трансформа — отдельный слой в этой сцене гасит холст под собой */
+.skills__center::after {
+  content: '';
+  position: absolute;
+  inset: -22% -18%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    62% 62% at calc(30% - var(--gx, 0) * 8%) calc(24% - var(--gy, 0) * 8%),
+    rgb(255 255 255 / 0.05) 0%,
+    rgb(255 255 255 / 0.014) 46%,
+    rgb(255 255 255 / 0) 72%
+  );
+}
+
+.skills__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--brand-mark-muted);
+}
+
+.skills__kind { color: var(--brand-veil); }
+
+.skills__line {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: clamp(1.25rem, 3.2vw, 2.15rem);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-tight);
+  line-height: 1.05;
+  text-wrap: balance;
+  color: var(--brand-mark);
+}
+
+.skills__word { display: inline-block; white-space: nowrap; }
+
+/* Буквы въезжают со сдвигом — задержку ставит скрипт */
+.skills__char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.55em);
+  transition:
+    opacity var(--dur-slow) var(--ease-slow),
+    transform var(--dur-slow) var(--ease-slow);
+}
+
+.skills__char.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.skills__note {
+  max-width: 26ch;
+  opacity: 0;
+  color: var(--brand-mark-muted);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.skills__note.is-in { opacity: 0.72; }
+
+@media (max-width: 720px) {
+  .skills__sticky { padding: var(--sp-16) var(--sp-4); }
+  .skills__iris { width: min(96vmin, 460px); height: min(96vmin, 460px); }
+  .skills__center { max-width: min(44vmin, 215px); gap: var(--sp-2); }
+  .skills__line { font-size: clamp(1.15rem, 5.6vw, 1.75rem); }
+  .skills__note { max-width: 24ch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skills__char { transition: none; opacity: 1; transform: none; }
+  .skills__note { transition: none; }
+  .skills__center { transform: none; opacity: 1; }
+  .skills__center::after { display: none; }
+}

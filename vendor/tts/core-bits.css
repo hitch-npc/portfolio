@@ -1,0 +1,113 @@
+/* Стили типографики — site tokens */
+.t-display {
+  font-family: var(--f-thin);
+  font-weight: 500;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  letter-spacing: 0;
+  
+  line-height: 1.02;
+  color: var(--n100); }
+.t-h1 {
+  font-family: var(--f-thin);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  letter-spacing: 0;
+  
+  line-height: 1.1;
+  color: var(--n100); }
+.t-h2 {
+  font-family: var(--f-thin);
+  font-weight: 500;
+  font-size: clamp(1.375rem, 2.6vw, 1.6rem);
+  letter-spacing: 0;
+  
+  line-height: 1.15;
+  color: var(--n100); }
+.t-h3 {
+  font-family: var(--f-head);
+  font-weight: 400;
+  font-size: 1.1rem;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  color: var(--n100); }
+.t-subtitle {
+  font-family: var(--font);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--n300); }
+.t-body-lg { font-size: 15px; line-height: 1.75; color: var(--n200); }
+.t-body { font-size: 14px; line-height: 1.75; color: var(--n300); }
+.t-body-sm { font-size: 12px; line-height: 1.7;  color: var(--n400); }
+.t-caption {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--n500); }
+.t-eyebrow, .t-label-accent {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--n300); }
+.t-num {
+  font-family: var(--f-num);
+  font-size: 3rem;
+  font-weight: 400;
+  color: var(--n100);
+  line-height: 1; }
+.t-price {
+  font-family: var(--f-num);
+  font-size: 1.6rem;
+  font-weight: 400;
+  color: var(--n100);
+  line-height: 1; }
+/* ══════════════════════════════════════════════════════════
+   04 — КНОПКИ
+   ══════════════════════════════════════════════════════════ */
+/* Базовые стили кнопок */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  border-radius: var(--r-sm);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  white-space: nowrap;
+  user-select: none; }
+.btn:active { transform: scale(.98); }
+.btn-md { font-size: 11px; padding: 13px 24px; }
+/* Варианты */
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 1px solid var(--accent);
+  font-weight: 700; }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-ghost {
+  background: transparent;
+  color: var(--n100);
+  border: 1px solid var(--n700); }
+.btn-ghost:hover { border-color: var(--n400); color: var(--n100); background: var(--n900); }
+/* ══════════════════════════════════════════════════════════
+   06 — ТЕГИ / БЕЙДЖИ
+   ══════════════════════════════════════════════════════════ */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap; }
+.tag-default { background: var(--n900); color: var(--n400); border: 1px solid var(--n800); }

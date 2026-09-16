@@ -1,0 +1,24 @@
+{
+  "name": "eldar-dalov-portfolio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Портфолио TBCS™ (Eldar Swartz). Токены — единый источник истины, деплой на GitHub Pages.",
+  "scripts": {
+    "dev": "npm run build:tokens && npm run build:tts && vite",
+    "build:tokens": "node tooling/build-tokens.mjs",
+    "build": "npm run build:tokens && npm run build:tts && vite build",
+    "preview": "vite preview",
+    "lint": "node tooling/guardrail.mjs",
+    "check": "node tooling/build-tokens.mjs --check && node tooling/guardrail.mjs",
+    "build:sandbox": "npm run build && node tooling/build-sandbox.mjs",
+    "build:tts": "node tooling/build-tts.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.0",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

@@ -1,0 +1,128 @@
+:root {
+  /* Цвет */
+  --black:           #111111;
+  --ink:             #FFFFFF;
+  --accent:          #0047FF;
+  --accent-hover:    #0038CC;
+  --accent-dim:      #0436B6;
+  --accent-ghost:    #EAF0FF;
+  --accent-border:   #B8C9F0;
+  --accent-soft:     #0436B6;
+
+  --n100:            #0D0D0D;
+  --n200:            #2D2D2B;
+  --n300:            #4A4A48;
+  --n400:            #6A6A68;
+  --n500:            #888886;
+  --n600:            #A8A8A5;
+  --n700:            #B5B5B0;
+  --n800:            #E2E1DA;
+  --n850:            #EAE9E2;
+  --n900:            #F2F1EB;
+  --n950:            #FAFAF7;
+
+  /* Блоб-атмосфера (solid) */
+  --blob-core:       #BFD0EE;
+  --blob-mid:        #E5DAEF;
+  --blob-purple:     #DBC4F0;
+  --blob-faint:      #08133D;
+
+  /* Blob presets для событий */
+  --blob-core-warm:  #F2D5B0;
+  --blob-mid-warm:   #F2DCC0;
+  --blob-core-cool:  #BFD0EE;
+  --blob-mid-cool:   #E5DAEF;
+  --blob-core-green: #C7E8C8;
+  --blob-mid-green:  #051205;
+
+  /* Инверсия и premium */
+  --on-accent:       #FFFFFF;
+  --premium-bg:      #0D0D0D;
+  --premium-ink:     #FFFFFF;
+
+  /* Теги */
+  --tag-o-bg:        #FFEDD5;
+  --tag-o-fg:        #C2410C;
+  --tag-o-bd:        #FED7AA;
+  --tag-g-bg:        #DCFCE7;
+  --tag-g-fg:        #16A34A;
+  --tag-g-bd:        #86EFAC;
+  --tag-r-bg:        #FEE2E2;
+  --tag-r-fg:        #DC2626;
+  --tag-r-bd:        #FCA5A5;
+
+  /* Состояния форм и тостов */
+  --info:            #2563EB;
+  --error-fg:        #DC2626;
+  --error-bd:        #DC2626;
+  --input-focus-bg:  #F5F8FF;
+  --danger-hover-bg: #FEE2E2;
+
+  /* Затемнение и тень */
+  --scrim:           #000000;
+  --overlay:         #00000088;
+  --shadow-color:    #000000AA;
+
+  /* Семантические цвета */
+  --success:         #22C55E;
+  --success-bg:      #DCFCE7;
+  --success-border:  #86EFAC;
+  --danger:          #E53E3E;
+  --danger-bg:       #FEE2E2;
+  --danger-border:   #FCA5A5;
+  --danger-text:     #DC2626;
+
+  /* Схема зала */
+  --seat-sel:        #22C55E;
+  --seat-sold:       #C0C3C9;
+  --seat-check:      #FFFFFF;
+  --zone-1:          #C9975A;
+  --zone-2:          #3F73E3;
+  --zone-3:          #2BA7B8;
+  --zone-4:          #7E6FD0;
+  --zone-5:          #33B978;
+
+  /* Шрифты */
+  --font:            'Manrope', system-ui, sans-serif;
+  --f-head:          'Forum', serif;
+  --f-thin:          'Cormorant Garamond', serif;
+  --f-num:           'Oranienbaum', serif;
+
+  /* Отступы */
+  --sp-1:            4px;
+  --sp-2:            8px;
+  --sp-3:            12px;
+  --sp-4:            16px;
+  --sp-5:            20px;
+  --sp-6:            24px;
+  --sp-8:            32px;
+  --sp-10:           40px;
+  --sp-12:           48px;
+  --sp-16:           64px;
+  --sp-20:           80px;
+
+  /* Межсекционные отступы */
+  --section-gap-sm:  40px;
+  --section-gap-md:  64px;
+  --section-gap-lg:  96px;
+
+  /* Анимации */
+  --ease-out:        cubic-bezier(.4, 0, .2, 1);
+  --ease-bounce:     cubic-bezier(.34, 1.56, .64, 1);
+  --dur-fast:        120ms;
+  --dur-base:        200ms;
+  --dur-slow:        320ms;
+
+  /* Радиус */
+  --r-sm:            2px;
+  --r-md:            4px;
+  --r-lg:            8px;
+  --r-full:          9999px;
+
+  /* Контент */
+  --content-max:     1200px;
+
+  /* Режим по умолчанию — mobile */
+  --page-pad:        20px;
+  --col-gap:         16px;
+}

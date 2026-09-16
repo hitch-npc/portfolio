@@ -1,0 +1,191 @@
+/* Hero: знак TBCS как поле стрелок. Все значения — через переменные. */
+
+/* Общая подпись: капс, широкая разрядка — техническая подача */
+.label {
+  margin: 0;
+  font-family: var(--f-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-caption);
+  text-transform: uppercase;
+  color: var(--brand-mark-muted);
+}
+
+.label--strong { color: var(--brand-mark); }
+
+.tm {
+  font-size: 0.6em;
+  vertical-align: super;
+  letter-spacing: 0;
+}
+
+/* Логотип и город: закреплены поверх всех блоков, переживают прокрутку */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-8);
+  justify-content: space-between;
+  padding: var(--sp-8) var(--page-pad);
+  padding-top: calc(var(--sp-8) + env(safe-area-inset-top, 0px));
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* Подложка под закреплённой строкой: ниже по странице под неё подъезжает
+   текст кейса, и без затемнения строки накладываются друг на друга */
+.topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(100% + var(--sp-12));
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    var(--brand-ground) 0%,
+    var(--brand-ground) 62%,
+    color-mix(in srgb, var(--brand-ground) 0%, transparent) 100%
+  );
+}
+
+.hero {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--sp-6);
+  padding: var(--sp-20) var(--page-pad) var(--sp-8);
+  min-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+  background: var(--brand-ground);
+  color: var(--brand-mark);
+}
+
+/* Волосяная сетка — отсылка к чертёжной подаче, почти не видна */
+.hero__grid {
+  background-image:
+    repeating-linear-gradient(to right, var(--brand-line) 0 1px, transparent 1px var(--grid-step)),
+    repeating-linear-gradient(to bottom, var(--brand-line) 0 1px, transparent 1px var(--grid-step));
+  opacity: 0.35;
+  -webkit-mask-image: radial-gradient(ellipse at center, var(--brand-mark) 20%, transparent 78%);
+  mask-image: radial-gradient(ellipse at center, var(--brand-mark) 20%, transparent 78%);
+}
+
+.hero__grid,
+.hero__mark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.hero__mark { color: var(--brand-mark); }
+
+/* Сцена знака — ряд грида, канвас внутри во всю площадь */
+.hero__stage {
+  position: relative;
+  grid-row: 1;
+  min-height: 0;
+}
+
+.hero__tm {
+  position: absolute;
+  z-index: 1;
+  opacity: 0;
+  color: var(--brand-mark);
+  font-family: var(--f-ui);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+/* Нижняя строка живёт в потоке грида, а не приколота к углу:
+   так подписи не могут наехать друг на друга ни на какой ширине */
+.hero__bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-8);
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.hero__id { display: grid; gap: var(--sp-1); }
+
+.hero__name {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--brand-mark);
+}
+
+/* Подсказка прокрутки: текст плюс три стрелки, сходящие вниз по очереди.
+   Ширину блока задаёт строка текста, стрелки растягиваются ровно по ней. */
+.cue {
+  display: grid;
+  gap: var(--sp-2);
+  width: fit-content;
+  margin-left: auto;
+}
+
+.cue__text {
+  max-width: 30ch;
+  text-align: right;
+  line-height: 1.8;
+  letter-spacing: 0.1em;
+}
+
+.cue__arrows {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 20px;
+  overflow: hidden;
+}
+
+.cue__arrows svg {
+  width: 10px;
+  height: 20px;
+  fill: none;
+  stroke: var(--brand-mark);
+  stroke-width: 1;
+  opacity: 0;
+  animation: cue-fall 2.4s var(--ease-out) infinite;
+}
+
+.cue__arrows svg:nth-child(2) { animation-delay: 0.22s; }
+.cue__arrows svg:nth-child(3) { animation-delay: 0.44s; }
+
+@keyframes cue-fall {
+  0% { opacity: 0; transform: translateY(-70%); }
+  22% { opacity: 1; }
+  62% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(70%); }
+}
+
+/* Всё, кроме логотипа и города, уходит при прокрутке — значение ставит JS */
+[data-hero-fade] {
+  opacity: var(--fade, 1);
+  transform: translateY(calc((1 - var(--fade, 1)) * -24px));
+  will-change: opacity, transform;
+}
+
+@media (max-width: 720px) {
+  .topbar { padding: var(--sp-6) var(--sp-4); padding-top: calc(var(--sp-6) + env(safe-area-inset-top, 0px)); }
+  .hero { padding: var(--sp-20) var(--sp-4) var(--sp-6); gap: var(--sp-4); }
+  .hero__bar { flex-direction: column; align-items: flex-start; }
+  .cue { margin-left: 0; }
+  .cue__text { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cue__arrows svg { animation: none; opacity: 1; }
+}
