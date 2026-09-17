@@ -6,10 +6,14 @@
 :root {
   color-scheme: dark light;
 
-  /* primitives.blue */
-  --cobalt:           #0047FF;
-  --cobalt-hover:     #0038CC;
-  --cobalt-dim:       #0436B6;
+  /* primitives.violet */
+  --mauve:            #E2C8FF;
+  --lilac:            #F8F3FF;
+
+  /* primitives.pastel */
+  --rose:             #FFC2DB;
+  --peach:            #FFDDB3;
+  --mint:             #ACF5D6;
 
   /* primitives.neutral */
   --void:             #000000;
@@ -33,9 +37,11 @@
   --sp-32:            128px;
 
   /* radius */
-  --r-sm:             2px;
-  --r-md:             4px;
-  --r-lg:             8px;
+  --r-sm:             10px;
+  --r-md:             16px;
+  --r-lg:             24px;
+  --r-xl:             32px;
+  --r-full:           999px;
 
   /* layout */
   --content-max:      1200px;
@@ -71,10 +77,18 @@
   /* brand */
   --brand-mark:       #FFFFFF;
   --brand-ground:     #000000;
-  --brand-accent:     #0047FF;
+  --brand-accent:     #F7F7F5;
+  --brand-glow:       #E2C8FF;
+  --brand-glow-inner: #F8F3FF;
   --brand-veil:       #C9C9C6;
   --brand-mark-muted: #8A8A88;
   --brand-line:       #1C1C1E;
+
+  /* tag */
+  --tag-ux:           #FFC2DB;
+  --tag-system:       #E2C8FF;
+  --tag-branding:     #FFDDB3;
+  --tag-identity:     #ACF5D6;
 
   /* color */
   --bg:           #000000;
@@ -83,10 +97,10 @@
   --fg-muted:     #8A8A88;
   --fg-faint:     #3A3A3C;
   --line:         #1C1C1E;
-  --accent:       #3E6BFF;
-  --accent-hover: #5C82FF;
-  --on-accent:    #FFFFFF;
-  --focus:        #5C82FF;
+  --accent:       #F7F7F5;
+  --accent-hover: #FFFFFF;
+  --on-accent:    #0D0D0D;
+  --focus:        #F7F7F5;
 }
 
 /* Ручное переключение на альтернативную тему */
@@ -98,10 +112,10 @@
   --fg-muted:     #6B6B68;
   --fg-faint:     #C9C9C5;
   --line:         #E2E2DE;
-  --accent:       #0047FF;
-  --accent-hover: #0038CC;
+  --accent:       #0D0D0D;
+  --accent-hover: #2B2B2D;
   --on-accent:    #FFFFFF;
-  --focus:        #0047FF;
+  --focus:        #0D0D0D;
 }
 
 /* Системная тема (не перебивает явный выбор пользователя) */
@@ -114,10 +128,10 @@
     --fg-muted:     #6B6B68;
     --fg-faint:     #C9C9C5;
     --line:         #E2E2DE;
-    --accent:       #0047FF;
-    --accent-hover: #0038CC;
+    --accent:       #0D0D0D;
+    --accent-hover: #2B2B2D;
     --on-accent:    #FFFFFF;
-    --focus:        #0047FF;
+    --focus:        #0D0D0D;
   }
 }
 
@@ -130,10 +144,10 @@
   --fg-muted:     #8A8A88;
   --fg-faint:     #3A3A3C;
   --line:         #1C1C1E;
-  --accent:       #3E6BFF;
-  --accent-hover: #5C82FF;
-  --on-accent:    #FFFFFF;
-  --focus:        #5C82FF;
+  --accent:       #F7F7F5;
+  --accent-hover: #FFFFFF;
+  --on-accent:    #0D0D0D;
+  --focus:        #F7F7F5;
 }
 
 [data-scheme="light"] {
@@ -144,8 +158,8 @@
   --fg-muted:     #6B6B68;
   --fg-faint:     #C9C9C5;
   --line:         #E2E2DE;
-  --accent:       #0047FF;
-  --accent-hover: #0038CC;
+  --accent:       #0D0D0D;
+  --accent-hover: #2B2B2D;
   --on-accent:    #FFFFFF;
-  --focus:        #0047FF;
+  --focus:        #0D0D0D;
 }

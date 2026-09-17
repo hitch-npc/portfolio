@@ -46,7 +46,7 @@ a { color: inherit; }
   color: var(--on-accent);
   font-size: 0.875rem;
   text-decoration: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   transition: top var(--dur-base) var(--ease-out);
 }
 .skip-link:focus-visible { top: var(--sp-4); }
@@ -94,7 +94,8 @@ a { color: inherit; }
   padding: var(--sp-3);
   background: var(--bg-sunk);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
+  corner-shape: squircle;
   font-family: var(--f-mono);
   font-size: 0.6875rem;
   color: var(--fg-muted);
@@ -121,7 +122,7 @@ a { color: inherit; }
   background: transparent;
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   font: inherit;
   cursor: pointer;
 }

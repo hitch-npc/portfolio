@@ -1,0 +1,147 @@
+/* Неоновое свечение: по кольцу бегут два хвоста, за ними — размытый
+   ореол. Движение от Moving Gradient Button (Originkit): два хвоста на
+   круг, постоянная угловая скорость; на наведении и клавиатурном фокусе
+   кольцо разгорается целиком. Цвета — роли бренда: хвост сиреневый,
+   голова белая с фиолетовым отливом, кольцо под хвостами — тусклый белый.
+
+   .neon — кольцо и ореол вокруг элемента. Хосту нужна непрозрачная
+   заливка: ореол лежит под ней и виден только снаружи кольца. Свой
+   z-index и isolation хосту нельзя — ореол уйдёт поверх заливки.
+   .neon-text — те же хвосты по буквам. .neon-pulse — ровный неон без
+   хвостов, для цветных тегов (ниже).
+
+   Всё на CSS: угол и накал — зарегистрированные свойства, их ведёт браузер.
+   prefers-reduced-motion: хвосты стоят, накал включается без перехода. */
+
+@property --neon-angle {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@property --neon-lit {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.neon,
+.neon-text {
+  --neon-trail: var(--brand-glow);
+  --neon-head: var(--brand-glow-inner);
+  /* пресет Originkit: count 2, speed 22 — оборот за 11,36 с. Хвост на 60%
+     периода (trail 60), колено на 45% хвоста: между хвостами тёмный пролёт */
+  --neon-comets: repeating-conic-gradient(from var(--neon-angle),
+    transparent 0deg 72deg, var(--neon-trail) 131.4deg, var(--neon-head) 180deg);
+  animation: neon-spin 11.36s linear infinite;
+}
+
+.neon {
+  --neon-band: 2px;
+  --neon-blur: var(--sp-2);
+  --neon-glow: 0.9;
+  --neon-base: color-mix(in srgb, var(--fg) 14%, transparent);
+  /* сплошной конус накала: головы слева и справа, как у компонента */
+  --neon-lit-trail: color-mix(in srgb, var(--neon-trail) calc(var(--neon-lit) * 100%), transparent);
+  --neon-lit-head: color-mix(in srgb, var(--neon-head) calc(var(--neon-lit) * 100%), transparent);
+  --neon-cover: conic-gradient(var(--neon-lit-trail), var(--neon-lit-head),
+    var(--neon-lit-trail), var(--neon-lit-head), var(--neon-lit-trail));
+  position: relative;
+  transition: --neon-lit var(--dur-base) var(--ease-out);
+}
+
+.neon::before,
+.neon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Кольцо: полоса по краю — маска «border-box минус content-box» */
+.neon::before {
+  padding: var(--neon-band);
+  background: var(--neon-cover), var(--neon-comets), var(--neon-base);
+  -webkit-mask: linear-gradient(black 0 0) border-box, linear-gradient(black 0 0) content-box;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(black 0 0) border-box exclude, linear-gradient(black 0 0) content-box;
+}
+
+/* Ореол: те же хвосты и накал, размытые, под заливкой хоста */
+.neon::after {
+  z-index: -1;
+  background: var(--neon-cover), var(--neon-comets);
+  filter: blur(var(--neon-blur));
+  opacity: var(--neon-glow);
+}
+
+:is(a, button):is(:hover, :focus-visible) .neon,
+.neon:is(a, button):is(:hover, :focus-visible) { --neon-lit: 1; }
+
+/* ── Ровный неон ───────────────────────────────────────────────────────
+   Для цветных тегов: кольцо и ближний ореол горят постоянно, дальний
+   ореол слегка дышит. Хвостов нет — на ряду цветных тегов они шумят.
+   Цвет — --pulse-hue хоста. Ореол снаружи рамки, поэтому заливка
+   хоста может быть полупрозрачной. Дыхание — прозрачность
+   псевдоэлемента, её ведёт композитор. */
+
+.neon-pulse {
+  --pulse-hue: var(--brand-glow);
+  position: relative;
+  isolation: isolate;
+}
+
+.neon-pulse::before,
+.neon-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.neon-pulse::before {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--pulse-hue) 70%, transparent),
+    0 0 var(--sp-1) color-mix(in srgb, var(--pulse-hue) 40%, transparent);
+}
+
+.neon-pulse::after {
+  box-shadow: 0 0 var(--sp-3) color-mix(in srgb, var(--pulse-hue) 45%, transparent);
+  animation: neon-breathe 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes neon-breathe {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* ── Буквы ─────────────────────────────────────────────────────────────
+   Цвет под хвостами — фон, обрезанный по буквам вместе с ними; ореол —
+   тень по силуэту. Без background-clip: text буквы остаются почти белыми. */
+
+.neon-text { color: var(--brand-accent); }
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .neon-text {
+    background-color: var(--brand-accent);
+    background-image: var(--neon-comets);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 var(--sp-1) color-mix(in srgb, var(--brand-glow) 55%, transparent));
+  }
+}
+
+@keyframes neon-spin {
+  to { --neon-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neon,
+  .neon-text,
+  .neon-pulse::after { animation: none; }
+  .neon { transition: none; }
+}

@@ -8,7 +8,8 @@
  * оставался предупреждением и в итоге накопился в ядре):
  *   1. сырой #hex вне :root — цвета только через var(--…);
  *      это касается и JS: canvas-фигуры читают цвет через getComputedStyle;
- *   2. border-radius > 8px — система угловатая, потолок --r-lg;
+ *   2. border-radius только из токенов --r-* — формы iOS 26: капсулы и
+ *      концентрические углы держатся на шкале, сырые px её размывают;
  *   3. transition/animation в файле без блока @media (prefers-reduced-motion: reduce);
  *   4. outline:none / outline:0 без правила :focus-visible в том же файле.
  *
@@ -55,12 +56,12 @@ for (const file of walk(ROOT)) {
     msgs.push(`  ✗ стр.${lineOf(src, m.index)}  сырой ${m[0]} — используй var(--…)`);
   }
 
-  /* 2) border-radius > 8px */
+  /* 2) border-radius только из токенов (ноль и проценты допустимы) */
   for (const m of src.matchAll(/border-radius:\s*([^;]+);/g)) {
-    const bad = [...m[1].matchAll(/(\d+)px/g)].map((x) => +x[1]).find((n) => n > 8);
-    if (bad !== undefined) {
+    const bad = [...m[1].matchAll(/(\d*\.?\d+)px/g)].find((x) => +x[1] > 0);
+    if (bad) {
       errors++;
-      msgs.push(`  ✗ стр.${lineOf(src, m.index)}  border-radius ${bad}px — потолок 8px (--r-lg)`);
+      msgs.push(`  ✗ стр.${lineOf(src, m.index)}  border-radius ${bad[0]} — только var(--r-…)`);
     }
   }
 

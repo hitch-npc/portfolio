@@ -12,7 +12,9 @@
          Archivo грузим заранее: из него собирается знак на первом экране -->
     <link rel="preload" href="/fonts/archivo-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
-  <body>
+  <!-- Сайт чёрный по замыслу: тема системы на него не влияет. Схема на body,
+       а не на main: skip-link, шапка и прелоадер тоже живут на тёмных токенах -->
+  <body data-scheme="dark">
     <!-- Спрайт: логотип TTS нужен в карточке и в кейсе, рисуем один раз -->
     <svg class="sprite" aria-hidden="true" focusable="false">
       <symbol id="tts-logo" viewBox="0 0 676 194" fill="none">
@@ -82,8 +84,7 @@
       </div>
     </header>
 
-    <!-- Сайт чёрный по замыслу: тема системы на него не влияет -->
-    <main id="main" data-scheme="dark">
+    <main id="main">
       <section class="skills" id="skills" data-skills aria-labelledby="skills-title">
         <div class="skills__sticky">
           <header class="skills__head">
@@ -95,28 +96,28 @@
           <ol class="skills__list" data-skills-list>
             <li class="skills__item" data-skill data-tags="Tokens&nbsp;· Components&nbsp;· Front-end&nbsp;code">
               <button class="skills__jump" type="button">
-                <span class="skills__num">01</span>
+                <span class="skills__num neon-text">01</span>
                 <span class="skills__name">Design Systems &amp; Engineering</span>
               </button>
               <p class="skills__desc">I build the system and ship it in code: tokens as the single source of truth, rules checked in&nbsp;CI.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Identity&nbsp;· Type&nbsp;· Art&nbsp;direction">
               <button class="skills__jump" type="button">
-                <span class="skills__num">02</span>
+                <span class="skills__num neon-text">02</span>
                 <span class="skills__name">Brand Systems</span>
               </button>
               <p class="skills__desc">Marks, type and art direction that hold together from a&nbsp;website to a&nbsp;Telegram sticker.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Research&nbsp;· UX&nbsp;audits&nbsp;· Decision&nbsp;records">
               <button class="skills__jump" type="button">
-                <span class="skills__num">03</span>
+                <span class="skills__num neon-text">03</span>
                 <span class="skills__name">Design Strategy</span>
               </button>
               <p class="skills__desc">Audits and research turned into product decisions, each one written down with its&nbsp;reason.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Figma&nbsp;to&nbsp;code&nbsp;· Agents&nbsp;· Automated&nbsp;checks">
               <button class="skills__jump" type="button">
-                <span class="skills__num">04</span>
+                <span class="skills__num neon-text">04</span>
                 <span class="skills__name">AI Workflows</span>
               </button>
               <p class="skills__desc">AI agents wired into the Figma-to-code pipeline, with rules the build enforces.</p>
@@ -127,7 +128,7 @@
             <canvas class="skills__iris" data-iris aria-hidden="true"></canvas>
 
             <div class="skills__center" aria-hidden="true">
-              <p class="label skills__meta" data-skills-kind></p>
+              <p class="label skills__meta neon-text" data-skills-kind></p>
               <p class="skills__line" data-skills-line></p>
               <p class="label skills__note" data-skills-note></p>
             </div>
@@ -148,8 +149,8 @@
           <article class="work-card" style="--i: 0" data-card>
             <div class="work-card__info">
               <ul class="work-card__tags" aria-label="My part">
-                <li>UX/UI</li>
-                <li>Design System</li>
+                <li class="neon-pulse work-card__tag--ux">UX/UI</li>
+                <li class="neon-pulse work-card__tag--system">Design System</li>
               </ul>
               <h3 class="work-card__title" data-card-title>Ticket to Show</h3>
               <p class="work-card__lead">Ticket service for theatre, opera and concerts in&nbsp;Moscow.</p>
@@ -160,7 +161,7 @@
               </dl>
               <p class="work-card__role">Head designer · 2026</p>
               <button class="work-card__open" type="button" aria-haspopup="dialog" aria-controls="case-tts" data-open="case-tts">
-                View case <svg class="work-card__arrow" viewBox="0 0 20 10" aria-hidden="true"><path d="M1 5 H18 M13.5 1 L18 5 L13.5 9" /></svg>
+                <span class="work-card__face neon">View case <svg class="work-card__arrow" viewBox="0 0 20 10" aria-hidden="true"><path d="M1 5 H18 M13.5 1 L18 5 L13.5 9" /></svg></span>
               </button>
             </div>
 
@@ -228,8 +229,8 @@
           <article class="work-card work-card--soon" style="--i: 1" data-card>
             <div class="work-card__info">
               <ul class="work-card__tags" aria-label="My part">
-                <li>Branding</li>
-                <li>Identity</li>
+                <li class="neon-pulse work-card__tag--branding">Branding</li>
+                <li class="neon-pulse work-card__tag--identity">Identity</li>
               </ul>
               <h3 class="work-card__title" data-card-title>Brand identity</h3>
               <p class="work-card__lead">The next case is in preparation.</p>

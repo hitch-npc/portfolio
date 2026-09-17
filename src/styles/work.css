@@ -8,6 +8,10 @@
      ещё разлетается. Фон прозрачный — иначе он закрыл бы этот пролёт */
   margin-top: -50svh;
   padding-top: var(--sp-20);
+  /* заголовок издалека крупнее экрана, наклонённые карты — шире колонки:
+     без обрезки они расширяют страницу, и мобильный Safari её уменьшает.
+     clip не делает раздел контейнером прокрутки — карты остаются липкими */
+  overflow-x: clip;
 }
 
 .work__head,
@@ -68,6 +72,10 @@
 .work-card {
   --rise: 0;
   --cover: 0;
+  /* угол превью концентричен углу карты: превью отстоит от края на --sp-4.
+     Считаем здесь, а не на рамке: рамка — контейнер .tts, и свои --r-*
+     у неё перекрыты токенами TTS */
+  --shot-r: calc(var(--r-xl) - var(--sp-4));
   position: sticky;
   top: calc(var(--top) + var(--i, 0) * var(--step));
   display: grid;
@@ -76,7 +84,9 @@
   height: min(calc(100svh - var(--top) - var(--sp-12)), 760px);
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  /* непрерывный угол, как у карточек iOS; без поддержки — обычная дуга */
+  border-radius: var(--r-xl);
+  corner-shape: squircle;
   background: var(--bg-sunk);
   transform:
     translateY(calc(var(--cover) * -18px))
@@ -122,16 +132,23 @@
   list-style: none;
 }
 
+/* Тег — стеклянная капсула в ровном неоне (neon.css, .neon-pulse) своего
+   оттенка: у каждой категории работы свой цвет (токены --tag-*).
+   Рамки нет — её рисует кольцо ореола; текст чуть тронут оттенком */
 .work-card__tags li {
   padding: var(--sp-1) var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--fg);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--pulse-hue) 10%, transparent);
+  color: color-mix(in oklab, var(--pulse-hue) 25%, var(--fg));
   font-size: 0.8125rem;
   font-weight: var(--fw-medium);
   line-height: 1.5;
 }
+
+.work-card__tags .work-card__tag--ux { --pulse-hue: var(--tag-ux); }
+.work-card__tags .work-card__tag--system { --pulse-hue: var(--tag-system); }
+.work-card__tags .work-card__tag--branding { --pulse-hue: var(--tag-branding); }
+.work-card__tags .work-card__tag--identity { --pulse-hue: var(--tag-identity); }
 
 .work-card__title {
   min-height: 1em;
@@ -190,25 +207,21 @@
   font-size: 0.875rem;
 }
 
-/* Вся карта нажимается: невидимый слой кнопки растянут на карту */
+/* Вся карта нажимается: невидимый слой кнопки растянут на карту. Поэтому
+   своего position у кнопки нет, и неоновый ореол рисует её лицо */
 .work-card__open {
   justify-self: start;
   display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
   margin-top: var(--sp-2);
-  padding: var(--sp-3) var(--sp-6);
+  padding: 0;
   border: 0;
-  border-radius: var(--r-sm);
-  /* фирменный кобальт, а не светлый --accent тёмной темы: у того с белым
-     текстом 4,4:1 — ниже нормы. У кобальта 6,3:1 */
-  background: var(--cobalt);
-  color: var(--on-accent);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--accent);
   font-family: var(--f-ui);
   font-size: 1rem;
   font-weight: var(--fw-medium);
   cursor: pointer;
-  transition: background var(--dur-base) var(--ease-out);
 }
 
 .work-card__open::after {
@@ -218,7 +231,24 @@
   z-index: 2;
 }
 
-.work-card__open:hover { background: var(--cobalt-hover); }
+/* Лицо кнопки — тёмная неоновая капсула (neon.css): по кольцу бегут хвосты,
+   ореол лежит под непрозрачной заливкой. Почти белый текст на чёрном — 19:1 */
+.work-card__face {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-6);
+  border-radius: inherit;
+  background: var(--brand-ground);
+  transition:
+    background var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out);
+}
+
+.work-card__open:hover .work-card__face {
+  background: color-mix(in srgb, var(--fg) 4%, var(--brand-ground));
+  color: var(--accent-hover);
+}
 
 .work-card__arrow {
   width: 20px;
@@ -236,7 +266,7 @@
   margin-top: var(--sp-2);
   padding: var(--sp-1) var(--sp-3);
   border: 1px dashed var(--fg-faint);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   color: var(--fg-muted);
   font-size: 0.875rem;
 }
@@ -255,7 +285,8 @@
      распирает колонку, а масштаб считается уже от распёртой */
   contain: inline-size;
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--shot-r);
+  corner-shape: squircle;
   transition: transform var(--dur-slow) var(--ease-slow);
 }
 
@@ -266,7 +297,8 @@
   place-items: center;
   height: 100%;
   border: 1px dashed var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--shot-r);
+  corner-shape: squircle;
   background: radial-gradient(circle, var(--fg-faint) 1px, transparent 1.5px) 0 0 / var(--sp-4) var(--sp-4);
 }
 
@@ -586,7 +618,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .work-card,
-  .work-card__open,
+  .work-card__face,
   .work-card__arrow,
   .work-card__frame { transition: none; }
 

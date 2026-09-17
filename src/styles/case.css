@@ -51,7 +51,7 @@ html:has(.case-view[open]) { overflow: hidden; }
   margin: var(--sp-4) var(--sp-4) 0 0;
   padding: var(--sp-2) var(--sp-4);
   border: 1px solid var(--fg-faint);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--brand-ground) 72%, transparent);
   backdrop-filter: blur(8px);
   color: var(--fg);

@@ -4,6 +4,8 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/preloader.css';
 import './styles/hero.css';
+// после hero.css: .neon-text перебивает цвет .label; до секций: те задают свои --neon-*
+import './styles/neon.css';
 import './styles/skills.css';
 import './styles/work.css';
 import './styles/case.css';

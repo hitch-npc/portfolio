@@ -2,13 +2,18 @@
    который собирается прокруткой. Список — содержимое, зрачок — отклик. */
 
 /* --tail — хвост в экранах после последнего навыка: пролёт сквозь зрачок.
-   --enter и --exit ставит skills.js: 0→1 на входе и на выходе */
+   --enter и --exit ставит skills.js: 0→1 на входе и на выходе.
+   На пролёте зрачок раздувается вчетверо шире экрана. Без обрезки по
+   горизонтали он расширяет страницу, и мобильный Safari уменьшает её
+   целиком. clip, а не hidden: hidden делает секцию контейнером прокрутки
+   и ломает липкий экран; по вертикали пролёт остаётся открытым */
 .skills {
   --tail: 0.9;
   --enter: 1;
   --exit: 0;
   position: relative;
   height: calc((var(--steps, 4) + var(--tail)) * 100svh);
+  overflow-x: clip;
   background: var(--brand-ground);
 }
 
@@ -73,7 +78,9 @@
   border-bottom: 1px solid var(--brand-line);
 }
 
-/* Полоса слева у активного пункта: сколько прокрутки осталось до следующего */
+/* Полоса слева у активного пункта: сколько прокрутки осталось до следующего.
+   Неоновый хвост: голова на растущем конце и едет вниз вместе с прокруткой,
+   вокруг — сиреневый ореол */
 .skills__item::before {
   content: '';
   position: absolute;
@@ -81,7 +88,11 @@
   top: -1px;
   bottom: -1px;
   width: 2px;
-  background: var(--brand-accent);
+  border-radius: var(--r-full);
+  background: linear-gradient(var(--brand-accent), var(--brand-glow) 70%, var(--brand-glow-inner));
+  box-shadow:
+    0 0 var(--sp-1) color-mix(in srgb, var(--brand-glow) 70%, transparent),
+    0 0 var(--sp-3) color-mix(in srgb, var(--brand-glow) 40%, transparent);
   transform: scaleY(0);
   transform-origin: top;
 }
@@ -102,6 +113,8 @@
   cursor: pointer;
 }
 
+/* Номер — неоновые буквы (neon.css): почти белые, как строка, по ним бегут
+   сиреневые хвосты */
 .skills__num {
   flex: none;
   font-family: var(--f-ui);
@@ -119,7 +132,8 @@
 }
 
 .skills__jump:hover .skills__name { color: var(--brand-veil); }
-.skills__item.is-active .skills__num { color: var(--brand-accent); }
+/* неон горит только у номера активного пункта, остальные серые, как строка */
+.skills__item:not(.is-active) .skills__num { background: none; color: inherit; filter: none; animation: none; }
 .skills__item.is-active .skills__name { color: var(--brand-mark); }
 
 /* Пояснение раскрывается только у активного пункта; на телефоне его нет —
@@ -192,8 +206,6 @@
     rgb(255 255 255 / 0) 72%
   );
 }
-
-.skills__meta { color: var(--brand-accent); }
 
 .skills__line {
   margin: 0;
