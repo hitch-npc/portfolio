@@ -2,7 +2,9 @@
  * Панель подбора параметров знака. Только для разработки: ?tune в адресе.
  * Структурные параметры требуют пересборки маски и сетки, живые — нет.
  */
-const STRUCTURAL = new Set(['text', 'tracking', 'fit', 'cell', 'blur', 'rowsPerCap', 'blurRatio']);
+// масштабы потока и дыхания входят в запечённые фазы ячеек, поэтому тоже
+// требуют пересборки сетки (see GlyphField._bakePhases)
+const STRUCTURAL = new Set(['text', 'tracking', 'fit', 'cell', 'blur', 'rowsPerCap', 'blurRatio', 'flowScale', 'breatheScale']);
 
 const CONTROLS = [
   ['rowsPerCap', 6, 30, 1],
