@@ -9,8 +9,7 @@
  * prefers-reduced-motion: всё показано сразу, цифры конечные, .is-live не
  * ставится — в самом ядре кейса анимации под этим запросом и так отключены.
  */
-
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+import { reduced } from '../motion/reduced.js';
 
 /** Досчитывает число до конечного за фиксированное время. */
 function countTo(el, value, duration = 900) {

@@ -1,0 +1,121 @@
+/* Свет на акцентах. По кольцу кнопки бегут два тёплых луча, за ними
+   мягкий ореол; на наведении и клавиатурном фокусе кольцо разгорается
+   целиком. Показывает, где действие: луч ведёт взгляд к одной кнопке
+   или к активному пункту (реестр эффектов — docs/01-product.md).
+
+   Движение от Moving Gradient Button (Originkit): два луча на круг,
+   постоянная угловая скорость, оборот за 11,36 с. Вид — свет лампы,
+   а не неоновая трубка: хвост короткий, тёплый (вольфрам, --brand-light),
+   голова — узкая горячая точка (нить накала, --brand-light-core) с мягким
+   спадом спереди, ореол вдвое слабее прежнего неона.
+
+   .beam — кольцо и ореол вокруг элемента. Хосту нужна непрозрачная
+   заливка: ореол лежит под ней и виден только снаружи кольца. Свой
+   z-index и isolation хосту нельзя — ореол уйдёт поверх заливки.
+   .beam-text — те же лучи по буквам.
+
+   Всё на CSS: угол и накал — зарегистрированные свойства, их ведёт браузер.
+   prefers-reduced-motion: лучи стоят, накал включается без перехода. */
+
+@property --beam-angle {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@property --beam-lit {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.beam,
+.beam-text {
+  --beam-trail: var(--brand-light);
+  --beam-head: var(--brand-light-core);
+  /* Период 180° — два луча на круг. Тёмный пролёт 0–110°, хвост 110–164°,
+     голова 164–176°, спереди спад в 4° — луч с мягким краем, а не срез */
+  --beam-rays: repeating-conic-gradient(from var(--beam-angle),
+    transparent 0deg 110deg,
+    color-mix(in srgb, var(--beam-trail) 72%, transparent) 164deg,
+    var(--beam-head) 176deg,
+    transparent 180deg);
+  animation: beam-spin 11.36s linear infinite;
+}
+
+.beam {
+  --beam-band: 1.5px;
+  --beam-blur: var(--sp-2);
+  --beam-glow: 0.45;
+  /* Накал поднимает подложку, а не кладёт глухой конус поверх лучей:
+     кольцо разгорается целиком, но пики лучей остаются ярче промежутков,
+     и движение по кольцу видно и на наведении */
+  --beam-base: color-mix(in srgb, var(--fg) calc(12% + var(--beam-lit) * 30%), transparent);
+  /* конусу остаётся только тон: он подмешивает тёплый свет, но не закрывает лучи */
+  --beam-lit-max: 30%;
+  --beam-lit-trail: color-mix(in srgb, var(--beam-trail) calc(var(--beam-lit) * var(--beam-lit-max)), transparent);
+  --beam-lit-head: color-mix(in srgb, var(--beam-head) calc(var(--beam-lit) * var(--beam-lit-max)), transparent);
+  --beam-cover: conic-gradient(var(--beam-lit-trail), var(--beam-lit-head),
+    var(--beam-lit-trail), var(--beam-lit-head), var(--beam-lit-trail));
+  position: relative;
+  transition: --beam-lit var(--dur-base) var(--ease-out);
+}
+
+.beam::before,
+.beam::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Кольцо: полоса по краю — маска «border-box минус content-box» */
+.beam::before {
+  padding: var(--beam-band);
+  background: var(--beam-cover), var(--beam-rays), var(--beam-base);
+  -webkit-mask: linear-gradient(black 0 0) border-box, linear-gradient(black 0 0) content-box;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(black 0 0) border-box exclude, linear-gradient(black 0 0) content-box;
+}
+
+/* Ореол: те же лучи и накал, размытые, под заливкой хоста. Накал здесь
+   полный: в размытом ореоле движение лучей и так не читается, а яркость
+   на наведении нужна */
+.beam::after {
+  z-index: -1;
+  --beam-lit-max: 100%;
+  background: var(--beam-cover), var(--beam-rays);
+  filter: blur(var(--beam-blur));
+  opacity: var(--beam-glow);
+}
+
+:is(a, button):is(:hover, :focus-visible) .beam,
+.beam:is(a, button):is(:hover, :focus-visible) { --beam-lit: 1; }
+
+/* ── Буквы ─────────────────────────────────────────────────────────────
+   Свет под лучами — фон, обрезанный по буквам вместе с ними; ореол —
+   тень по силуэту. Без background-clip: text буквы остаются почти белыми. */
+
+.beam-text { color: var(--brand-accent); }
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .beam-text {
+    background-color: var(--brand-accent);
+    background-image: var(--beam-rays);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 var(--sp-1) color-mix(in srgb, var(--brand-light) 30%, transparent));
+  }
+}
+
+@keyframes beam-spin {
+  to { --beam-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beam,
+  .beam-text { animation: none; }
+  .beam { transition: none; }
+}

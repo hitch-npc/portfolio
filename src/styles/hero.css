@@ -1,4 +1,4 @@
-/* Hero: знак TBCS как поле стрелок. Все значения — через переменные. */
+/* Hero: знак TBCS как поле треугольников. Все значения — через переменные. */
 
 /* Общая подпись: капс, широкая разрядка — техническая подача */
 .label {
@@ -105,6 +105,25 @@
   transition: opacity var(--dur-slow) var(--ease-out);
 }
 
+/* Строка с идеей — подпись к знаку: встаёт под его левый край по габаритам,
+   которые отдаёт поле (see main.js, bindIdea). Поле под строкой не гасится:
+   фигуры фона отжимает тень цвета фона вокруг букв, текст остаётся чётким.
+   Появляется дешифровкой, когда уходит прелоадер */
+.hero__idea {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  font-size: clamp(0.75rem, 0.9vw, 0.875rem);
+  white-space: nowrap;
+  text-shadow:
+    0 0 2px var(--brand-ground),
+    0 0 8px var(--brand-ground);
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.hero__idea.is-on { opacity: 1; }
+
 /* Нижняя строка живёт в потоке грида, а не приколота к углу:
    так подписи не могут наехать друг на друга ни на какой ширине */
 .hero__bar {
@@ -195,5 +214,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cue__arrows svg { animation: none; opacity: 1; }
+  .hero__idea { transition: none; }
   .hero__stage[data-hero-fade] { transform: none; }
 }

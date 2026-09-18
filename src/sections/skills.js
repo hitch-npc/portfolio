@@ -19,7 +19,8 @@
  * (--exit). Под хвост уже подъезжает раздел с кейсами.
  */
 import { Iris } from './iris.js';
-import { onScrollFrame, requestFrame } from '../brand/frame.js';
+import { onScrollFrame, requestFrame } from '../motion/frame.js';
+import { reduced } from '../motion/reduced.js';
 
 const CHAR_STAGGER = 18; // мс между буквами при смене строки
 
@@ -43,7 +44,7 @@ export class SkillsWheel {
 
     this.index = -1;
     this._readTail();
-    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.reduced = reduced();
 
     this.section.style.setProperty('--steps', String(this.skills.length));
 
@@ -67,7 +68,7 @@ export class SkillsWheel {
 
     addEventListener('resize', this._onResize);
     // чтение геометрии и запись стилей разведены по общим фазам кадра
-    // (see brand/frame.js)
+    // (see motion/frame.js)
     this._offFrame = onScrollFrame(() => this._read(), (rect) => this._write(rect));
   }
 

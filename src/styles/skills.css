@@ -79,8 +79,8 @@
 }
 
 /* Полоса слева у активного пункта: сколько прокрутки осталось до следующего.
-   Неоновый хвост: голова на растущем конце и едет вниз вместе с прокруткой,
-   вокруг — сиреневый ореол */
+   Тот же свет, что на кнопке кейса (light.css): горячая голова на растущем
+   конце едет вниз вместе с прокруткой, вокруг — тёплый ореол */
 .skills__item::before {
   content: '';
   position: absolute;
@@ -89,10 +89,10 @@
   bottom: -1px;
   width: 2px;
   border-radius: var(--r-full);
-  background: linear-gradient(var(--brand-accent), var(--brand-glow) 70%, var(--brand-glow-inner));
+  background: linear-gradient(var(--brand-accent), var(--brand-light) 70%, var(--brand-light-core));
   box-shadow:
-    0 0 var(--sp-1) color-mix(in srgb, var(--brand-glow) 70%, transparent),
-    0 0 var(--sp-3) color-mix(in srgb, var(--brand-glow) 40%, transparent);
+    0 0 var(--sp-1) color-mix(in srgb, var(--brand-light) 45%, transparent),
+    0 0 var(--sp-3) color-mix(in srgb, var(--brand-light) 20%, transparent);
   transform: scaleY(0);
   transform-origin: top;
 }
@@ -113,8 +113,8 @@
   cursor: pointer;
 }
 
-/* Номер — неоновые буквы (neon.css): почти белые, как строка, по ним бегут
-   сиреневые хвосты */
+/* Номер — буквы со светом (light.css): почти белые, как строка, по ним
+   бегут тёплые лучи */
 .skills__num {
   flex: none;
   font-family: var(--f-ui);

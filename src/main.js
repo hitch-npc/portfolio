@@ -4,18 +4,18 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/preloader.css';
 import './styles/hero.css';
-// после hero.css: .neon-text перебивает цвет .label; до секций: те задают свои --neon-*
-import './styles/neon.css';
+// после hero.css: .beam-text перебивает цвет .label; до секций: те задают свои --beam-*
+import './styles/light.css';
 import './styles/skills.css';
 import './styles/work.css';
 import './styles/case.css';
 import './styles/tts-case.css';
-import './styles/overlay.css';
-import { GlyphField } from './brand/glyph-field.js';
+import { GlyphField } from './field/glyph-field.js';
 import { Preloader } from './brand/preloader.js';
-import { mountTape } from './brand/vhs.js';
-import { onScrollFrame } from './brand/frame.js';
-import { mountRays, bindRays } from './brand/rays.js';
+import { onScrollFrame } from './motion/frame.js';
+import { pauseOffscreen } from './motion/visibility.js';
+import { bindDecrypt, decrypt, prepare } from './motion/decrypt.js';
+import { reduced } from './motion/reduced.js';
 import { SkillsWheel } from './sections/skills.js';
 import { mountWork } from './sections/work.js';
 import { mountCase } from './sections/case.js';
@@ -51,6 +51,47 @@ function bindTrademark(canvas, tm) {
 }
 
 /**
+ * Строка с идеей под знаком: сколько фигур в поле и что их держит.
+ * Число настоящее — поле считает свои фигуры при текущем размере экрана,
+ * поэтому на телефоне и на большом мониторе оно разное.
+ *
+ * Строка встаёт под левый край знака по его габаритам, как подпись к рисунку.
+ * Появляется дешифровкой один раз, когда уходит прелоадер; дальше на resize
+ * число просто обновляется. Идёт перебор — новое число ждёт его конца.
+ */
+function bindIdea(canvas, el) {
+  if (!el) return null;
+
+  const phrase = (n) => `${n.toLocaleString('en-US').replace(/,/g, '\u00A0')} triangles. One system.`;
+  let running = false;
+  let pending = null;
+
+  canvas.addEventListener('markbox', (e) => {
+    const box = e.detail;
+    el.style.left = `${box.left}px`;
+    el.style.top = `${box.top + box.height + box.cap * 0.2}px`;
+    const text = phrase(box.count);
+    if (running) pending = text;
+    else prepare(el, text);
+  });
+
+  return {
+    async reveal() {
+      const text = el.dataset.text;
+      if (!text) return;
+      running = true;
+      const shown = prepare(el, text);
+      if (!reduced()) shown.textContent = '';
+      el.classList.add('is-on');
+      await decrypt(shown, text, { stagger: 28 });
+      running = false;
+      if (pending) prepare(el, pending);
+      pending = null;
+    },
+  };
+}
+
+/**
  * Прокрутка уводит всё, кроме логотипа и города: знак и нижняя строка гаснут,
  * закреплённая верхняя строка остаётся. Значение отдаём в CSS одной переменной.
  */
@@ -59,7 +100,7 @@ function bindHeroFade(hero) {
   if (!targets.length) return;
 
   // затухание считается от прокрутки, а не от геометрии: читать нечего,
-  // блок живёт только в фазе записи общего кадра (see brand/frame.js)
+  // блок живёт только в фазе записи общего кадра (see motion/frame.js)
   onScrollFrame(null, () => {
     const span = innerHeight * 0.55;
     const fade = Math.max(0, Math.min(1, 1 - scrollY / span));
@@ -68,51 +109,14 @@ function bindHeroFade(hero) {
   });
 }
 
-/** Пока hero вне экрана, поле не рисуется: незачем жечь кадры. */
-function bindVisibility(hero, fields) {
-  const io = new IntersectionObserver(([entry]) => {
-    for (const f of fields) f.paused = !entry.isIntersecting;
-  }, { rootMargin: '10% 0px' });
-  io.observe(hero);
-}
-
-/**
- * Плёнка живёт только вне кейса. Пока окно кейса открыто, она гасится и ставится
- * на паузу: экраны продукта должны читаться без помех, а кадры незачем жечь.
- * Кейс закрыт — плёнка снова идёт.
- */
-function bindTapeMute(tape) {
-  const vhs = document.querySelector('.vhs');
-  const caseEl = document.querySelector('.case');
-  if (!vhs || !caseEl) return () => {};
-
-  const mute = (on) => {
-    vhs.classList.toggle('is-mute', on);
-    if (tape) tape.paused = on;
-  };
-
-  // кейс живёт в <dialog>: закрытое окно не отрисовано и не пересекает экран.
-  // Порог ровно 0 — кейс выше экрана в разы, заметной доли не наберёт
-  new IntersectionObserver(([e]) => mute(e.isIntersecting), { threshold: 0 }).observe(caseEl);
-  return mute;
-}
-
 async function boot() {
-  // лучи — до прелоадера: разметка тегов статическая, ждать нечего
-  const tags = [...document.querySelectorAll('.neon-pulse')];
-  for (const tag of tags) mountRays(tag);
-  bindRays(tags);
-
-  const tape = mountTape(document.querySelector('[data-vhs-tape]'));
-  expose('__tape', tape);
-
   const hero = document.querySelector('.hero');
   const canvas = document.querySelector('[data-glyph-field]');
   if (!canvas || !hero) return;
 
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const preRoot = document.querySelector('[data-preloader]');
   const tm = bindTrademark(canvas, document.querySelector('[data-mark-tm]'));
+  const idea = bindIdea(canvas, document.querySelector('[data-idea]'));
 
   const startField = () => {
     const field = new GlyphField(canvas);
@@ -121,11 +125,12 @@ async function boot() {
     field.start();
     expose('__field', field);
 
-    bindVisibility(hero, [field]);
+    // пока hero вне экрана, поле не рисуется: незачем жечь кадры
+    pauseOffscreen(hero, [field]);
     bindHeroFade(hero);
   };
 
-  if (reduced || !preRoot) {
+  if (reduced() || !preRoot) {
     preRoot?.remove();
     await waitForDisplayFont();
     startField();
@@ -137,24 +142,25 @@ async function boot() {
     startField();
     await pre.dismiss();
   }
+  idea?.reveal();
 
   const skillsSection = document.querySelector('[data-skills]');
   if (skillsSection) {
     const skills = new SkillsWheel(skillsSection);
     expose('__skills', skills);
     // зрачок не крутится, пока блок за экраном
-    bindVisibility(skillsSection, [skills.iris]);
+    pauseOffscreen(skillsSection, [skills.iris]);
   }
 
-  const muteTape = bindTapeMute(tape);
-  expose('__muteTape', muteTape);
   mountCase(document.querySelector('[data-tts]'));
   expose('__work', mountWork(document.querySelector('[data-work]')));
+  // метки секций и названия карт собираются из шума по атрибуту [data-decrypt]
+  bindDecrypt(document.querySelector('main'));
 
   // панель настройки параметров знака: dev-сервер и ?tune в адресе.
   // Динамический импорт под DEV — модуль панели в сборку не попадает вовсе
   if (DEV && new URLSearchParams(location.search).has('tune')) {
-    const { mountTunePanel } = await import('./brand/tune.js');
+    const { mountTunePanel } = await import('./field/tune.js');
     mountTunePanel(window.__field);
   }
 }

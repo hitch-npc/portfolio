@@ -7,9 +7,6 @@
  * среднее их прячет. Второй по важности — записей transform за кадр: это
  * прямая цена анимации. В установившемся режиме там должна стоять единица.
  *
- * Отдельно включается плёнка VHS с витрины: вопрос «потянет ли сайт кольцо»
- * — это вопрос про их сумму, а не про кольцо в одиночку.
- *
  * Картинки генерируются на месте в выбранном размере. Так видно цену декода:
  * 25 растров по 900 px и 25 по 64 px дают одинаковую картинку на экране
  * и очень разную цену на слабой машине.
@@ -20,10 +17,8 @@
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/gallery.css';
-import '../styles/overlay.css';
 import '../styles/gallery-lab.css';
 import { GALLERY, CircularGallery } from '../sections/gallery.js';
-import { mountTape } from '../brand/vhs.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -55,7 +50,6 @@ const IMAGE_MODES = {
 
 const params = { ...GALLERY };
 let mode = 'gradient';
-let tape = null;
 let gallery = null;
 let urls = [];
 
@@ -273,16 +267,6 @@ function mountPanel() {
     mode = img.value;
     await bakeImages(IMAGE_MODES[mode].px);
     gallery.setImages(urls);
-  });
-
-  const vhs = document.createElement('label');
-  vhs.className = 'lab__check';
-  vhs.innerHTML = '<input type="checkbox"><span>плёнка VHS поверх (как на витрине)</span>';
-  modes.append(vhs);
-  vhs.querySelector('input').addEventListener('change', (e) => {
-    $('[data-vhs]').hidden = !e.target.checked;
-    if (e.target.checked && !tape) tape = mountTape($('[data-vhs-tape]'));
-    else if (tape) tape.paused = !e.target.checked;
   });
 
   const naive = document.createElement('label');

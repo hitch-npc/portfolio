@@ -65,6 +65,8 @@
       <div class="hero__stage" data-hero-fade>
         <canvas class="hero__mark" data-glyph-field aria-hidden="true"></canvas>
         <span class="hero__tm" data-mark-tm aria-hidden="true">™</span>
+        <!-- Идея сайта одной строкой. Число фигур ставит поле (see main.js, bindIdea) -->
+        <p class="label label--strong hero__idea" data-idea>Thousands of&nbsp;triangles. One&nbsp;system.</p>
       </div>
 
       <div class="hero__bar" data-hero-fade>
@@ -74,7 +76,7 @@
         </div>
 
         <div class="cue">
-          <p class="label cue__text">Scroll down when you're done playing</p>
+          <p class="label cue__text">Scroll down</p>
           <span class="cue__arrows" aria-hidden="true">
             <svg viewBox="0 0 10 20"><path d="M5 1 V18 M1 13.5 L5 18 L9 13.5" /></svg>
             <svg viewBox="0 0 10 20"><path d="M5 1 V18 M1 13.5 L5 18 L9 13.5" /></svg>
@@ -88,7 +90,7 @@
       <section class="skills" id="skills" data-skills aria-labelledby="skills-title">
         <div class="skills__sticky">
           <header class="skills__head">
-            <p class="label">Skills</p>
+            <p class="label" data-decrypt>Skills</p>
             <h2 class="skills__title" id="skills-title">What I bring to a&nbsp;product team</h2>
           </header>
 
@@ -96,28 +98,28 @@
           <ol class="skills__list" data-skills-list>
             <li class="skills__item" data-skill data-tags="Tokens&nbsp;· Components&nbsp;· Front-end&nbsp;code">
               <button class="skills__jump" type="button">
-                <span class="skills__num neon-text">01</span>
+                <span class="skills__num beam-text">01</span>
                 <span class="skills__name">Design Systems &amp; Engineering</span>
               </button>
               <p class="skills__desc">I build the system and ship it in code: tokens as the single source of truth, rules checked in&nbsp;CI.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Identity&nbsp;· Type&nbsp;· Art&nbsp;direction">
               <button class="skills__jump" type="button">
-                <span class="skills__num neon-text">02</span>
+                <span class="skills__num beam-text">02</span>
                 <span class="skills__name">Brand Systems</span>
               </button>
               <p class="skills__desc">Marks, type and art direction that hold together from a&nbsp;website to a&nbsp;Telegram sticker.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Research&nbsp;· UX&nbsp;audits&nbsp;· Decision&nbsp;records">
               <button class="skills__jump" type="button">
-                <span class="skills__num neon-text">03</span>
+                <span class="skills__num beam-text">03</span>
                 <span class="skills__name">Design Strategy</span>
               </button>
               <p class="skills__desc">Audits and research turned into product decisions, each one written down with its&nbsp;reason.</p>
             </li>
             <li class="skills__item" data-skill data-tags="Figma&nbsp;to&nbsp;code&nbsp;· Agents&nbsp;· Automated&nbsp;checks">
               <button class="skills__jump" type="button">
-                <span class="skills__num neon-text">04</span>
+                <span class="skills__num beam-text">04</span>
                 <span class="skills__name">AI Workflows</span>
               </button>
               <p class="skills__desc">AI agents wired into the Figma-to-code pipeline, with rules the build enforces.</p>
@@ -128,7 +130,7 @@
             <canvas class="skills__iris" data-iris aria-hidden="true"></canvas>
 
             <div class="skills__center" aria-hidden="true">
-              <p class="label skills__meta neon-text" data-skills-kind></p>
+              <p class="label skills__meta beam-text" data-skills-kind></p>
               <p class="skills__line" data-skills-line></p>
               <p class="label skills__note" data-skills-note></p>
             </div>
@@ -140,7 +142,7 @@
            кейс раскрывается только по нажатию и листается в своём окне -->
       <section class="work" id="work" data-work aria-labelledby="work-title">
         <header class="work__head" data-work-head>
-          <p class="label">Cases</p>
+          <p class="label" data-decrypt>Cases</p>
           <h2 class="work__title" id="work-title">Selected work</h2>
           <p class="work__hint">Open a card to read the full case.</p>
         </header>
@@ -149,10 +151,10 @@
           <article class="work-card" style="--i: 0" data-card>
             <div class="work-card__info">
               <ul class="work-card__tags" aria-label="My part">
-                <li class="neon-pulse work-card__tag--ux">UX/UI</li>
-                <li class="neon-pulse work-card__tag--system">Design System</li>
+                <li>UX/UI</li>
+                <li>Design System</li>
               </ul>
-              <h3 class="work-card__title" data-card-title>Ticket to Show</h3>
+              <h3 class="work-card__title" data-decrypt="42">Ticket to Show</h3>
               <p class="work-card__lead">Ticket service for theatre, opera and concerts in&nbsp;Moscow.</p>
               <dl class="work-card__stats">
                 <div><dt>screens</dt><dd>12</dd></div>
@@ -161,7 +163,7 @@
               </dl>
               <p class="work-card__role">Head designer · 2026</p>
               <button class="work-card__open" type="button" aria-haspopup="dialog" aria-controls="case-tts" data-open="case-tts">
-                <span class="work-card__face neon">View case <svg class="work-card__arrow" viewBox="0 0 20 10" aria-hidden="true"><path d="M1 5 H18 M13.5 1 L18 5 L13.5 9" /></svg></span>
+                <span class="work-card__face beam">View case <svg class="work-card__arrow" viewBox="0 0 20 10" aria-hidden="true"><path d="M1 5 H18 M13.5 1 L18 5 L13.5 9" /></svg></span>
               </button>
             </div>
 
@@ -229,10 +231,10 @@
           <article class="work-card work-card--soon" style="--i: 1" data-card>
             <div class="work-card__info">
               <ul class="work-card__tags" aria-label="My part">
-                <li class="neon-pulse work-card__tag--branding">Branding</li>
-                <li class="neon-pulse work-card__tag--identity">Identity</li>
+                <li>Branding</li>
+                <li>Identity</li>
               </ul>
-              <h3 class="work-card__title" data-card-title>Brand identity</h3>
+              <h3 class="work-card__title" data-decrypt="42">Brand identity</h3>
               <p class="work-card__lead">The next case is in preparation.</p>
               <p class="work-card__soon">Coming soon</p>
             </div>
@@ -629,11 +631,6 @@
       </dialog>
     </main>
 
-    <div class="vhs" aria-hidden="true">
-      <canvas class="vhs__tape" data-vhs-tape></canvas>
-      <div class="vhs__scan"></div>
-      <div class="vhs__edge"></div>
-    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

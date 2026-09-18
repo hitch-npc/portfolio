@@ -1,59 +1,65 @@
 /**
- * GlyphField — знак TBCS, собранный из поля стрелок.
+ * GlyphField — знак TBCS, собранный из поля одинаковых фигур.
+ *
+ * Идея сайта в одном кадре: ни одна фигура не нарисована руками — размер,
+ * яркость и поворот каждой задаёт одно правило. Сама фигура сменная
+ * (see shapes.js): сейчас треугольник, раньше была стрелка.
  *
  * Как устроено:
  *   1. Текст рисуется в невидимый canvas и размывается — получается карта покрытия
  *      (0..1 на ячейку сетки). Размытие и есть «мягкий край»: у границы буквы
- *      покрытие падает плавно, стрелки укорачиваются и гаснут, а не обрываются.
- *   2. Сетка ячеек. В каждой рисуется стрелка: длина и яркость — от покрытия,
+ *      покрытие падает плавно, фигуры мельчают и гаснут, а не обрываются.
+ *   2. Сетка ячеек. В каждой рисуется фигура: размер и яркость — от покрытия,
  *      направление — от поля потока.
  *   3. Поле потока — сумма несинхронных волн, поэтому рисунок не зацикливается
- *      на глаз. Курсор добавляет вихрь: рядом с ним стрелки разворачиваются
+ *      на глаз. Курсор добавляет вихрь: рядом с ним фигуры разворачиваются
  *      по касательной и ячейки слегка расходятся — это и есть дисторсия.
+ *      Курсор ушёл — правило возвращает знак в форму: памяти у поля нет.
  *
- *   4. Дыхание инверсии — медленные пятна, внутри которых покрытие переворачивается:
- *      буква уходит в тень, фон вспыхивает. Знак читается и в негативе, потому что
- *      его держит перепад плотности, а не сам по себе светлый цвет.
+ *   4. Инверсия — пятна, внутри которых покрытие переворачивается: буква уходит
+ *      в тень, фон вспыхивает. Два источника: медленное дыхание по всему полю
+ *      и линза под курсором. Знак читается и в негативе, потому что его держит
+ *      перепад плотности, а не сам по себе светлый цвет.
  *
  * Буква остаётся читаемой, потому что её держит плотность и яркость, а не контур.
  *
- * Цена кадра. Стрелок порядка восьми тысяч, и наивно это восемь тысяч
- * ctx.stroke() и шесть десятков тысяч синусов за кадр — на слабой машине
- * один знак съедает весь кадровый бюджет. Поэтому:
+ * Цена кадра. Фигур порядка десяти тысяч, и наивно это десять тысяч вызовов
+ * канвы и шесть десятков тысяч синусов за кадр — на слабой машине один знак
+ * съедает весь кадровый бюджет. Поэтому:
  *   • фазы волн у ячейки постоянны, меняется только время — формула суммы
- *     углов превращает синус на ячейку в пару умножений (see _buildCells);
- *   • стрелки не рисуются по одной, а складываются в корзины по яркости
- *     (PARAMS.shades) и уходят в канву одним stroke на корзину. Геометрия
- *     каждой стрелки при этом точная — округляется только прозрачность
- *     и толщина линии, и то на 1/64.
- * Итого на кадр: 128 stroke вместо восьми тысяч и 12 синусов вместо 48 000.
- * Геометрия стрелки при этом совпадает с прежней до последнего бита —
- * проверено попиксельным сравнением с прежней реализацией.
+ *     углов превращает синус на ячейку в пару умножений (see _bakePhases);
+ *   • фигуры не рисуются по одной, а складываются в корзины по яркости
+ *     (PARAMS.shades) и уходят в канву пачками по CHUNK: один fill или
+ *     stroke на пачку. Геометрия каждой фигуры точная — округляется только
+ *     прозрачность и толщина линии, и то на 1/128.
+ * Итого на кадр: несколько сотен вызовов канвы вместо десяти тысяч и 12 синусов.
+ *
+ * Поле сообщает габариты знака и число фигур событием markbox: по ним DOM
+ * ставит ™ и строку с идеей под знаком.
  *
  * prefers-reduced-motion: один статичный кадр, без анимации и без реакции на курсор.
  */
+import { SHAPES } from './shapes.js';
 
 export const PARAMS = {
   text: 'TBCS',
   stackBelow: 620,     // ниже этой ширины знак встаёт в две строки: TB / CS
   lineGap: 0.12,       // просвет между строками, доли высоты прописной
   fitStacked: 0.82,    // в две строки знак шире: строка вдвое короче, места больше
-  lineGapStacked: 0.3, // и просвет крупнее, иначе длинные стрелки сшивают строки
+  lineGapStacked: 0.3, // и просвет крупнее, иначе крупные фигуры сшивают строки
   tracking: -0.05,     // разрядка знака, доли кегля
   fit: 0.71,           // доля ширины холста под знак
   cell: 14.02,         // шаг сетки, css-пиксели (пересчитывается, если autoCell)
   autoCell: true,      // шаг сетки от высоты букв, а не от ширины экрана
-  rowsPerCap: 22,      // сколько рядов стрелок укладывается в высоту прописной
+  rowsPerCap: 22,      // сколько рядов фигур укладывается в высоту прописной
   cellMin: 6,
   cellMax: 34,
-  maxCells: 26000,     // потолок числа стрелок: страховка для слабых машин и телефонов
+  maxCells: 26000,     // потолок числа фигур: страховка для слабых машин и телефонов
   blur: 10.94,         // размытие маски, css-пиксели (пересчитывается, если autoCell)
   blurRatio: 0.78,     // размытие от шага сетки — мягкость края держится пропорционально
-  ghost: 0.075,        // покрытие вне буквы: еле видные стрелки фона
-  arrowMin: 0.28,      // длина стрелки при нулевом покрытии, доли ячейки
-  arrowMax: 2.0,       // длина при полном покрытии
-  headRatio: 0.13,     // размер наконечника от длины
-  weight: 0.85,        // толщина линии, css-пиксели
+  shape: 'triangle',   // фигура в ячейке (see shapes.js); её размеры — там же
+  ghost: 0.075,        // покрытие вне буквы: еле видные фигуры фона
+  weight: 0.85,        // толщина линии для линейных фигур, css-пиксели
   flowScale: 5.5,      // масштаб поля потока: меньше — крупнее и глаже волны
   flowSpeed: 0.86,     // скорость дрейфа поля
   breathe: 0.82,       // глубина инверсии: 0 — выключено, 1 — полный негатив в пятне
@@ -62,11 +68,15 @@ export const PARAMS = {
   mouseRadius: 410,    // радиус вихря, css-пиксели
   swirl: 1.0,          // насколько курсор перебивает поле (0..1)
   push: 51,            // расхождение ячеек от курсора, css-пиксели
+  invert: 0.9,         // глубина линзы под курсором: 0 — нет, 1 — полный негатив
+  invertRadius: 230,   // радиус линзы, css-пиксели: меньше вихря — линза внутри него
   ease: 0.16,          // инертность курсора
-  shades: 128,         // ступеней яркости в кадре; 0 — рисовать каждую стрелку отдельно
+  shades: 128,         // ступеней яркости в кадре; 0 — рисовать каждую фигуру отдельно
 };
 
-const TAU = Math.PI * 2;
+// фигур в одном пути корзины: цена заливки растёт с числом контуров в пути
+// быстрее, чем линейно, и пачки по 32 держат её ровной
+const CHUNK = 32;
 
 const smoothstep = (edge0, edge1, x) => {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
@@ -80,7 +90,9 @@ export class GlyphField {
    */
   constructor(canvas, params = {}) {
     this.canvas = canvas;
-    this.p = { ...PARAMS, ...params };
+    // общие параметры, поверх — размеры фигуры, поверх — переопределения
+    const shape = params.shape || PARAMS.shape;
+    this.p = { ...PARAMS, ...SHAPES[shape].params, ...params };
     this.ctx = canvas.getContext('2d');
 
     this.mask = document.createElement('canvas');
@@ -115,7 +127,17 @@ export class GlyphField {
   }
 
   /**
-   * Привязывает DOM-элемент к полю: его сносит тем же потоком, что и стрелки,
+   * Меняет фигуру и подставляет её размеры по умолчанию.
+   * Нужна панели ?tune: сравнить стрелку и треугольник на одном знаке.
+   */
+  setShape(name) {
+    if (!SHAPES[name]) return;
+    Object.assign(this.p, SHAPES[name].params, { shape: name });
+    this._draw(0);
+  }
+
+  /**
+   * Привязывает DOM-элемент к полю: его сносит тем же потоком, что и фигуры,
    * но он остаётся чёткой типографикой — в этом весь приём.
    */
   attachSatellite(el) {
@@ -174,7 +196,7 @@ export class GlyphField {
     m.textBaseline = 'alphabetic';
 
     // на узком экране монограмма встаёт в две строки: иначе буквы слишком мелкие
-    // и поле стрелок вырождается в растр
+    // и поле фигур вырождается в растр
     const stacked = w < p.stackBelow;
     const half = Math.ceil([...p.text].length / 2);
     const source = stacked ? [p.text.slice(0, half), p.text.slice(half)] : [p.text];
@@ -333,7 +355,7 @@ export class GlyphField {
     const layout = this._layout(w, h);
 
     // шаг сетки — от высоты прописной: на любом экране в букву укладывается
-    // одинаковое число стрелок, иначе знак вырождается либо в штриховку, либо в кашу
+    // одинаковое число фигур, иначе знак вырождается либо в штриховку, либо в кашу
     if (this.p.autoCell) {
       const raw = layout.cap / this.p.rowsPerCap;
       let cell = Math.min(this.p.cellMax, Math.max(this.p.cellMin, raw));
@@ -349,7 +371,8 @@ export class GlyphField {
     const data = this._renderMask(w, h, layout, this.p.blur);
     this._buildCells(w, h, data);
 
-    // габариты знака в css-пикселях — по ним DOM ставит ™, шейпы и подписи
+    // габариты знака в css-пикселях — по ним DOM ставит ™ и строку с идеей.
+    // count — сколько фигур в поле: строка под знаком называет настоящее число
     const markWidth = Math.max(...layout.lines.map((l) => l.rawWidth)) * layout.scale;
     this.markBox = {
       left: (w - markWidth) / 2,
@@ -357,6 +380,7 @@ export class GlyphField {
       width: markWidth,
       height: layout.blockHeight,
       cap: layout.cap,
+      count: this.n,
     };
     this.canvas.dispatchEvent(new CustomEvent('markbox', { detail: this.markBox }));
     this._draw(0);
@@ -364,7 +388,7 @@ export class GlyphField {
 
   /**
    * Направление поля потока в точке — эталонная запись формулы.
-   * Стрелки считают её же, но разложенной по формуле суммы углов и потому
+   * Фигуры считают её же, но разложенной по формуле суммы углов и потому
    * нечитаемо (see _bakePhases и _draw): правку вносить в оба места.
    * Здесь она нужна ради одной точки в кадре — спутника знака.
    */
@@ -380,7 +404,7 @@ export class GlyphField {
   /**
    * Таблицы яркости и корзины путей. Прозрачность и толщина округляются
    * до 1/shades — при 128 ступенях это 0.007 прозрачности и 0.003 px толщины,
-   * то есть меньше ступени 8-битного буфера. Геометрия стрелки не округляется.
+   * то есть меньше ступени 8-битного буфера. Геометрия фигуры не округляется.
    */
   _shadeTables(shades) {
     if (!this._alpha || this._alpha.length !== shades || this._shadeWeight !== this.p.weight) {
@@ -393,7 +417,10 @@ export class GlyphField {
       }
       this._shadeWeight = this.p.weight;
     }
-    if (!this._paths || this._paths.length !== shades) this._paths = new Array(shades);
+    if (!this._paths || this._paths.length !== shades) {
+      this._paths = new Array(shades);
+      this._counts = new Uint16Array(shades);
+    }
     this._paths.fill(null);
     return this._paths;
   }
@@ -402,11 +429,17 @@ export class GlyphField {
     const { ctx, p, w, h } = this;
     if (!w) return;
 
+    const shape = SHAPES[p.shape] || SHAPES.triangle;
+    const fill = shape.mode === 'fill';
+    const trace = shape.trace;
+
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     // цвет знака — токен, он не меняется от кадра к кадру: читаем его на resize,
     // а не гоняем getComputedStyle внутри цикла отрисовки
-    ctx.strokeStyle = this.ink || (this.ink = this._markColor());
+    const ink = this.ink || (this.ink = this._markColor());
+    ctx.strokeStyle = ink;
+    ctx.fillStyle = ink;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
@@ -418,10 +451,10 @@ export class GlyphField {
     }
 
     const active = !this.reduced && this.mouse.inside;
-    const head = p.headRatio;
 
     // в покое инверсия выключена: это движение, а не оформление
     const depth = this.reduced ? 0 : p.breathe;
+    const lens = active ? p.invert : 0;
 
     // время входит в кадр двенадцатью синусами — по два на каждую волну,
     // дальше на ячейку остаётся только пара умножений (see _bakePhases)
@@ -436,54 +469,67 @@ export class GlyphField {
 
     const shades = p.shades | 0;
     const bins = shades > 1 ? this._shadeTables(shades) : null;
+    const counts = this._counts;
     const last = shades - 1;
 
     const gx = this.gx, gy = this.gy, gcov = this.gcov, ph = this.ph;
     const ghost = p.ghost;
     const cellSize = p.cell;
-    const aMin = p.arrowMin, aSpan = p.arrowMax - p.arrowMin;
+    const sMin = p.sizeMin, sSpan = p.sizeMax - p.sizeMin;
     const mx = this.mouse.x, my = this.mouse.y;
     const mr = p.mouseRadius, swirl = p.swirl, pushK = p.push;
+    const ir = p.invertRadius;
 
     for (let i = 0; i < this.n; i += 1) {
       const o = i * 12;
       let cov = gcov[i] > ghost ? gcov[i] : ghost;
 
+      let ax = gx[i];
+      let ay = gy[i];
+
+      // расстояние до курсора нужно дважды: линзе инверсии и вихрю
+      let dist = Infinity, dx = 0, dy = 0;
+      if (active) {
+        dx = ax - mx;
+        dy = ay - my;
+        // hypot в V8 заметно дороже корня, а переполнение здесь недостижимо
+        dist = Math.sqrt(dx * dx + dy * dy);
+      }
+
+      // Инверсия: берётся сильнейший из двух источников — дыхание поля или
+      // линза под курсором. Сумма пересвечивала бы место их встречи в ноль
+      let b = 0;
       if (depth > 0) {
         const bv = 0.62 * (ph[o + 6] * cr1 - ph[o + 7] * sr1)
           + 0.62 * (ph[o + 9] * cr2 - ph[o + 8] * sr2)
           + 0.5 * (ph[o + 10] * cr3 + ph[o + 11] * sr3);
-        const b = smoothstep(0.3, 1.2, bv) * depth;
-        cov = cov * (1 - b) + (1 - cov) * b;
+        b = smoothstep(0.3, 1.2, bv) * depth;
       }
+      if (lens > 0 && dist < ir) {
+        const bl = smoothstep(ir, ir * 0.25, dist) * lens;
+        if (bl > b) b = bl;
+      }
+      if (b > 0) cov = cov * (1 - b) + (1 - cov) * b;
       if (cov < 0.02) continue;
 
       const base = 1.25 * (ph[o] * cu + ph[o + 1] * su)
         + 1.25 * (ph[o + 3] * cv + ph[o + 2] * sv)
         + 0.6 * (ph[o + 4] * cq + ph[o + 5] * sq);
 
-      let vx = Math.cos(base);
-      let vy = Math.sin(base);
-
-      let ax = gx[i];
-      let ay = gy[i];
-      let ux = vx, uy = vy;
+      let ux = Math.cos(base);
+      let uy = Math.sin(base);
 
       if (active) {
-        const dx = ax - mx;
-        const dy = ay - my;
-        // hypot в V8 заметно дороже корня, а переполнение здесь недостижимо
-        const dist = Math.sqrt(dx * dx + dy * dy);
         const inf = smoothstep(mr, 0, dist) * swirl;
         if (inf > 0.001) {
           const nx = dist > 1e-3 ? dx / dist : 0;
           const ny = dist > 1e-3 ? dy / dist : 0;
-          // касательная к курсору — стрелки закручиваются вокруг него
+          // касательная к курсору — фигуры закручиваются вокруг него
           // спираль: касательная плюс доля радиальной — так вихрь читается яснее кольца
           const sx = -ny * 0.82 + nx * 0.58;
           const sy = nx * 0.82 + ny * 0.58;
-          vx = vx * (1 - inf) + sx * inf;
-          vy = vy * (1 - inf) + sy * inf;
+          const vx = ux * (1 - inf) + sx * inf;
+          const vy = uy * (1 - inf) + sy * inf;
           // ячейки слегка расходятся — лёгкая дисторсия
           ax += nx * inf * pushK;
           ay += ny * inf * pushK;
@@ -493,52 +539,38 @@ export class GlyphField {
         }
       }
 
-      const len = cellSize * (aMin + aSpan * cov);
-      const halfX = ux * len * 0.5;
-      const halfY = uy * len * 0.5;
-      const hx = ax + halfX;
-      const hy = ay + halfY;
-      const tx = ax - halfX;
-      const ty = ay - halfY;
-
-      // наконечник
-      const hl = len * head;
-      const bx = ux * hl, by = uy * hl;
-      const wx = uy * hl * 0.55, wy = ux * hl * 0.55;
+      const len = cellSize * (sMin + sSpan * cov);
 
       if (bins) {
         let bi = (cov * last + 0.5) | 0;
         if (bi < 0) bi = 0; else if (bi > last) bi = last;
-        let path = bins[bi];
-        if (!path) { path = new Path2D(); bins[bi] = path; }
-        path.moveTo(tx, ty);
-        path.lineTo(hx, hy);
-        path.moveTo(hx, hy);
-        path.lineTo(hx - bx - wx, hy - by + wy);
-        path.moveTo(hx, hy);
-        path.lineTo(hx - bx + wx, hy - by - wy);
+        // корзина — пачки по CHUNK фигур, а не один путь: фон почти целиком
+        // падает в одну корзину, и заливка пути из десяти тысяч контуров
+        // стоила 90 мс на кадр против 2 мс пачками (замер, Chrome)
+        let list = bins[bi];
+        if (!list) { list = bins[bi] = []; counts[bi] = CHUNK; }
+        if (counts[bi] >= CHUNK) { list.push(new Path2D()); counts[bi] = 0; }
+        counts[bi] += 1;
+        trace(list[list.length - 1], ax, ay, ux, uy, len, p);
       } else {
         ctx.globalAlpha = 0.06 + 0.94 * Math.pow(cov, 0.85);
         ctx.lineWidth = p.weight * (0.55 + 0.45 * cov);
         ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(hx, hy);
-        ctx.moveTo(hx, hy);
-        ctx.lineTo(hx - bx - wx, hy - by + wy);
-        ctx.moveTo(hx, hy);
-        ctx.lineTo(hx - bx + wx, hy - by - wy);
-        ctx.stroke();
+        trace(ctx, ax, ay, ux, uy, len, p);
+        if (fill) ctx.fill(); else ctx.stroke();
       }
     }
 
-    // одна команда канве на корзину вместо одной на стрелку
+    // одна команда канве на пачку вместо одной на фигуру
     if (bins) {
       for (let i = 0; i < shades; i += 1) {
-        const path = bins[i];
-        if (!path) continue;
+        const list = bins[i];
+        if (!list) continue;
         ctx.globalAlpha = this._alpha[i];
         ctx.lineWidth = this._width[i];
-        ctx.stroke(path);
+        for (const path of list) {
+          if (fill) ctx.fill(path); else ctx.stroke(path);
+        }
       }
     }
 

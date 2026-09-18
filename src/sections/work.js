@@ -13,11 +13,13 @@
  * окно обратно в карту. У открытого кейса свой адрес (#case-tts): ссылкой
  * можно поделиться, кнопка «назад» закрывает окно.
  *
+ * Названия карт дешифруются общим модулем по атрибуту (see motion/decrypt.js).
+ *
  * prefers-reduced-motion: окно открывается и закрывается без анимации,
- * заголовки карт не дешифруются, стопка не сжимается.
+ * стопка не сжимается.
  */
-import { decrypt } from './decrypt.js';
-import { onScrollFrame, requestFrame } from '../brand/frame.js';
+import { onScrollFrame, requestFrame } from '../motion/frame.js';
+import { reduced } from '../motion/reduced.js';
 
 // ширина, под которую свёрстан первый экран редизайна; в карте он масштабируется
 const SHOT_WIDTH = 1180;
@@ -32,7 +34,6 @@ const FULL = 'inset(0px 0px 0px 0px round 0px)';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const easeOut = (t) => 1 - (1 - t) ** 3;
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Окно кейса, привязанное к своей карте. */
 class CaseView {
@@ -178,7 +179,7 @@ function bindDepth(section, cards) {
 
   // геометрия читается в общей фазе чтения, стили пишутся в общей фазе
   // записи — иначе каждая запись переменной обесценивает следующее чтение
-  // (see brand/frame.js)
+  // (see motion/frame.js)
   const read = () => ({
     vh: innerHeight,
     headTop: head ? head.getBoundingClientRect().top : 0,
@@ -271,37 +272,6 @@ function splitTitle(title) {
   title.append(frag);
 }
 
-/** Название проекта дешифруется, когда карта выходит на экран. Один раз. */
-function bindTitles(root) {
-  if (reduced()) return null;
-
-  const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      const title = e.target;
-      if (!e.isIntersecting) {
-        // строку стираем только здесь: наблюдатель ответил, карта за экраном.
-        // Не отрисовалось ни кадра (робот, фоновая вкладка) — название на месте
-        if (!title.dataset.armed) {
-          title.dataset.armed = '1';
-          title.textContent = '';
-        }
-        continue;
-      }
-      io.unobserve(title);
-      decrypt(title, title.dataset.text, { stagger: 42 });
-    }
-  }, { threshold: 0.6 });
-
-  for (const title of root.querySelectorAll('[data-card-title]')) {
-    const text = title.textContent.trim();
-    title.dataset.text = text;
-    // пока строка перебирается, скринридер читает имя, а не мусор
-    title.setAttribute('aria-label', text);
-    io.observe(title);
-  }
-  return io;
-}
-
 export function mountWork(section) {
   if (!section) return null;
 
@@ -326,7 +296,6 @@ export function mountWork(section) {
 
   const shots = fitShots(section);
   const undepth = bindDepth(section, cards);
-  bindTitles(section);
 
   // прямая ссылка на кейс
   views.get(location.hash)?.open({ instant: true, push: false });

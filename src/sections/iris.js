@@ -38,7 +38,8 @@
  * корона стоит.
  */
 
-import { onScrollFrame } from '../brand/frame.js';
+import { onScrollFrame } from '../motion/frame.js';
+import { reduced } from '../motion/reduced.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -120,7 +121,7 @@ export class Iris {
     this.blinkIn = rand(this.p.blinkMin, this.p.blinkMax);
     this.lid = 1;
 
-    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.reduced = reduced();
     this._buildRays();
 
     this._onPointer = (e) => {
@@ -144,7 +145,7 @@ export class Iris {
     addEventListener('resize', this._onResize);
 
     // положение холста на экране — в фазе чтения общего кадра; пока глаз
-    // на паузе за экраном, читать его незачем (see brand/frame.js)
+    // на паузе за экраном, читать его незачем (see motion/frame.js)
     this._offFrame = onScrollFrame(
       () => (this.paused ? null : this.canvas.getBoundingClientRect()),
       (r) => { if (r) this.box = r; },
@@ -182,11 +183,11 @@ export class Iris {
       mark: get('--brand-mark', s.color),
       line: get('--brand-line', s.color),
       ground: get('--brand-ground', s.color),
-      // перелив короны — те же тона, что у тегов и кнопки кейса
-      ice: get('--brand-cta-glow', s.color),
-      glow: get('--brand-glow', s.color),
-      gold: get('--brand-gold', s.color),
-      halo: get('--brand-gold-inner', s.color),
+      // перелив короны — своя палитра зрачка (токены --iris-*)
+      ice: get('--iris-ice', s.color),
+      glow: get('--iris-glow', s.color),
+      gold: get('--iris-gold', s.color),
+      halo: get('--iris-halo', s.color),
     };
   }
 
