@@ -1,0 +1,184 @@
+/* Песочница кольца: слева сцена, справа пульт.
+   Витриной не является — в сборку страница не попадает. */
+
+.lab {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-ui);
+}
+
+/* Сцена ─────────────────────────────────────────────────────────── */
+
+.lab__frame {
+  position: fixed;
+  inset: 0;
+  right: var(--panel-w);
+}
+
+.lab__track { position: relative; }
+
+.lab__pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  margin-right: var(--panel-w);
+}
+
+.lab__host { width: 100%; height: 100%; }
+
+/* Пульт ─────────────────────────────────────────────────────────── */
+
+.lab { --panel-w: 320px; }
+
+.lab__panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--panel-w);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  overflow-y: auto;
+  background: var(--bg-sunk);
+  border-left: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.lab__title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 13px;
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+}
+
+.lab__hint {
+  margin: 0;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+/* Счётчики ──────────────────────────────────────────────────────── */
+
+.lab__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab__stat { display: flex; justify-content: space-between; gap: var(--sp-2); }
+.lab__stat span:first-child { color: var(--fg-muted); }
+.lab__stat[data-warn="1"] span:last-child { color: var(--tag-ux); }
+
+.lab__spark {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 34px;
+  display: block;
+}
+
+/* Ручки ─────────────────────────────────────────────────────────── */
+
+.lab__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+
+.lab__legend {
+  color: var(--fg-muted);
+  letter-spacing: var(--tr-caption);
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.lab__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.lab__row label { color: var(--fg); }
+
+.lab__val {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+
+.lab__row input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.lab__row select {
+  grid-column: 2;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-1) var(--sp-2);
+  font: inherit;
+}
+
+.lab__check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+.lab__check input { accent-color: var(--accent); }
+
+.lab__btns { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+.lab__btn {
+  flex: 1 1 auto;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.lab__btn:hover { border-color: var(--accent); }
+
+.lab__btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.lab__out {
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab__btn { transition: none; }
+}

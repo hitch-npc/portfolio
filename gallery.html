@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Circular Gallery — песочница</title>
+    <meta name="robots" content="noindex" />
+  </head>
+  <!-- Кольцо живёт на чёрном: тема зрителя на песочницу не влияет -->
+  <body class="lab" data-scheme="dark">
+    <div data-view></div>
+
+    <!-- Плёнка с витрины: включается тумблером, чтобы мерить сумму,
+         а не кольцо в одиночку -->
+    <div class="vhs" data-vhs aria-hidden="true" hidden>
+      <canvas class="vhs__tape" data-vhs-tape></canvas>
+      <div class="vhs__scan"></div>
+      <div class="vhs__edge"></div>
+    </div>
+
+    <aside class="lab__panel" data-panel></aside>
+
+    <script type="module" src="/src/sandbox/gallery-lab.js"></script>
+  </body>
+</html>

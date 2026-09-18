@@ -14,7 +14,8 @@
     "build:sandbox": "npm run build && node tooling/build-sandbox.mjs",
     "build:tts": "node tooling/build-tts.mjs",
     "fetch:fonts": "node tooling/fetch-fonts.mjs",
-    "fetch:fontshare": "node tooling/fetch-fontshare.mjs"
+    "fetch:fontshare": "node tooling/fetch-fontshare.mjs",
+    "lab": "vite --open /gallery.html"
   },
   "devDependencies": {
     "vite": "^8.3.0",

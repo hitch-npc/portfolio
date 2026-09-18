@@ -1,0 +1,73 @@
+/* Circular Gallery — кольцо карточек.
+
+   Слои. Продвинут в композитор ровно один узел — кольцо: оно и крутится
+   после наезда. Карточки получают will-change только на время наводки
+   (класс is-live ставит скрипт): 25 постоянных слоёв стоят видеопамяти,
+   а после наезда их матрицы всё равно не меняются.
+
+   preserve-3d на карточке нужен по делу: без него backface-visibility
+   картинки не считается относительно её собственного разворота, и карточка
+   на развороте не гаснет, а показывает зеркальную копию. */
+
+.gallery {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  touch-action: manipulation;
+  /* содержимое кольца не влияет на раскладку страницы и не тянет за собой
+     пересчёт соседей при каждом кадре */
+  contain: layout paint;
+}
+
+.gallery__stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.gallery__ring {
+  position: relative;
+  width: 0;
+  height: 0;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.gallery__card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--card-w);
+  height: var(--card-h);
+  margin-left: calc(var(--card-w) / -2);
+  margin-top: calc(var(--card-h) / -2);
+  border-radius: var(--card-r);
+  overflow: hidden;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+/* наводка жива — карточки едут; дальше слои отпускаются обратно */
+.gallery.is-live .gallery__card { will-change: transform; }
+
+.gallery__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery__stage,
+  .gallery__ring,
+  .gallery.is-live .gallery__card { will-change: auto; }
+}

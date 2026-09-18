@@ -55,6 +55,9 @@ export default defineConfig({
   // csp идёт после singlefile: хэш считается от уже встроенного скрипта
   plugins: [viteSingleFile(), csp()],
   build: {
+    // вход перечислен явно: в корне лежит ещё gallery.html — песочница кольца,
+    // она живёт только на dev-сервере и на витрину попасть не должна
+    rollupOptions: { input: 'index.html' },
     target: 'es2020',
     assetsInlineLimit: 100_000_000,
     cssCodeSplit: false,
