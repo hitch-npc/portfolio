@@ -110,7 +110,6 @@ async function mountField() {
   field.resize();
   field.start();
   window.__field = field;
-  addEventListener('resize', () => field.resize());
 }
 
 /** Ставит пресет: всё к умолчаниям фигуры, поверх — значения пресета. */
