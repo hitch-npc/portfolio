@@ -14,6 +14,8 @@ import './styles/overlay.css';
 import { GlyphField } from './brand/glyph-field.js';
 import { Preloader } from './brand/preloader.js';
 import { mountTape } from './brand/vhs.js';
+import { onScrollFrame } from './brand/frame.js';
+import { mountRays, bindRays } from './brand/rays.js';
 import { SkillsWheel } from './sections/skills.js';
 import { mountWork } from './sections/work.js';
 import { mountCase } from './sections/case.js';
@@ -56,21 +58,14 @@ function bindHeroFade(hero) {
   const targets = [...document.querySelectorAll('[data-hero-fade]')];
   if (!targets.length) return;
 
-  let ticking = false;
-  const apply = () => {
+  // затухание считается от прокрутки, а не от геометрии: читать нечего,
+  // блок живёт только в фазе записи общего кадра (see brand/frame.js)
+  onScrollFrame(null, () => {
     const span = innerHeight * 0.55;
     const fade = Math.max(0, Math.min(1, 1 - scrollY / span));
     for (const el of targets) el.style.setProperty('--fade', fade.toFixed(3));
     hero.style.visibility = fade <= 0.001 ? 'hidden' : '';
-  };
-
-  addEventListener('scroll', () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => { ticking = false; apply(); });
-  }, { passive: true });
-
-  apply();
+  });
 }
 
 /** Пока hero вне экрана, поле не рисуется: незачем жечь кадры. */
@@ -103,7 +98,13 @@ function bindTapeMute(tape) {
 }
 
 async function boot() {
+  // лучи — до прелоадера: разметка тегов статическая, ждать нечего
+  const tags = [...document.querySelectorAll('.neon-pulse')];
+  for (const tag of tags) mountRays(tag);
+  bindRays(tags);
+
   const tape = mountTape(document.querySelector('[data-vhs-tape]'));
+  expose('__tape', tape);
 
   const hero = document.querySelector('.hero');
   const canvas = document.querySelector('[data-glyph-field]');

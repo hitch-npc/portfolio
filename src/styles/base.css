@@ -33,7 +33,7 @@ a { color: inherit; }
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-xs);
 }
 
 .skip-link {
@@ -46,7 +46,8 @@ a { color: inherit; }
   color: var(--on-accent);
   font-size: 0.875rem;
   text-decoration: none;
-  border-radius: var(--r-full);
+  /* та же форма, что у кнопок карточек: капсул в интерфейсе больше нет */
+  border-radius: var(--r-xs);
   transition: top var(--dur-base) var(--ease-out);
 }
 .skip-link:focus-visible { top: var(--sp-4); }

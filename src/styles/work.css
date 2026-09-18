@@ -21,15 +21,43 @@
   padding-inline: var(--page-pad);
 }
 
-/* Заголовок приезжает из глубины: крупнее и прозрачнее, пока не встанет.
-   --head ставит work.js */
+/* Заголовок приезжает из глубины: крупнее, пока не встанет. --head ставит
+   work.js, и он же ведёт ленту появления — одна величина на весь блок.
+
+   Прозрачность блоку больше не задаётся: строки гаснут по очереди, и общая
+   прозрачность поверх этого читалась бы вторым, лишним затуханием. */
 .work__head {
   --head: 1;
+  --tape: 1;
   display: grid;
   gap: var(--sp-3);
-  opacity: var(--head);
   transform: translateY(calc((1 - var(--head)) * 64px)) scale(calc(1.14 - var(--head) * 0.14));
   transform-origin: 0 100%;
+}
+
+/* Лента: надпись «Cases» первой, буквы заголовка следом, подсказка последней.
+   Ведёт её --tape (равномерный), а не --head (с замедлением): доли ленты
+   должны ложиться на прокрутку ровно, иначе сборка проскакивает.
+   Подобраны так, чтобы первые буквы вставали на место, пока зрачок ещё
+   виден, а подсказка — уже после того, как он исчез. */
+.work__head .label { opacity: clamp(0, calc(var(--tape) / 0.18), 1); }
+
+.work__hint { opacity: clamp(0, calc((var(--tape) - 0.78) / 0.22), 1); }
+
+/* Буква приезжает оттуда, где был глаз: вектор и доля в ленте — на самой
+   букве, их ставит work.js. Только opacity и transform: обе величины
+   композитор ведёт сам, без пересчёта вёрстки на кадр. */
+.work__char {
+  display: inline-block;
+  white-space: pre;
+  /* 0.04 — задержка от начала ленты, 0.58 — разбег между первой и последней
+     буквой, 0.34 — путь одной буквы; вместе ровно единица */
+  --t: clamp(0, calc((var(--tape) - 0.04 - var(--d, 0) * 0.58) / 0.34), 1);
+  opacity: var(--t);
+  transform: translate(
+    calc((1 - var(--t)) * var(--dx, 0px)),
+    calc((1 - var(--t)) * var(--dy, 0px))
+  );
 }
 
 .work__title {
@@ -132,23 +160,25 @@
   list-style: none;
 }
 
-/* Тег — стеклянная капсула в ровном неоне (neon.css, .neon-pulse) своего
-   оттенка: у каждой категории работы свой цвет (токены --tag-*).
-   Рамки нет — её рисует кольцо ореола; текст чуть тронут оттенком */
+/* Тег — заострённая пластина с контровым светом (neon.css, .neon-pulse):
+   почти белый кант, бело-золотой ореол вполсилы и лучи из-за пластины.
+   Один тон на все категории: ряд разноцветных капсул спорил с монохромом
+   сайта и перетягивал внимание с названия проекта. Рамки нет — её рисует
+   кант. Заливка непрозрачная, на тоне карты: под пластиной лежат лучи. */
 .work-card__tags li {
+  --pulse-hue: var(--brand-gold);
+  --pulse-core: var(--brand-gold-inner);
+  --pulse-fill: color-mix(in srgb, var(--pulse-hue) 9%, var(--bg-sunk));
+  --pulse-glow: 0.5;
+  /* 0.62 от этого — покой (слой 1 маски лучей), полная сила — под курсором */
+  --pulse-rays: 0.97;
   padding: var(--sp-1) var(--sp-3);
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--pulse-hue) 10%, transparent);
-  color: color-mix(in oklab, var(--pulse-hue) 25%, var(--fg));
+  border-radius: var(--r-xs);
+  color: color-mix(in oklab, var(--pulse-hue) 22%, var(--fg));
   font-size: 0.8125rem;
   font-weight: var(--fw-medium);
   line-height: 1.5;
 }
-
-.work-card__tags .work-card__tag--ux { --pulse-hue: var(--tag-ux); }
-.work-card__tags .work-card__tag--system { --pulse-hue: var(--tag-system); }
-.work-card__tags .work-card__tag--branding { --pulse-hue: var(--tag-branding); }
-.work-card__tags .work-card__tag--identity { --pulse-hue: var(--tag-identity); }
 
 .work-card__title {
   min-height: 1em;
@@ -215,7 +245,7 @@
   margin-top: var(--sp-2);
   padding: 0;
   border: 0;
-  border-radius: var(--r-full);
+  border-radius: var(--r-xs);
   background: none;
   color: var(--accent);
   font-family: var(--f-ui);
@@ -231,9 +261,18 @@
   z-index: 2;
 }
 
-/* Лицо кнопки — тёмная неоновая капсула (neon.css): по кольцу бегут хвосты,
-   ореол лежит под непрозрачной заливкой. Почти белый текст на чёрном — 19:1 */
+/* Лицо кнопки — тёмная неоновая пластина (neon.css): по кольцу бегут хвосты,
+   ореол лежит под непрозрачной заливкой. Почти белый текст на чёрном — 19:1.
+
+   Тон у CTA свой: хвост ледяной синий, голова бело-жёлтая — как у нити
+   накала, горячая точка впереди остывающего следа. Сиреневый бренда рядом
+   с бело-золотыми тегами читался розовым и спорил с ними; бело-жёлтая голова
+   связывает кнопку с тегами, синий хвост отделяет действие от меток.
+   Переопределение работает, потому что work.css подключается после neon.css
+   (see main.js). */
 .work-card__face {
+  --neon-trail: var(--brand-cta-glow);
+  --neon-head: var(--brand-cta-glow-inner);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-3);
@@ -266,7 +305,7 @@
   margin-top: var(--sp-2);
   padding: var(--sp-1) var(--sp-3);
   border: 1px dashed var(--fg-faint);
-  border-radius: var(--r-full);
+  border-radius: var(--r-xs);
   color: var(--fg-muted);
   font-size: 0.875rem;
 }
@@ -625,5 +664,8 @@
   .work-card { transform: none; }
   .work-card::after { opacity: 0; }
   .work__head { opacity: 1; transform: none; }
+  .work__head .label,
+  .work__hint,
+  .work__char { opacity: 1; transform: none; }
   .work-card:has(.work-card__open:hover) .work-card__frame { transform: none; }
 }

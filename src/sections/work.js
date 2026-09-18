@@ -17,6 +17,7 @@
  * заголовки карт не дешифруются, стопка не сжимается.
  */
 import { decrypt } from './decrypt.js';
+import { onScrollFrame, requestFrame } from '../brand/frame.js';
 
 // ширина, под которую свёрстан первый экран редизайна; в карте он масштабируется
 const SHOT_WIDTH = 1180;
@@ -173,17 +174,32 @@ function bindDepth(section, cards) {
     stickTops = cards.map((card) => parseFloat(getComputedStyle(card).top) || 0);
   };
 
-  let ticking = false;
-  const apply = () => {
-    ticking = false;
-    const vh = innerHeight;
+  splitTitle(section.querySelector('.work__title'));
 
+  // геометрия читается в общей фазе чтения, стили пишутся в общей фазе
+  // записи — иначе каждая запись переменной обесценивает следующее чтение
+  // (see brand/frame.js)
+  const read = () => ({
+    vh: innerHeight,
+    headTop: head ? head.getBoundingClientRect().top : 0,
+    rects: cards.map((card) => card.getBoundingClientRect()),
+  });
+
+  const write = ({ vh, headTop, rects }) => {
     if (head) {
-      const top = head.getBoundingClientRect().top;
-      head.style.setProperty('--head', easeOut(clamp((vh - top) / (vh * 0.55), 0, 1)).toFixed(3));
+      // Ход заголовка начинается на 0.18 экрана раньше, чем он войдёт в кадр:
+      // к этому моменту строка в зрачке гаснет, и первые буквы принимают
+      // эстафету, а не появляются в пустоте после паузы (замер: глаз на
+      // нуле при --exit ≈ 0.33, прежняя формула давала ноль до 0.4).
+      const raw = clamp((vh * 1.18 - headTop) / (vh * 0.98), 0, 1);
+      // Глубине нужно замедление к концу: блок должен встать, а не доползать.
+      head.style.setProperty('--head', easeOut(raw).toFixed(3));
+      // Ленте появления — равномерный ход. С тем же easeOut две трети букв
+      // вставали на место, пока заголовок ещё под сгибом, и на экран он
+      // выезжал уже собранным: сборку никто не видел.
+      head.style.setProperty('--tape', raw.toFixed(3));
     }
 
-    const rects = cards.map((card) => card.getBoundingClientRect());
     cards.forEach((card, i) => {
       // распрямляется к середине экрана: дальше карта уже читается ровной
       const rise = clamp((rects[i].top - stickTops[i]) / (vh - stickTops[i]), 0, 1);
@@ -194,24 +210,65 @@ function bindDepth(section, cards) {
       card.style.setProperty('--cover', cover.toFixed(3));
     });
   };
-  const onScroll = () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(apply);
-  };
+
   const onResize = () => {
     measure();
-    onScroll();
+    requestFrame();
   };
 
-  addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onResize);
   measure();
-  apply();
+  const off = onScrollFrame(read, write);
   return () => {
-    removeEventListener('scroll', onScroll);
+    off();
     removeEventListener('resize', onResize);
   };
+}
+
+/**
+ * Разбирает заголовок раздела на буквы: каждая получает свою долю --d
+ * в общей ленте появления и вектор, по которому приезжает на место.
+ *
+ * Появление ведёт --head, а не таймер: раздел наезжает на хвост навыков,
+ * и буквы должны собираться ровно тогда, когда зрачок растворяется —
+ * при таймере это совпало бы только на одной скорости прокрутки.
+ * Прокрутили назад — буквы так же разлетелись.
+ *
+ * Буквы прилетают сверху-справа, оттуда, где только что был глаз, и
+ * с разбросом: ровная лесенка читается титрами, а не сборкой.
+ * Разброс детерминированный — один и тот же заголовок собирается одинаково.
+ *
+ * Скринридеру буквы не нужны: строка уходит в aria-label целиком,
+ * иначе заголовок читался бы по одному символу.
+ */
+function splitTitle(title) {
+  if (!title || reduced()) return;
+
+  const text = title.textContent.trim();
+  title.setAttribute('aria-label', text);
+  title.textContent = '';
+
+  const chars = [...text];
+  const frag = document.createDocumentFragment();
+
+  chars.forEach((ch, i) => {
+    if (ch === ' ') {
+      frag.append(' ');
+      return;
+    }
+    const span = document.createElement('span');
+    span.className = 'work__char';
+    span.textContent = ch;
+    // «случайность», одинаковая при каждой сборке
+    const n = Math.sin(i * 12.9898) * 43758.5453;
+    const jitter = n - Math.floor(n);
+    span.style.setProperty('--d', (i / Math.max(1, chars.length - 1)).toFixed(3));
+    span.style.setProperty('--dx', `${(18 + jitter * 44).toFixed(1)}px`);
+    span.style.setProperty('--dy', `${(-22 - jitter * 52).toFixed(1)}px`);
+    frag.append(span);
+  });
+
+  title.append(frag);
 }
 
 /** Название проекта дешифруется, когда карта выходит на экран. Один раз. */
