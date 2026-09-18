@@ -19,6 +19,7 @@
  * (--exit). Под хвост уже подъезжает раздел с кейсами.
  */
 import { Iris } from './iris.js';
+import { onScrollFrame, requestFrame } from '../brand/frame.js';
 
 const CHAR_STAGGER = 18; // мс между буквами при смене строки
 
@@ -41,7 +42,6 @@ export class SkillsWheel {
     }));
 
     this.index = -1;
-    this.ticking = false;
     this._readTail();
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -60,23 +60,15 @@ export class SkillsWheel {
       li.querySelector('.skills__jump').addEventListener('click', () => this.jump(i));
     });
 
-    this._onScroll = () => {
-      if (this.ticking) return;
-      this.ticking = true;
-      requestAnimationFrame(() => {
-        this.ticking = false;
-        this.update();
-      });
-    };
-
     this._onResize = () => {
       this._readTail();
-      this._onScroll();
+      requestFrame();
     };
 
-    addEventListener('scroll', this._onScroll, { passive: true });
     addEventListener('resize', this._onResize);
-    this.update();
+    // чтение геометрии и запись стилей разведены по общим фазам кадра
+    // (see brand/frame.js)
+    this._offFrame = onScrollFrame(() => this._read(), (rect) => this._write(rect));
   }
 
   /** Длина хвоста в экранах — из CSS, где она задаёт высоту секции. */
@@ -160,8 +152,18 @@ export class SkillsWheel {
     }, 160);
   }
 
+  /** Фаза чтения: единственное обращение к геометрии за кадр. */
+  _read() {
+    return this.section.getBoundingClientRect();
+  }
+
+  /** Единый пересчёт: читает сам и сразу пишет. Для вызовов вне кадра прокрутки. */
   update() {
-    const rect = this.section.getBoundingClientRect();
+    this._write(this._read());
+  }
+
+  /** Фаза записи: только стили, ни одного чтения геометрии. */
+  _write(rect) {
     const { span, stepsSpan } = this._spans(rect.height);
     if (span <= 0) return;
 
@@ -189,7 +191,7 @@ export class SkillsWheel {
   destroy() {
     this.iris.destroy();
     clearTimeout(this._noteTimer);
-    removeEventListener('scroll', this._onScroll);
+    this._offFrame?.();
     removeEventListener('resize', this._onResize);
   }
 }

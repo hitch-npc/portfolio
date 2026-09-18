@@ -22,11 +22,27 @@
  * Хост получает --gx/--gy/--lid — по ним текст внутри зрачка живёт в той же
  * трёхмерности, а не лежит поверх картинки.
  *
- * prefers-reduced-motion: один статичный кадр, прямой взгляд, без смаза.
+ * Сияние. По краю зрачка — тонкая переливающаяся корона, как у затмения:
+ * ледяной синий, сиреневый и бело-золотой медленно плывут по кругу. Корона
+ * лежит ровно на эллипсе зрачка — тот же центр, ракурс и пружина, — поэтому
+ * едет и дышит вместе с ним и заряжается с навыками. Курсор работает как
+ * фонарь: сторона короны, обращённая к нему, разгорается бело-золотой дугой,
+ * тем ярче, чем он ближе; направление и сила догоняют курсор с инерцией,
+ * и свет перетекает по кругу, а не прыгает. Только край зрачка:
+ * сияние по всей радужке спорило с точками и размывало рисунок.
+ * Искр нет сознательно: пробовали, блёстки удешевляли глаз. Корона
+ * рисуется в том же холсте — отдельный CSS-слой поверх радужки композитор
+ * гасит вместе с ней (see skills.css).
+ *
+ * prefers-reduced-motion: один статичный кадр, прямой взгляд, без смаза,
+ * корона стоит.
  */
+
+import { onScrollFrame } from '../brand/frame.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = (t) => t * t * (3 - 2 * t);
 const rand = (a, b) => a + Math.random() * (b - a);
 
 // детерминированный шум: одна и та же радужка при каждой перерисовке
@@ -55,6 +71,12 @@ export const IRIS = {
   trail: 0.36,        // гашение прошлого кадра: меньше — длиннее смаз
   refract: 0.09,      // выпуклость роговицы
   wobble: 0.018,      // жидкое дрожание радужки
+  textFollow: 0.3,    // насколько строка едет за зрачком: 1 — вплотную, 0 — стоит
+  textSquash: 0.14,   // насколько ракурс и моргание сплющивают строку
+  glow: 0.6,          // сила короны по краю зрачка; 0 — без неё
+  glowDrift: 0.14,    // скорость перелива по кругу, рад/с — оборот за 45 с
+  glowHot: 0.95,      // яркость дуги со стороны курсора
+  glowReach: 1.4,     // с какого расстояния от края зрачка курсор влияет, доли радиуса радужки
 };
 
 export class Iris {
@@ -84,6 +106,12 @@ export class Iris {
     this.speed = 0;
     this.pointerAt = -1e3;
 
+    // курсор для короны: координаты окна, близость и угол с инерцией
+    this.cursor = null;
+    this.box = null;
+    this.near = 0;
+    this.hotAng = 0;
+
     // зрачок на пружине
     this.pr = 1;
     this.pv = 0;
@@ -96,7 +124,10 @@ export class Iris {
     this._buildRays();
 
     this._onPointer = (e) => {
-      const r = this.canvas.getBoundingClientRect();
+      this.cursor = { x: e.clientX, y: e.clientY };
+      // геометрию холста читает общий кадр (ниже): чтение в обработчике
+      // событий посреди кадра заставляло пересчитывать вёрстку
+      const r = this.box || this.canvas.getBoundingClientRect();
       if (!r.width) return;
       // цель взгляда в долях полуэкрана: глаз косит, а не выворачивается
       this.aimX = clamp((e.clientX - (r.left + r.width / 2)) / (innerWidth / 2), -1, 1);
@@ -104,9 +135,20 @@ export class Iris {
       this.pointerAt = this.t;
     };
     this._onResize = () => this.resize();
+    this._onLeave = () => { this.cursor = null; };
 
-    if (!this.reduced) addEventListener('pointermove', this._onPointer, { passive: true });
+    if (!this.reduced) {
+      addEventListener('pointermove', this._onPointer, { passive: true });
+      document.documentElement.addEventListener('pointerleave', this._onLeave);
+    }
     addEventListener('resize', this._onResize);
+
+    // положение холста на экране — в фазе чтения общего кадра; пока глаз
+    // на паузе за экраном, читать его незачем (see brand/frame.js)
+    this._offFrame = onScrollFrame(
+      () => (this.paused ? null : this.canvas.getBoundingClientRect()),
+      (r) => { if (r) this.box = r; },
+    );
   }
 
   /** Длины штрихов: клочья задаются волнами по углу, шум лишь ломает регулярность. */
@@ -140,6 +182,11 @@ export class Iris {
       mark: get('--brand-mark', s.color),
       line: get('--brand-line', s.color),
       ground: get('--brand-ground', s.color),
+      // перелив короны — те же тона, что у тегов и кнопки кейса
+      ice: get('--brand-cta-glow', s.color),
+      glow: get('--brand-glow', s.color),
+      gold: get('--brand-gold', s.color),
+      halo: get('--brand-gold-inner', s.color),
     };
   }
 
@@ -161,9 +208,87 @@ export class Iris {
     // шаг точек — от самого длинного штриха: он и упирается во внешний радиус
     this.step = (this.R * (1 - this.p.pupil)) / (this.p.dotsMax + 0.6);
     this._readColors();
+    this._bakeGlow();
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.ctx.clearRect(0, 0, w, h);
     this.draw();
+  }
+
+  /**
+   * Корона запекается один раз на размер холста: переливающееся кольцо
+   * (conic) с узким профилем вокруг радиуса зрачка. В кадре остаётся один
+   * drawImage — с тем же центром, ракурсом и пружиной, что у чаши зрачка.
+   * Радиусы профиля — в долях радиуса зрачка.
+   */
+  _bakeGlow() {
+    const rpn = this.R * this.p.pupil;
+    const OUT = 1.25;                       // внешний край запечённого кольца
+    const Rg = rpn * OUT;
+    const size = Math.max(2, Math.ceil(2 * Rg * this.dpr));
+    const c = this._glow || (this._glow = document.createElement('canvas'));
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    const m = size / 2;
+    const { ice, glow, gold } = this.colors;
+
+    // два оборота перелива: одного на кольцо мало, цвет стоит пятнами
+    if (typeof g.createConicGradient === 'function') {
+      const cg = g.createConicGradient(0, m, m);
+      [ice, glow, gold, ice, glow, gold, ice].forEach((col, i, all) => cg.addColorStop(i / (all.length - 1), col));
+      g.fillStyle = cg;
+    } else {
+      g.fillStyle = glow;
+    }
+    g.fillRect(0, 0, size, size);
+
+    // узкий профиль: внутрь зрачка корона почти не заходит — там текст,
+    // наружу даёт мягкий короткий шлейф
+    const at = (r) => r / OUT;
+    const rg = g.createRadialGradient(m, m, 0, m, m, m);
+    rg.addColorStop(0, 'rgb(0 0 0 / 0)');
+    rg.addColorStop(at(0.88), 'rgb(0 0 0 / 0)');
+    rg.addColorStop(at(0.96), 'rgb(0 0 0 / 0.45)');
+    rg.addColorStop(at(1.0), 'rgb(0 0 0 / 1)');
+    rg.addColorStop(at(1.05), 'rgb(0 0 0 / 0.5)');
+    rg.addColorStop(at(1.13), 'rgb(0 0 0 / 0.14)');
+    rg.addColorStop(1, 'rgb(0 0 0 / 0)');
+    g.globalCompositeOperation = 'destination-in';
+    g.fillStyle = rg;
+    g.fillRect(0, 0, size, size);
+
+    // Дуга фонаря: то же кольцо, но бело-золотое и только в секторе ±75°
+    // вокруг 0° (три часа). В кадре её поворачивают к курсору.
+    const h = this._hot || (this._hot = document.createElement('canvas'));
+    h.width = size;
+    h.height = size;
+    const hg = h.getContext('2d');
+    hg.fillStyle = this.colors.halo;
+    hg.fillRect(0, 0, size, size);
+    hg.globalCompositeOperation = 'destination-in';
+    const hr = hg.createRadialGradient(m, m, 0, m, m, m);
+    hr.addColorStop(0, 'rgb(0 0 0 / 0)');
+    hr.addColorStop(at(0.9), 'rgb(0 0 0 / 0)');
+    hr.addColorStop(at(0.97), 'rgb(0 0 0 / 0.5)');
+    hr.addColorStop(at(1.0), 'rgb(0 0 0 / 1)');
+    hr.addColorStop(at(1.07), 'rgb(0 0 0 / 0.45)');
+    hr.addColorStop(at(1.18), 'rgb(0 0 0 / 0.1)');
+    hr.addColorStop(1, 'rgb(0 0 0 / 0)');
+    hg.fillStyle = hr;
+    hg.fillRect(0, 0, size, size);
+    if (typeof hg.createConicGradient === 'function') {
+      const cm = hg.createConicGradient(0, m, m);
+      cm.addColorStop(0, 'rgb(0 0 0 / 1)');
+      cm.addColorStop(0.09, 'rgb(0 0 0 / 0.5)');
+      cm.addColorStop(0.21, 'rgb(0 0 0 / 0)');
+      cm.addColorStop(0.79, 'rgb(0 0 0 / 0)');
+      cm.addColorStop(0.91, 'rgb(0 0 0 / 0.5)');
+      cm.addColorStop(1, 'rgb(0 0 0 / 1)');
+      hg.fillStyle = cm;
+      hg.fillRect(0, 0, size, size);
+    }
+
+    this._glowR = Rg;
   }
 
   setProgress(v) {
@@ -326,6 +451,61 @@ export class Iris {
     ctx.lineWidth = 1;
     ctx.stroke();
 
+    // Корона — поверх края чаши, под точками: первый ряд точек лежит
+    // на свету. Домножена на fade: холст не стирается, а гасится, и свет,
+    // положенный каждый кадр, иначе копился бы до glow / fade — втрое ярче
+    // в покое и вдесятеро на саккаде, где гашение слабеет.
+    if (p.glow > 0 && this._glow) {
+      const breathe = this.reduced ? 1 : 0.8 + 0.2 * Math.sin(this.t * 0.7);
+      // глаз заряжается вместе с навыками: к последнему корона полнее
+      const charge = 0.55 + 0.45 * this.progress;
+      const sx = this.pr * 1.02 * Math.cos(this.yaw);
+      const sy = this.pr * 1.02 * Math.cos(this.pitch) * this.lid;
+
+      // Фонарь: где курсор относительно центра зрачка. Экранный вектор
+      // переводится в плоскость глаза — делится на ракурс, иначе при взгляде
+      // вбок дуга смотрела бы мимо курсора. Только на ракурс, без века:
+      // на моргании веко падает до 0.08, и деление на него раздувало
+      // вертикаль в 12 раз — дуга дёргалась вверх-вниз с каждым морганием.
+      // Сила и угол догоняют цель с инерцией — свет перетекает, а не прыгает.
+      if (!this.reduced) {
+        let nearT = 0;
+        let angT = this.hotAng;
+        const b = this.box;
+        if (this.cursor && b && b.width) {
+          const dx = (this.cursor.x - b.left) * (this.w / b.width) - px;
+          const dy = (this.cursor.y - b.top) * (this.h / b.height) - py;
+          const d = Math.hypot(dx, dy);
+          nearT = smooth(clamp(1 - (d - rp) / (this.R * p.glowReach), 0, 1));
+          angT = Math.atan2(dy / Math.cos(this.pitch), dx / Math.cos(this.yaw));
+        }
+        this.near += (nearT - this.near) * (1 - Math.exp(-dt * 5));
+        const da = Math.atan2(Math.sin(angT - this.hotAng), Math.cos(angT - this.hotAng));
+        this.hotAng += da * (1 - Math.exp(-dt * 7));
+      }
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(px, py);
+      // ровно эллипс чаши: её пружина, ракурс и моргание
+      ctx.scale(sx, sy);
+
+      // вся корона чуть светлеет, когда курсор рядом
+      ctx.globalAlpha = clamp(p.glow * breathe * charge * (1 + this.near * 0.45) * this.lid * fade, 0, 1);
+      ctx.save();
+      ctx.rotate(this.t * p.glowDrift);
+      ctx.drawImage(this._glow, -this._glowR, -this._glowR, this._glowR * 2, this._glowR * 2);
+      ctx.restore();
+
+      // дуга фонаря — к курсору
+      if (this.near > 0.004 && this._hot) {
+        ctx.globalAlpha = clamp(p.glowHot * this.near * breathe * this.lid * fade, 0, 1);
+        ctx.rotate(this.hotAng);
+        ctx.drawImage(this._hot, -this._glowR, -this._glowR, this._glowR * 2, this._glowR * 2);
+      }
+      ctx.restore();
+    }
+
     ctx.fillStyle = this.colors.mark;
 
     const front = p.feather / p.rays;
@@ -385,15 +565,21 @@ export class Iris {
       st.setProperty('--gx', (this.yaw / p.gazeMax).toFixed(3));
       st.setProperty('--gy', (this.pitch / p.gazeMax).toFixed(3));
       st.setProperty('--lid', this.lid.toFixed(3));
-      // текст едет ровно с центром зрачка: иначе при взгляде вбок строка
-      // выезжает на радужку и упирается в точки
-      st.setProperty('--pcx', `${pc.x.toFixed(1)}px`);
-      st.setProperty('--pcy', `${pc.y.toFixed(1)}px`);
-      // ракурс строки — тем же косинусом, что сплющивает зрачок в эллипс.
-      // Только 2d-трансформы: 3d поднимает строку в отдельный слой,
-      // и композитор гасит холст радужки под ним
-      st.setProperty('--sx', (Math.cos(this.yaw) * 0.985).toFixed(4));
-      st.setProperty('--sy', (Math.cos(this.pitch) * this.lid * 0.985).toFixed(4));
+      // Строка едет за центром зрачка, но не вплотную. Вплотную — это ход
+      // до ±52 px при радиусе зрачка 138 и собственной ширине строки 199:
+      // на саккаде край строки выезжал за зрачок на светлые точки радужки,
+      // и прочесть её было нельзя. textFollow держит ход внутри зрачка:
+      // связь с взглядом читается, а строка остаётся на тёмном.
+      st.setProperty('--pcx', `${(pc.x * p.textFollow).toFixed(1)}px`);
+      st.setProperty('--pcy', `${(pc.y * p.textFollow).toFixed(1)}px`);
+      // Ракурс — тем же косинусом, что сплющивает зрачок в эллипс, но взятым
+      // долей: на моргании множитель падал до 0.09 и строка схлопывалась
+      // в полоску на всю длительность моргания. Теперь моргание её только
+      // приминает. Только 2d-трансформы: 3d поднимает строку в отдельный
+      // слой, и композитор гасит холст радужки под ним
+      const squash = (v) => 1 - (1 - v) * p.textSquash;
+      st.setProperty('--sx', squash(Math.cos(this.yaw) * 0.985).toFixed(4));
+      st.setProperty('--sy', squash(Math.cos(this.pitch) * this.lid * 0.985).toFixed(4));
     }
   }
 
@@ -411,6 +597,8 @@ export class Iris {
   destroy() {
     cancelAnimationFrame(this._raf);
     removeEventListener('pointermove', this._onPointer);
+    document.documentElement.removeEventListener('pointerleave', this._onLeave);
     removeEventListener('resize', this._onResize);
+    this._offFrame?.();
   }
 }
