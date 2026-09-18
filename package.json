@@ -15,7 +15,8 @@
     "build:tts": "node tooling/build-tts.mjs",
     "fetch:fonts": "node tooling/fetch-fonts.mjs",
     "fetch:fontshare": "node tooling/fetch-fontshare.mjs",
-    "lab": "vite --open /gallery.html"
+    "lab": "vite --open /gallery.html",
+    "lab:field": "vite --open /field.html"
   },
   "devDependencies": {
     "vite": "^8.3.0",

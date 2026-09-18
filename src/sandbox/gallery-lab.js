@@ -17,7 +17,7 @@
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/gallery.css';
-import '../styles/gallery-lab.css';
+import '../styles/lab.css';
 import { GALLERY, CircularGallery } from '../sections/gallery.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);

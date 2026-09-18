@@ -1,0 +1,25 @@
+/* Песочница знака: сцена — то же поле, что в hero, на том же фоне.
+   Общий пульт и счётчики — lab.css. */
+
+.field-lab__stage {
+  background: var(--brand-ground);
+  color: var(--brand-mark);
+  overflow: hidden;
+}
+
+.field-lab__mark {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--brand-mark);
+}
+
+.field-lab__presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.field-lab__presets .lab__btn[aria-pressed="true"] { border-color: var(--accent); }

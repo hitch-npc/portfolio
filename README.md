@@ -22,6 +22,8 @@
 npm run dev      # сборка токенов + ядра кейса, затем vite
 npm run check    # сверка tokens.css с tokens.json + страж
 npm run build    # сборка в один файл: dist/index.html
+npm run lab:field    # песочница знака: дыхание, курсор, фигуры, цена кадра
+npm run lab          # песочница кольца галереи
 npm run fetch:fonts  # один раз на смену набора: шрифты с Google → public/fonts
 ```
 

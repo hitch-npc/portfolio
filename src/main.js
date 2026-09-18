@@ -156,13 +156,6 @@ async function boot() {
   expose('__work', mountWork(document.querySelector('[data-work]')));
   // метки секций и названия карт собираются из шума по атрибуту [data-decrypt]
   bindDecrypt(document.querySelector('main'));
-
-  // панель настройки параметров знака: dev-сервер и ?tune в адресе.
-  // Динамический импорт под DEV — модуль панели в сборку не попадает вовсе
-  if (DEV && new URLSearchParams(location.search).has('tune')) {
-    const { mountTunePanel } = await import('./field/tune.js');
-    mountTunePanel(window.__field);
-  }
 }
 
 boot();

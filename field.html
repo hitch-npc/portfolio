@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Знак TBCS — песочница</title>
+    <meta name="robots" content="noindex" />
+    <link rel="preload" href="/fonts/archivo-normal-latin.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <!-- Знак живёт на чёрном, как в hero: тема зрителя на песочницу не влияет -->
+  <body class="lab" data-scheme="dark">
+    <div class="lab__frame field-lab__stage">
+      <canvas class="field-lab__mark" data-field aria-hidden="true"></canvas>
+      <p class="label label--strong hero__idea is-on" data-idea></p>
+    </div>
+
+    <aside class="lab__panel" data-panel></aside>
+
+    <script type="module" src="/src/sandbox/field-lab.js"></script>
+  </body>
+</html>

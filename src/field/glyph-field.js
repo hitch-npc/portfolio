@@ -20,6 +20,9 @@
  *      в тень, фон вспыхивает. Два источника: медленное дыхание по всему полю
  *      и линза под курсором. Знак читается и в негативе, потому что его держит
  *      перепад плотности, а не сам по себе светлый цвет.
+ *   5. Вдох-выдох — волна размера: фигуры медленно растут и мельчают, волна
+ *      идёт по знаку наискосок. Под курсором — лупа: середина растягивается
+ *      и фигуры крупнеют, но не расходятся в дыру.
  *
  * Буква остаётся читаемой, потому что её держит плотность и яркость, а не контур.
  *
@@ -31,8 +34,8 @@
  *   • фигуры не рисуются по одной, а складываются в корзины по яркости
  *     (PARAMS.shades) и уходят в канву пачками по CHUNK: один fill или
  *     stroke на пачку. Геометрия каждой фигуры точная — округляется только
- *     прозрачность и толщина линии, и то на 1/128.
- * Итого на кадр: несколько сотен вызовов канвы вместо десяти тысяч и 12 синусов.
+ *     прозрачность и толщина линии, и то на 1/64.
+ * Итого на кадр: несколько сотен вызовов канвы вместо десяти тысяч и 14 синусов.
  *
  * Поле сообщает габариты знака и число фигур событием markbox: по ним DOM
  * ставит ™ и строку с идеей под знаком.
@@ -62,21 +65,30 @@ export const PARAMS = {
   weight: 0.85,        // толщина линии для линейных фигур, css-пиксели
   flowScale: 5.5,      // масштаб поля потока: меньше — крупнее и глаже волны
   flowSpeed: 0.86,     // скорость дрейфа поля
-  breathe: 0.82,       // глубина инверсии: 0 — выключено, 1 — полный негатив в пятне
-  breatheScale: 1.9,   // масштаб пятен инверсии: меньше — пятна крупнее
-  breatheSpeed: 0.09,  // скорость дрейфа пятен: своё время, медленнее потока
+  breathe: 0.9,        // глубина инверсии: 0 — выключено, 1 — полный негатив в пятне
+  breatheScale: 2.3,   // масштаб пятен инверсии: меньше — пятна крупнее
+  breatheSpeed: 0.15,  // скорость дрейфа пятен: своё время, медленнее потока
+  pulse: 0.22,         // вдох-выдох: насколько фигуры растут и мельчают волной, доли размера
+  pulseScale: 1.6,     // длина волны вдоха по знаку: меньше — волна шире
+  pulseSpeed: 0.7,     // темп дыхания, рад/с: 0.7 — вдох и выдох примерно за 9 с
   mouseRadius: 410,    // радиус вихря, css-пиксели
   swirl: 1.0,          // насколько курсор перебивает поле (0..1)
-  push: 51,            // расхождение ячеек от курсора, css-пиксели
+  magnify: 0.55,       // лупа под курсором: ячейки расходятся от центра и крупнеют
+  push: 0,             // прежнее расталкивание, css-пиксели: >0 пробивает дыру под курсором
   invert: 0.9,         // глубина линзы под курсором: 0 — нет, 1 — полный негатив
   invertRadius: 230,   // радиус линзы, css-пиксели: меньше вихря — линза внутри него
   ease: 0.16,          // инертность курсора
-  shades: 128,         // ступеней яркости в кадре; 0 — рисовать каждую фигуру отдельно
+  shades: 64,          // ступеней яркости в кадре; 0 — рисовать каждую фигуру отдельно.
+                       // 64, а не 128: на пятую часть дешевле кадр, ступень 0.015 на глаз не видна
 };
 
 // фигур в одном пути корзины: цена заливки растёт с числом контуров в пути
 // быстрее, чем линейно, и пачки по 32 держат её ровной
 const CHUNK = 32;
+// запечённых чисел на ячейку: по паре sin/cos на три волны потока,
+// три волны дыхания инверсии и одну волну вдоха
+const STRIDE = 14;
+const TAU = Math.PI * 2;
 
 const smoothstep = (edge0, edge1, x) => {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
@@ -105,6 +117,7 @@ export class GlyphField {
     this.mouse = { x: -1e4, y: -1e4, tx: -1e4, ty: -1e4, inside: false };
     this.t = 0;
     this.tb = 0; // время дыхания: отдельно от потока, он теперь быстрый
+    this.tp = 0; // время вдоха-выдоха
     this._raf = null;
     this._last = 0;
     this.paused = false;
@@ -128,7 +141,7 @@ export class GlyphField {
 
   /**
    * Меняет фигуру и подставляет её размеры по умолчанию.
-   * Нужна панели ?tune: сравнить стрелку и треугольник на одном знаке.
+   * Нужна песочнице знака (field.html): сравнить фигуры на одном знаке.
    */
   setShape(name) {
     if (!SHAPES[name]) return;
@@ -164,8 +177,8 @@ export class GlyphField {
       const dist = Math.hypot(mx, my);
       const inf = smoothstep(this.p.mouseRadius, 0, dist);
       if (inf > 0.001 && dist > 1e-3) {
-        dx += (mx / dist) * inf * this.p.push * 0.5;
-        dy += (my / dist) * inf * this.p.push * 0.5;
+        dx += (mx / dist) * inf * this.p.push * 0.5 + mx * inf * this.p.magnify * 0.5;
+        dy += (my / dist) * inf * this.p.push * 0.5 + my * inf * this.p.magnify * 0.5;
         rot += inf * 9;
       }
     }
@@ -293,23 +306,24 @@ export class GlyphField {
    * Фазы волн у ячейки постоянны — двигается только время. Поэтому
    * sin(a + ωt) раскладывается в sin a · cos ωt + cos a · sin ωt, где первый
    * множитель считается один раз здесь, а второй — один раз на весь кадр.
-   * Шесть синусов на ячейку в кадре превращаются в шесть на кадр.
+   * Семь синусов на ячейку в кадре превращаются в семь на кадр.
    * Сами формулы потока и дыхания в читаемом виде — в _flow и в комментариях
    * ниже; правка одной из записей обязана меняться и во второй.
    *
-   * Пересобирается вместе с сеткой: масштабы потока и дыхания входят в фазу.
+   * Пересобирается вместе с сеткой: масштабы потока, дыхания и вдоха входят в фазу.
    */
   _bakePhases(w, h) {
     const p = this.p;
     const n = this.cells.length;
     const fs = p.flowScale;
     const bs = p.breatheScale;
+    const ps = p.pulseScale;
 
     this.n = n;
     this.gx = new Float64Array(n);
     this.gy = new Float64Array(n);
     this.gcov = new Float64Array(n);
-    this.ph = new Float64Array(n * 12);
+    this.ph = new Float64Array(n * STRIDE);
 
     for (let i = 0; i < n; i += 1) {
       const cell = this.cells[i];
@@ -319,7 +333,7 @@ export class GlyphField {
 
       const nx = cell.x / w;
       const ny = cell.y / h;
-      const o = i * 12;
+      const o = i * STRIDE;
 
       // поток: sin(a1 + .9t) · 1.25 + cos(a2 − .7t) · 1.25 + sin(a3 + .45t) · .6
       const a1 = nx * fs * 2.0;
@@ -336,6 +350,10 @@ export class GlyphField {
       this.ph[o + 6] = Math.sin(b1); this.ph[o + 7] = Math.cos(b1);
       this.ph[o + 8] = Math.sin(b2); this.ph[o + 9] = Math.cos(b2);
       this.ph[o + 10] = Math.sin(b3); this.ph[o + 11] = Math.cos(b3);
+
+      // вдох: sin(c − τp) — волна идёт по знаку по диагонали
+      const c = (nx * 1.0 + ny * 0.6) * ps * TAU;
+      this.ph[o + 12] = Math.sin(c); this.ph[o + 13] = Math.cos(c);
     }
   }
 
@@ -403,8 +421,9 @@ export class GlyphField {
 
   /**
    * Таблицы яркости и корзины путей. Прозрачность и толщина округляются
-   * до 1/shades — при 128 ступенях это 0.007 прозрачности и 0.003 px толщины,
-   * то есть меньше ступени 8-битного буфера. Геометрия фигуры не округляется.
+   * до 1/shades — при 64 ступенях это 0.015 прозрачности и 0.006 px толщины,
+   * около четырёх ступеней 8-битного буфера: на тысячах мелких фигур полос
+   * не видно. Геометрия фигуры не округляется.
    */
   _shadeTables(shades) {
     if (!this._alpha || this._alpha.length !== shades || this._shadeWeight !== this.p.weight) {
@@ -448,6 +467,7 @@ export class GlyphField {
       this.mouse.y += (this.mouse.ty - this.mouse.y) * p.ease;
       this.t += dt * p.flowSpeed;
       this.tb += dt * p.breatheSpeed;
+      this.tp += dt * p.pulseSpeed;
     }
 
     const active = !this.reduced && this.mouse.inside;
@@ -466,6 +486,8 @@ export class GlyphField {
     const cr1 = Math.cos(tb * 0.8), sr1 = Math.sin(tb * 0.8);
     const cr2 = Math.cos(tb * 0.55), sr2 = Math.sin(tb * 0.55);
     const cr3 = Math.cos(tb * 0.37), sr3 = Math.sin(tb * 0.37);
+    const pulse = this.reduced ? 0 : p.pulse;
+    const cp = Math.cos(this.tp), sp = Math.sin(this.tp);
 
     const shades = p.shades | 0;
     const bins = shades > 1 ? this._shadeTables(shades) : null;
@@ -477,11 +499,11 @@ export class GlyphField {
     const cellSize = p.cell;
     const sMin = p.sizeMin, sSpan = p.sizeMax - p.sizeMin;
     const mx = this.mouse.x, my = this.mouse.y;
-    const mr = p.mouseRadius, swirl = p.swirl, pushK = p.push;
+    const mr = p.mouseRadius, swirl = p.swirl, pushK = p.push, mag = p.magnify;
     const ir = p.invertRadius;
 
     for (let i = 0; i < this.n; i += 1) {
-      const o = i * 12;
+      const o = i * STRIDE;
       let cov = gcov[i] > ghost ? gcov[i] : ghost;
 
       let ax = gx[i];
@@ -519,27 +541,39 @@ export class GlyphField {
       let ux = Math.cos(base);
       let uy = Math.sin(base);
 
+      let grow = 1;
       if (active) {
-        const inf = smoothstep(mr, 0, dist) * swirl;
-        if (inf > 0.001) {
+        const fall = smoothstep(mr, 0, dist);
+        if (fall > 0.001) {
           const nx = dist > 1e-3 ? dx / dist : 0;
           const ny = dist > 1e-3 ? dy / dist : 0;
-          // касательная к курсору — фигуры закручиваются вокруг него
-          // спираль: касательная плюс доля радиальной — так вихрь читается яснее кольца
-          const sx = -ny * 0.82 + nx * 0.58;
-          const sy = nx * 0.82 + ny * 0.58;
-          const vx = ux * (1 - inf) + sx * inf;
-          const vy = uy * (1 - inf) + sy * inf;
-          // ячейки слегка расходятся — лёгкая дисторсия
-          ax += nx * inf * pushK;
-          ay += ny * inf * pushK;
-          const inv = 1 / Math.sqrt(vx * vx + vy * vy);
-          ux = vx * inv;
-          uy = vy * inv;
+          const inf = fall * swirl;
+          if (inf > 0.001) {
+            // касательная к курсору — фигуры закручиваются вокруг него
+            // спираль: касательная плюс доля радиальной — так вихрь читается яснее кольца
+            const sx = -ny * 0.82 + nx * 0.58;
+            const sy = nx * 0.82 + ny * 0.58;
+            const vx = ux * (1 - inf) + sx * inf;
+            const vy = uy * (1 - inf) + sy * inf;
+            const inv = 1 / Math.sqrt(vx * vx + vy * vy);
+            ux = vx * inv;
+            uy = vy * inv;
+          }
+          // Лупа: ячейка уходит от курсора пропорционально своему расстоянию,
+          // поэтому в самом центре смещение ноль — середина растягивается, как
+          // под увеличительным стеклом, но не пустеет. Фигура растёт вместе
+          // с шагом сетки, и просветов не появляется. Складок нет, пока
+          // magnify < 4. Прежнее расталкивание (push) смещало центр сильнее
+          // всего и пробивало под курсором дыру — оно оставлено для сравнения
+          ax += dx * fall * mag + nx * fall * pushK;
+          ay += dy * fall * mag + ny * fall * pushK;
+          grow = 1 + fall * mag;
         }
       }
 
-      const len = cellSize * (sMin + sSpan * cov);
+      // вдох-выдох: волна размера идёт по знаку, фигуры растут и мельчают
+      const wave = pulse > 0 ? 1 + pulse * (ph[o + 12] * cp - ph[o + 13] * sp) : 1;
+      const len = cellSize * (sMin + sSpan * cov) * grow * wave;
 
       if (bins) {
         let bi = (cov * last + 0.5) | 0;
