@@ -10,6 +10,9 @@ import './styles/skills.css';
 import './styles/work.css';
 import './styles/case.css';
 import './styles/tts-case.css';
+import './styles/gallery.css';
+import './styles/archive.css';
+import './styles/poster.css';
 import { GlyphField } from './field/glyph-field.js';
 import { Preloader } from './brand/preloader.js';
 import { onScrollFrame } from './motion/frame.js';
@@ -19,6 +22,9 @@ import { reduced } from './motion/reduced.js';
 import { SkillsWheel } from './sections/skills.js';
 import { mountWork } from './sections/work.js';
 import { mountCase } from './sections/case.js';
+import { mountGallery } from './sections/gallery.js';
+import { PosterDetail } from './sections/poster-detail.js';
+import { POSTERS } from './sections/posters.js';
 
 // Отладочные ручки — только в dev. В сборке import.meta.env.DEV = false,
 // и всё, что под ним, вырезается: ни панели, ни window.__* на витрине.
@@ -150,6 +156,22 @@ async function boot() {
     expose('__skills', skills);
     // зрачок не крутится, пока блок за экраном
     pauseOffscreen(skillsSection, [skills.iris]);
+  }
+
+  // Архив: кольцо постеров и разворот карточки. Пока разворот открыт,
+  // кольцо стоит — крутить фон под открытой панелью незачем
+  const ringRoot = document.querySelector('[data-archive-ring]');
+  if (ringRoot && POSTERS.length) {
+    let ring = null;
+    const detail = new PosterDetail({
+      onOpen: () => { if (ring) ring.paused = true; },
+      onClose: () => { if (ring) ring.paused = false; },
+    });
+    // карточек ровно столько, сколько постеров: лента конечная, у неё есть
+    // последняя карточка, на которой кольцо останавливается
+    ring = mountGallery(ringRoot, POSTERS, { drive: 'page', laps: 1, count: POSTERS.length });
+    ring.onPick = (item, el) => detail.open(item, el);
+    expose('__archive', ring);
   }
 
   mountCase(document.querySelector('[data-tts]'));

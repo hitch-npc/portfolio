@@ -16,7 +16,8 @@
     "fetch:fonts": "node tooling/fetch-fonts.mjs",
     "fetch:fontshare": "node tooling/fetch-fontshare.mjs",
     "lab": "vite --open /gallery.html",
-    "lab:field": "vite --open /field.html"
+    "lab:field": "vite --open /field.html",
+    "posters": "node tooling/posters.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0",

@@ -1,0 +1,58 @@
+{
+  "_example": {
+    "title": "Заголовок карточки; без него — имя файла",
+    "kind": ["Poster", "Typography"],
+    "year": "2024",
+    "client": "Кто заказал",
+    "role": "Что делал",
+    "note": "Два-три предложения о работе. Пусто — строка не показывается.",
+    "facts": {
+      "Format": "A1",
+      "Print": "Risograph"
+    }
+  },
+  "pottery-space": {
+    "title": "Pottery Space",
+    "kind": ["Poster"]
+  },
+  "stone-fingers": {
+    "title": "Stone Fingers",
+    "kind": ["Poster"]
+  },
+  "nature-ceramics": {
+    "title": "Nature Ceramics",
+    "kind": ["Poster"]
+  },
+  "spanish-passion": {
+    "title": "Spanish Passion",
+    "kind": ["Poster"]
+  },
+  "wild-menu": {
+    "title": "Wild Menu",
+    "kind": ["Poster"]
+  },
+  "limitless": {
+    "title": "Limitless",
+    "kind": ["Poster"]
+  },
+  "the-act": {
+    "title": "The Act",
+    "kind": ["Poster"]
+  },
+  "unique": {
+    "title": "Unique",
+    "kind": ["Poster"]
+  },
+  "wild-is-inside": {
+    "title": "Wild Is Inside",
+    "kind": ["Poster"]
+  },
+  "namstore": {
+    "title": "Namstore",
+    "kind": ["Poster"]
+  },
+  "hamlet": {
+    "title": "Hamlet",
+    "kind": ["Poster"]
+  }
+}

@@ -29,9 +29,33 @@
  * На тач-устройствах ветка не включается вовсе — и это же делает их случай
  * самым дешёвым.
  *
+ * Ступени. Цель прокрутки подтягивается к ближайшей карточке, а не идёт
+ * слитно: на спокойном листании карточки выходят в фокус по одной, каждая
+ * успевает встать. Бросок тачпада уводит цель на десяток карточек вперёд —
+ * кольцо проворачивается мимо них с потолком скорости и мягко тормозит на
+ * той, куда попала прокрутка (see motion/scrub.js). Наезд не ступенчатый:
+ * приближение должно идти за прокруткой слитно.
+ *
+ * Конец ленты. В режиме страницы один проход — вся лента, от первой
+ * карточки до последней; дальше кольцо стоит, а прокрутка уходит странице.
+ * Хвост трека (tail) оставлен на то, чтобы последняя карточка успела
+ * встать и подержаться в кадре, а не уехала в тот же миг.
+ *
+ * Клик. Карточка — кнопка, и кольцо о ней больше ничего не знает: оно
+ * зовёт onPick и отдаёт постер вместе с элементом. Что показывать дальше —
+ * дело вызывающего (see poster-detail.js). Слушатель один на всё кольцо.
+ *
+ * Надпись в центре. Живёт рядом с кольцом, а не внутри: внутри крутилась бы
+ * вместе с карточками. На наезде она не уезжает с центром кольца (тот уходит
+ * за нижний край) и не гаснет, а опускается под постер, мельчает и тускнеет:
+ * середину занимает постер, а метка раздела остаётся на виду всю прокрутку.
+ *
  * prefers-reduced-motion: кольцо стоит в конечном положении наезда,
  * без вращения, без наводки, без кадров.
  */
+
+import { onScrollFrame } from '../motion/frame.js';
+import { scrub } from '../motion/scrub.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -44,6 +68,14 @@ const CARD_PERSPECTIVE = 1000;
 const STAGE_PERSPECTIVE = 2000;
 // доля, на которую значение догоняет цель за кадр при 60 Гц
 const HOVER_LERP = 0.15;
+// мёртвая зона ступени: карточка меняется не ровно на половине шага, а чуть
+// позже — иначе на самой границе кольцо дёргается между соседями
+const SNAP_DEAD = 0.12;
+// надпись после наезда: какая доля роста и какая доля яркости от исходных
+const HUB_SMALL = 0.82;
+const HUB_DIM = 0.38;
+// и на сколько от низа блока встаёт её середина — под постером, над подсказкой
+const HUB_BOTTOM = 150;
 // матрицу не переписываем, пока сдвиг меньше половины физического пикселя
 const EPS = 0.004;
 // колесо отдаёт до 400 px за событие; больше — это уже инерция трекпада
@@ -51,23 +83,42 @@ const WHEEL_CLAMP = 400;
 const TOUCH_GAIN = 2.2;
 
 export const GALLERY = {
-  count: 25,          // карточек в кольце
-  ringRadius: 224,    // радиус кольца в его собственных единицах
-  cardW: 40,          // карточка в тех же единицах: масштаб задаёт кольцо
-  cardH: 45,
-  cardRadius: 4,
-  zoom: 5,            // во сколько раз кольцо вырастает к концу наезда
-  zoomOffset: 0,      // ручная поправка к подъёму центра, px
-  sensitivity: 5,     // 0…10 — сколько прокрутки стоит одна карточка
-  smoothing: 10,      // 0…10 — инерция прокрутки
-  reach: 5,           // радиус действия курсора
-  strength: 5,        // насколько сильно карточка отталкивается и растёт
-  parallax: 5,        // наклон всей сцены за курсором
-  entryCards: 2,      // сколько карточек прокрутки занимает наезд
+  count: 13,          // карточек в кольце; витрина ставит по числу постеров
+  ringRadius: 286,    // радиус кольца в его собственных единицах
+  // Карточка и приближение связаны: на экране постер выходит ростом
+  // cardH/ringRadius от радиуса кольца, а сколько карточек помещается
+  // в кадр — задаёт одно приближение. Здесь выбрано «по одному крупно»:
+  // 80/286 при zoom 5.5 даёт постер почти во весь экран и ровно одну
+  // карточку в кадре; соседние подходят с краёв.
+  cardW: 82,          // карточка в тех же единицах: масштаб задаёт кольцо
+  cardH: 80,
+  cardRadius: 0,      // постер без скругления: рамка не спорит с работой
+  zoom: 5.5,          // во сколько раз кольцо вырастает к концу наезда
+  zoomOffset: -52,    // ручная поправка к подъёму центра, px
+  sensitivity: 0.5,   // 0…10 — сколько прокрутки стоит одна карточка (drive: 'wheel')
+  smoothing: 9,       // 0…10 — инерция прокрутки
+  maxSpeed: 15,       // потолок: карточек в секунду, сколько бы ни накрутили; 0 — снять
+  snap: true,         // цель подтягивается к ближайшей карточке
+  tail: 0.14,         // доля трека после последней карточки (drive: 'page')
+  reach: 3,           // радиус действия курсора
+  strength: 6,        // насколько сильно карточка отталкивается и растёт
+  parallax: 2.5,      // наклон всей сцены за курсором
+  entryCards: 3,      // сколько карточек прокрутки занимает наезд
   laps: 1,            // оборотов на всю высоту трека (drive: 'page')
+  fit: true,          // карточка берёт пропорции картинки; false — общий размер
+  fitMin: 0.55,       // предельные пропорции: у́же и шире карточка не станет
+  fitMax: 1.5,        // шире — и разворот ляжет на соседей по кольцу
+  hub: 'ARCHIVED WORKS',  // надпись в центре кольца; '' — убрать
   drive: 'wheel',     // 'wheel' — колесо внутри блока, 'page' — прокрутка страницы
   naive: false,       // снять экономию кадра — для замеров «до/после», см. _frame
 };
+
+// подсказка к клику: на тач-устройствах жест называется иначе
+const HINT_CLICK = 'Click a poster to open it';
+const HINT_TAP = 'Tap a poster to open it';
+
+/** Кольцо принимает и голые адреса, и постеры целиком. */
+const asItem = (v) => (typeof v === 'string' ? { src: v } : v);
 
 /** Угол карточки: отсчёт от нижней точки кольца. */
 const cardAngle = (i, count) => (i / Math.max(1, count)) * TAU + FOCUS_ANGLE;
@@ -100,7 +151,11 @@ export class CircularGallery {
     this.target = 0;
     this.entry = 0;
     this.cards = [];
+    this.onPick = null;   // (item, el) => void — клик по карточке
     this.pointer = null;  // координаты курсора, снятые в событии и прочитанные в кадре
+    this._dragged = false;
+    this._hubLast = '';
+    this._snapAt = 0;
     this.tilt = { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0 };
     this._ringLast = '';
     this._stageLast = '';
@@ -123,8 +178,22 @@ export class CircularGallery {
     this.ring = document.createElement('div');
     this.ring.className = 'gallery__ring';
 
-    this.stage.append(this.ring);
-    this.root.append(this.stage);
+    this.hub = document.createElement('div');
+    this.hub.className = 'gallery__hub';
+    this.hub.setAttribute('aria-hidden', 'true');
+    const hubTitle = document.createElement('p');
+    hubTitle.className = 'gallery__hub-title';
+    hubTitle.textContent = this.p.hub;
+    this.hub.append(hubTitle);
+    this.hub.hidden = !this.p.hub;
+
+    // подсказка к клику: гаснет навсегда, как только карточку открыли
+    this.cue = document.createElement('p');
+    this.cue.className = 'gallery__cue';
+    this.cue.textContent = this.hoverable ? HINT_CLICK : HINT_TAP;
+
+    this.stage.append(this.ring, this.hub);
+    this.root.append(this.stage, this.cue);
     this._buildCards();
   }
 
@@ -137,12 +206,20 @@ export class CircularGallery {
     this.cards = [];
 
     for (let i = 0; i < count; i += 1) {
-      const el = document.createElement('div');
+      // кнопка, а не div: карточка открывается кликом, и клавиатуре
+      // с экранным диктором это объясняется один раз — тегом
+      const el = document.createElement('button');
+      el.type = 'button';
       el.className = 'gallery__card';
 
-      const url = src.length ? src[i % src.length] : null;
+      const item = src.length ? asItem(src[i % src.length]) : null;
+      const url = item?.src ?? null;
+      // без постера открывать нечего: кнопка выпадает и из обхода табом
+      el.disabled = !item;
+      if (item) el.setAttribute('aria-label', item.title || `Poster ${i + 1}`);
+      let img = null;
       if (url) {
-        const img = document.createElement('img');
+        img = document.createElement('img');
         img.className = 'gallery__img';
         img.src = url;
         img.alt = '';
@@ -159,16 +236,33 @@ export class CircularGallery {
       }
 
       this.ring.append(el);
-      this.cards.push({
+      const card = {
         el,
+        item,
+        aspect: 0,
         angle: cardAngle(i, count),
         rot: 0, rotT: 0,
         x: 0, xT: 0,
         y: 0, yT: 0,
         scale: 1, scaleT: 1,
         last: '',
-      });
+      };
+      this.cards.push(card);
+
+      // пропорции известны только после загрузки; до неё карточка стоит
+      // в общем размере, потом подгоняется под свой постер
+      if (img) {
+        const fit = () => {
+          if (!img.naturalWidth || !img.naturalHeight) return;
+          card.aspect = clamp(img.naturalWidth / img.naturalHeight, this.p.fitMin, this.p.fitMax);
+          this._fitCard(card);
+        };
+        if (img.complete) fit();
+        else img.addEventListener('load', fit, { once: true });
+      }
     }
+    // открывать нечего — и подсказывать не о чем
+    this.cue.hidden = !this.cards.some((c) => c.item);
     this._applyCardBox();
   }
 
@@ -179,6 +273,22 @@ export class CircularGallery {
     st.setProperty('--card-w', `${cardW}px`);
     st.setProperty('--card-h', `${cardH}px`);
     st.setProperty('--card-r', `${cardRadius}px`);
+    for (const card of this.cards) this._fitCard(card);
+  }
+
+  /**
+   * Ширина карточки под пропорции её постера. Высота у всех общая, меняется
+   * ширина — так в кольце стоят и квадраты, и вертикали, и развороты, и
+   * ничего не обрезается: кадр совпадает с картинкой, обрезать нечего.
+   * Пределы нужны, чтобы разворот не лёг на соседей, а узкая вертикаль
+   * не выродилась в полоску.
+   */
+  _fitCard(card) {
+    if (!this.p.fit || !card.aspect) {
+      card.el.style.removeProperty('--card-w');
+      return;
+    }
+    card.el.style.setProperty('--card-w', `${(this.p.cardH * card.aspect).toFixed(1)}px`);
   }
 
   /* ─── производные величины ─────────────────────────────────────── */
@@ -189,8 +299,9 @@ export class CircularGallery {
     const w = this.root.clientWidth;
     const h = this.root.clientHeight;
 
-    // кольцо целиком в кадре: диаметр плюс диагональ карточки по краям
-    const span = 2 * p.ringRadius + Math.hypot(p.cardW, p.cardH);
+    // кольцо целиком в кадре: диаметр плюс диагональ самой широкой карточки
+    const wide = p.fit ? Math.max(p.cardW, p.cardH * p.fitMax) : p.cardW;
+    const span = 2 * p.ringRadius + Math.hypot(wide, p.cardH);
     this.baseScale = w > 0 && h > 0 ? clamp(Math.min(w, h) / span, 0.01, 1) : 1;
     this.zoomScale = clamp(p.zoom, 0.5, 20) * this.baseScale;
     this.lift = p.ringRadius * this.zoomScale + p.zoomOffset;
@@ -201,6 +312,14 @@ export class CircularGallery {
     this.lapProgress = (1 - this.entryFraction) * (count / Math.max(1, count - 1));
     this.scrollTotal = Math.max(1, (400 - clamp(p.sensitivity, 0, 10) * 32) * total);
     this.scrollLerp = clamp(0.16 - clamp(p.smoothing, 0, 10) * 0.012, 0.03, 0.16);
+    // одна карточка прокрутки — это ровно 1/total хода progress, и в наезде,
+    // и во вращении: потолок в карточках переводится в потолок хода делением
+    this.cardSpeed = Math.max(0, p.maxSpeed) / total;
+    // одна карточка прокрутки в долях progress — шаг ступени
+    this.cardStep = 1 / total;
+
+    // куда уходит надпись: от середины блока к его низу
+    this.hubDrop = Math.max(0, h / 2 - HUB_BOTTOM);
 
     this.hoverRadius = (100 + p.reach * 80) * this.baseScale;
     this.falloff = Math.max(1, this.hoverRadius / 2);
@@ -230,10 +349,18 @@ export class CircularGallery {
     this._invalidate();
   }
 
-  /** Сбрасывает кеш матриц: следующий кадр перепишет всё. */
+  /**
+   * Сбрасывает кеш матриц: следующий кадр перепишет всё. Вместе с кешем
+   * обязательно снимается и флаг «всё улеглось»: иначе после пересборки
+   * карточек кадр выходил из расчёта раньше, чем расставил их, и кольцо
+   * схлопывалось в одну точку в центре.
+   */
   _invalidate() {
+    this._snapAt = Math.max(0, Math.round((this.progress - this.entryFraction) / this.cardStep));
     this._ringLast = '';
     this._stageLast = '';
+    this._hubLast = '';
+    this._settled = false;
     for (const c of this.cards) c.last = '';
   }
 
@@ -260,6 +387,17 @@ export class CircularGallery {
     this.root.addEventListener('pointermove', this._onPointer, { passive: true });
     this.root.addEventListener('pointerleave', this._onLeave, { passive: true });
 
+    // слушатель один на всё кольцо: карточек два десятка, и они пересобираются
+    this._onClick = (e) => {
+      if (this._dragged) return;   // пальцем крутили, а не выбирали
+      const el = e.target.closest?.('.gallery__card');
+      const card = el && this.cards.find((c) => c.el === el);
+      if (!card?.item) return;
+      this.root.classList.add('is-picked');   // подсказка своё отработала
+      this.onPick?.(card.item, el);
+    };
+    this.ring.addEventListener('click', this._onClick);
+
     if (this.p.drive === 'page') this._bindPage();
     else this._bindWheel();
   }
@@ -280,10 +418,17 @@ export class CircularGallery {
     };
 
     let ty = null;
-    this._onTouchStart = (e) => { ty = e.touches[0]?.clientY ?? null; };
+    let ty0 = null;
+    this._onTouchStart = (e) => {
+      ty = e.touches[0]?.clientY ?? null;
+      ty0 = ty;
+      this._dragged = false;
+    };
     this._onTouchMove = (e) => {
       const y = e.touches[0]?.clientY;
       if (y == null || ty == null) return;
+      // сдвиг больше полпальца — это прокрутка, и клик за ней не считается
+      if (Math.abs(y - ty0) > 8) this._dragged = true;
       const d = clamp((ty - y) * TOUCH_GAIN, -WHEEL_CLAMP, WHEEL_CLAMP);
       ty = y;
       if (spent(d)) return;
@@ -303,22 +448,29 @@ export class CircularGallery {
    * Прокрутка страницы. Блок не перехватывает колесо вовсе: кольцо читает
    * своё положение внутри трека — высокой обёртки с закреплённым кольцом.
    * Так кольцо встраивается в одностраничник и не дерётся с ним за прокрутку.
+   *
+   * Чтение геометрии и запись цели разведены по фазам общего кадра
+   * (see motion/frame.js): свой слушатель прокрутки читал бы этот rect
+   * после чужих записей и заставлял браузер пересчитывать вёрстку посреди
+   * кадра — тем дороже, чем больше на странице таких блоков.
    */
   _bindPage() {
     const track = this.root.closest('[data-gallery-track]') || this.root;
-    let ticking = false;
-
-    const read = () => {
-      ticking = false;
-      const r = track.getBoundingClientRect();
-      const run = Math.max(1, r.height - innerHeight);
-      const k = clamp(-r.top / run, 0, 1);
-      this.target = k * (this.entryFraction + this.lapProgress * this.p.laps);
-    };
-
-    this._onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(read); } };
-    addEventListener('scroll', this._onScroll, { passive: true });
-    read();
+    this._offScroll = onScrollFrame(
+      () => {
+        const r = track.getBoundingClientRect();
+        const run = Math.max(1, r.height - innerHeight);
+        return clamp(-r.top / run, 0, 1);
+      },
+      (k) => {
+        // хвост трека кольцо не крутит: он нужен, чтобы последняя карточка
+        // успела встать и подержаться в кадре, прежде чем раздел уедет вверх
+        const ride = clamp(k / Math.max(0.05, 1 - this.p.tail), 0, 1);
+        // один проход — вся лента: ride === 1 ставит в фокус последнюю
+        // карточку, и дальше кольцо стоит
+        this.target = ride * (this.entryFraction + (1 - this.entryFraction) * this.p.laps);
+      },
+    );
   }
 
   /* ─── кадр ─────────────────────────────────────────────────────── */
@@ -358,6 +510,23 @@ export class CircularGallery {
   }
 
   /**
+   * Цель, подтянутая к ближайшей карточке. Наезд не трогаем: приближение
+   * должно идти за прокруткой слитно, ступени начинаются после него.
+   *
+   * Шаг кольца — ровно 1/total хода progress, а откат оборота кратен шагу
+   * (lapProgress = count шагов), поэтому сетка ступеней переживает откат.
+   */
+  _snap(raw) {
+    if (!this.p.snap || raw <= this.entryFraction) {
+      this._snapAt = 0;
+      return raw;
+    }
+    const at = (raw - this.entryFraction) / this.cardStep;
+    if (Math.abs(at - this._snapAt) > 0.5 + SNAP_DEAD) this._snapAt = Math.round(at);
+    return this.entryFraction + this._snapAt * this.cardStep;
+  }
+
+  /**
    * Один кадр. Возвращать наружу нечего — всё уходит в transform.
    * @param {number} dt секунд с прошлого кадра
    */
@@ -365,8 +534,13 @@ export class CircularGallery {
     const p = this.p;
     this.writes = 0;
 
-    const sk = 1 - (1 - this.scrollLerp) ** (dt * 60);
-    this.progress += (this.target - this.progress) * sk;
+    // инерция подводит к цели мягко, потолок скорости не даёт броску тачпада
+    // промотать кольцо целиком: на спокойной прокрутке он не включается
+    // вовсе, на броске растягивает его (see motion/scrub.js)
+    this.progress = scrub(this.progress, this._snap(this.target), dt, {
+      lerp: this.scrollLerp,
+      speed: this.cardSpeed,
+    });
 
     // оборот замкнут: откатываем и текущее, и цель — иначе цель убежит в бесконечность
     const lapEnd = this.entryFraction + this.lapProgress;
@@ -421,6 +595,24 @@ export class CircularGallery {
       this.ring.style.transform = ring;
       this._ringLast = ring;
       this.writes += 1;
+    }
+
+    // надпись уходит из центра вниз, под постер, и там остаётся: мельче
+    // и тусклее, но на виду — середину кольца занимает постер
+    if (this.p.hub) {
+      const k = this.entry;
+      // уходит с опережением: кольцо на наезде растёт и подбирается к её
+      // месту, и на равномерном ходе они пересекались
+      const y = ((1 - (1 - k) ** 3) * this.hubDrop).toFixed(1);
+      const size = (1 - k * (1 - HUB_SMALL)).toFixed(3);
+      const veil = (1 - k * (1 - HUB_DIM)).toFixed(3);
+      const hub = `${y}:${size}:${veil}`;
+      if (hub !== this._hubLast) {
+        this.hub.style.transform = `translate3d(0, ${y}px, 0) scale(${size})`;
+        this.hub.style.opacity = veil;
+        this._hubLast = hub;
+        this.writes += 1;
+      }
     }
 
     // вне наводки смещения карточек нулевые, а значит их матрицы не зависят
@@ -479,13 +671,15 @@ export class CircularGallery {
     this._ro?.disconnect();
     this.root.removeEventListener('pointermove', this._onPointer);
     this.root.removeEventListener('pointerleave', this._onLeave);
+    this.ring.removeEventListener('click', this._onClick);
     this.root.removeEventListener('wheel', this._onWheel);
     this.root.removeEventListener('touchstart', this._onTouchStart);
     this.root.removeEventListener('touchmove', this._onTouchMove);
     this.root.removeEventListener('touchend', this._onTouchEnd);
     this.root.removeEventListener('touchcancel', this._onTouchEnd);
-    if (this._onScroll) removeEventListener('scroll', this._onScroll);
+    this._offScroll?.();
     this.stage.remove();
+    this.cue.remove();
   }
 }
 

@@ -43,6 +43,12 @@
   position: absolute;
   left: 0;
   top: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
   width: var(--card-w);
   height: var(--card-h);
   margin-left: calc(var(--card-w) / -2);
@@ -54,6 +60,12 @@
   backface-visibility: visible;
 }
 
+/* карточка без постера открывать нечего: и курсор, и таб это знают */
+.gallery__card:disabled { cursor: default; }
+
+.gallery__card:hover .gallery__img,
+.gallery__card:focus-visible .gallery__img { filter: brightness(1.14); }
+
 /* наводка жива — карточки едут; дальше слои отпускаются обратно */
 .gallery.is-live .gallery__card { will-change: transform; }
 
@@ -64,10 +76,69 @@
   display: block;
   user-select: none;
   backface-visibility: hidden;
+  transition: filter var(--dur-base) var(--ease-out);
 }
+
+/* ─── надпись в центре кольца ─────────────────────────────────────── */
+
+/* из потока вынута: .gallery__stage центрирует кольцо флексом, и второй
+   элемент рядом сдвинул бы его вбок */
+.gallery__hub {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  /* transform намеренно не в will-change: надпись на наезде мельчает, и
+     поднятый слой отрисовал бы её один раз крупно, а потом ужал — с мылом.
+     Без слоя браузер перерисовывает строку на каждом шаге, она чёткая,
+     а шагов этих ровно столько, сколько длится наезд */
+  will-change: opacity;
+}
+
+.gallery__hub-title {
+  margin: 0;
+  max-width: 44%;
+  font-family: var(--f-ui);
+  font-size: clamp(13px, 1.5vw, 21px);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-caption);
+  line-height: 1.4;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+/* подсказка к клику: своё дело она делает один раз */
+.gallery__cue {
+  position: absolute;
+  left: 50%;
+  bottom: var(--sp-6);
+  translate: -50% 0;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-4);
+  /* left: 50% оставляет на ширину только половину блока, и на телефоне
+     подсказка ломалась на две строки; она в одну строку и задумана */
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--brand-ground) 60%, transparent);
+  color: var(--fg-muted);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.gallery.is-picked .gallery__cue { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .gallery__stage,
   .gallery__ring,
+  .gallery__hub,
   .gallery.is-live .gallery__card { will-change: auto; }
+  .gallery__img,
+  .gallery__cue { transition: none; }
 }

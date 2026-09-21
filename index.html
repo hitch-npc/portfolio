@@ -143,7 +143,7 @@
       <section class="work" id="work" data-work aria-labelledby="work-title">
         <header class="work__head" data-work-head>
           <p class="label" data-decrypt>Cases</p>
-          <h2 class="work__title" id="work-title">Selected work</h2>
+          <h2 class="work__title" id="work-title">Projects</h2>
           <p class="work__hint">Open a card to read the full case.</p>
         </header>
 
@@ -249,6 +249,19 @@
               </div>
             </div>
           </article>
+        </div>
+      </section>
+
+      <!-- Архив постеров. Трек в три экрана, кольцо в нём закреплено:
+           прокрутка страницы крутит кольцо, а не отнимается у неё.
+           Заголовок раздела — сама надпись в центре кольца, поэтому
+           в разметке он только для читалок -->
+      <section class="archive" id="archive" aria-labelledby="archive-title">
+        <h2 class="sr-only" id="archive-title">Archived works</h2>
+        <div class="archive__track" data-gallery-track>
+          <div class="archive__pin">
+            <div class="archive__ring" data-archive-ring></div>
+          </div>
         </div>
       </section>
 

@@ -17,8 +17,11 @@
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/gallery.css';
+import '../styles/poster.css';
 import '../styles/lab.css';
 import { GALLERY, CircularGallery } from '../sections/gallery.js';
+import { PosterDetail } from '../sections/poster-detail.js';
+import { POSTERS } from '../sections/posters.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -28,13 +31,15 @@ const SLIDERS = [
   { group: 'Кольцо', key: 'count', label: 'карточек', min: 3, max: 60, step: 1 },
   { group: 'Кольцо', key: 'ringRadius', label: 'радиус', min: 80, max: 420, step: 2, unit: 'px' },
   { group: 'Кольцо', key: 'entryCards', label: 'карточек на наезд', min: 1, max: 8, step: 1 },
-  { group: 'Карточка', key: 'cardW', label: 'ширина', min: 8, max: 160, step: 1, unit: 'px' },
+  { group: 'Карточка', key: 'cardW', label: 'ширина (без подгонки)', min: 8, max: 160, step: 1, unit: 'px' },
   { group: 'Карточка', key: 'cardH', label: 'высота', min: 8, max: 180, step: 1, unit: 'px' },
   { group: 'Карточка', key: 'cardRadius', label: 'скругление', min: 0, max: 40, step: 1, unit: 'px' },
   { group: 'Наезд', key: 'zoom', label: 'приближение', min: 0.5, max: 20, step: 0.1, unit: '×' },
   { group: 'Наезд', key: 'zoomOffset', label: 'подъём центра', min: -400, max: 400, step: 4, unit: 'px' },
   { group: 'Прокрутка', key: 'sensitivity', label: 'чувствительность', min: 0, max: 10, step: 0.5 },
   { group: 'Прокрутка', key: 'smoothing', label: 'инерция', min: 0, max: 10, step: 0.5 },
+  { group: 'Прокрутка', key: 'maxSpeed', label: 'потолок скорости', min: 0, max: 30, step: 1, unit: ' карт/с' },
+  { group: 'Прокрутка', key: 'tail', label: 'хвост трека (только «страница»)', min: 0, max: 0.4, step: 0.02 },
   { group: 'Прокрутка', key: 'laps', label: 'оборотов на трек', min: 1, max: 4, step: 1 },
   { group: 'Курсор', key: 'reach', label: 'радиус действия', min: 0, max: 10, step: 0.5 },
   { group: 'Курсор', key: 'strength', label: 'сила', min: 0, max: 10, step: 0.5 },
@@ -42,24 +47,41 @@ const SLIDERS = [
 ];
 
 const IMAGE_MODES = {
+  posters: { label: `постеры — ${POSTERS.length} шт.`, px: -1 },
   gradient: { label: 'градиенты (без <img>)', px: 0 },
   px64: { label: 'растр 64 px', px: 64 },
   px256: { label: 'растр 256 px', px: 256 },
   px900: { label: 'растр 900 px', px: 900 },
 };
 
-const params = { ...GALLERY };
-let mode = 'gradient';
+// песочница заводится в том же составе, что и витрина: карточек по числу
+// постеров, иначе ступени меряются не на той ленте
+const params = { ...GALLERY, count: POSTERS.length || GALLERY.count };
+let mode = POSTERS.length ? 'posters' : 'gradient';
 let gallery = null;
-let urls = [];
+let items = [];
+let held = false;   // пауза с пульта: разворот её не должен снимать
+
+// разворот постера. Пока он открыт, кольцо стоит: крутить фон под
+// открытой панелью незачем, а замеры кадра так остаются честными
+const detail = new PosterDetail({
+  onOpen: () => { if (gallery) gallery.paused = true; },
+  onClose: () => { if (gallery) gallery.paused = held; },
+});
 
 /* ─── картинки ──────────────────────────────────────────────────── */
 
 /** Рисует N разных растров заданного размера. Пиксели настоящие: декод честный. */
 async function bakeImages(px, n = 12) {
-  for (const u of urls) URL.revokeObjectURL(u);
-  urls = [];
-  if (!px) return urls;
+  // адреса постеров отдаёт сборщик, отзывать их нельзя — только свои blob
+  for (const it of items) if (typeof it === 'string' && it.startsWith('blob:')) URL.revokeObjectURL(it);
+  items = [];
+  if (px < 0) {
+    // постеры идут целиком, вместе с текстами: по ним и строится разворот
+    items = POSTERS;
+    return items;
+  }
+  if (!px) return items;
 
   for (let i = 0; i < n; i += 1) {
     const c = document.createElement('canvas');
@@ -81,9 +103,9 @@ async function bakeImages(px, n = 12) {
       }
     }
     const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.82));
-    urls.push(URL.createObjectURL(blob));
+    items.push(URL.createObjectURL(blob));
   }
-  return urls;
+  return items;
 }
 
 /* ─── сборка сцены ──────────────────────────────────────────────── */
@@ -117,7 +139,11 @@ function mountScene() {
     scrollTo(0, 0);
   }
 
-  gallery = new CircularGallery(host, urls, params);
+  gallery = new CircularGallery(host, items, params);
+  // разворот есть только у постеров: у нарисованных растров нет ни текстов,
+  // ни материалов — открывать было бы нечего
+  gallery.onPick = (item, el) => { if (item.slug) detail.open(item, el); };
+  gallery.paused = held;
   gallery.start();
   window.__gallery = gallery;
 }
@@ -266,7 +292,26 @@ function mountPanel() {
   img.addEventListener('change', async () => {
     mode = img.value;
     await bakeImages(IMAGE_MODES[mode].px);
-    gallery.setImages(urls);
+    gallery.setImages(items);
+    gallery.root.classList.toggle('is-picked', mode !== 'posters');
+  });
+
+  const fit = document.createElement('label');
+  fit.className = 'lab__check';
+  fit.innerHTML = '<input type="checkbox" checked><span>карточка по пропорциям постера</span>';
+  modes.append(fit);
+  fit.querySelector('input').addEventListener('change', (e) => {
+    params.fit = e.target.checked;
+    gallery.setParams({ fit: e.target.checked });
+  });
+
+  const snap = document.createElement('label');
+  snap.className = 'lab__check';
+  snap.innerHTML = '<input type="checkbox" checked><span>ступени по карточкам</span>';
+  modes.append(snap);
+  snap.querySelector('input').addEventListener('change', (e) => {
+    params.snap = e.target.checked;
+    gallery.setParams({ snap: e.target.checked });
   });
 
   const naive = document.createElement('label');
@@ -282,7 +327,10 @@ function mountPanel() {
   pause.className = 'lab__check';
   pause.innerHTML = '<input type="checkbox"><span>пауза кольца</span>';
   modes.append(pause);
-  pause.querySelector('input').addEventListener('change', (e) => { gallery.paused = e.target.checked; });
+  pause.querySelector('input').addEventListener('change', (e) => {
+    held = e.target.checked;
+    gallery.paused = held;
+  });
 
   // тормоз: занимает поток ровно столько, сколько просят. Так видно,
   // при каком запасе кадра кольцо начинает ронять кадры — на этой машине
@@ -382,5 +430,6 @@ function mountPanel() {
 
 /* ─── старт ─────────────────────────────────────────────────────── */
 
+await bakeImages(IMAGE_MODES[mode].px);
 mountScene();
 mountPanel();
