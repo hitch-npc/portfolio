@@ -57,6 +57,13 @@ function csp() {
  *
  * Хук config тут идёт после singlefile: оба плагина в группе post, а внутри
  * группы порядок — порядок списка. Путь приходит исходный, абсолютный.
+ *
+ * Папка постерам задаётся через assetFileNames, а не через assetsDir, и это
+ * не прихоть. assetsDir уводит в ту же папку и сам скрипт, а ссылку на
+ * картинку сборщик считает от места скрипта: singlefile потом вставляет
+ * скрипт в index.html в корне, и путь оказывается короче на папку — все
+ * постеры отдают 404. Скрипт всё равно встраивается и на диск не попадает,
+ * поэтому его имя здесь только для того, чтобы он считался лежащим в корне.
  */
 function keepPosters() {
   return {
@@ -64,8 +71,9 @@ function keepPosters() {
     apply: 'build',
     enforce: 'post',
     config(config) {
-      // единственные невстроенные ресурсы витрины — постеры, им своя папка
-      config.build.assetsDir = 'posters';
+      const out = config.build.rollupOptions.output;
+      out.assetFileNames = 'posters/[name]-[hash][extname]';
+      out.entryFileNames = '[name]-[hash].js';
       // true — встроить, false — оставить файлом
       config.build.assetsInlineLimit = (file) => !/[\\/]src[\\/]posters[\\/]/.test(file);
     },
