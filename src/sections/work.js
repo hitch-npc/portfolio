@@ -23,8 +23,6 @@ import { reduced } from '../motion/reduced.js';
 
 // ширина, под которую свёрстан первый экран редизайна; в карте он масштабируется
 const SHOT_WIDTH = 1180;
-// мельче текст макета не читается: на телефоне экран обрезается справа, а не сжимается
-const SHOT_MIN_SCALE = 0.42;
 
 const OPEN_MS = 620;
 const CLOSE_MS = 420;
@@ -143,18 +141,24 @@ class CaseView {
 }
 
 /**
- * Первый экран продукта свёрстан в натуральную ширину и сжимается под рамку.
- * На узкой рамке сжатие останавливается: виден левый край — логотип, афиша, кнопка.
+ * Первый экран продукта свёрстан в натуральную ширину 1180px и сжимается
+ * под ширину рамки: макет виден целиком на любом экране, обрезать его
+ * справа нельзя — на телефоне от него оставалась левая треть.
  */
 function fitShots(root) {
   const ro = new ResizeObserver((entries) => {
     for (const e of entries) {
       const w = e.contentBoxSize?.[0]?.inlineSize ?? e.contentRect.width;
-      const k = Math.max(w / SHOT_WIDTH, SHOT_MIN_SCALE);
-      e.target.style.setProperty('--k', k.toFixed(4));
+      e.target.style.setProperty('--k', (w / SHOT_WIDTH).toFixed(4));
     }
   });
-  for (const shot of root.querySelectorAll('[data-shot]')) ro.observe(shot);
+  const shots = [...root.querySelectorAll('[data-shot]')];
+  for (const shot of shots) ro.observe(shot);
+  // первый проход сразу: наблюдатель может не успеть до первого кадра,
+  // и макет остался бы на запасном масштабе из CSS
+  for (const shot of shots) {
+    shot.style.setProperty('--k', (shot.getBoundingClientRect().width / SHOT_WIDTH).toFixed(4));
+  }
   return ro;
 }
 

@@ -109,7 +109,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
-  height: min(calc(100svh - var(--top) - var(--sp-12)), 760px);
+  /* Высота по содержимому, но не выше экрана: на телефоне макет виден целиком
+     и невысок, и фиксированная высота оставляла пустую полосу между кнопкой
+     и превью. На широкой карте содержимое всё равно упирается в потолок */
+  height: auto;
+  max-height: min(calc(100svh - var(--top) - var(--sp-12)), 760px);
   overflow: hidden;
   border: 1px solid var(--line);
   /* непрерывный угол, как у карточек iOS; без поддержки — обычная дуга */
@@ -304,13 +308,21 @@
 
 /* ── Превью ──────────────────────────────────────────────────────────── */
 
+/* Макет показывается целиком, на любой ширине: рамка тянется по нему и стоит
+   по центру свободного места. Обрезать справа, как раньше, нельзя — на
+   телефоне от макета оставалась левая треть, постер резало пополам,
+   а подпись обрывалась на полуслове */
 .work-card__shot {
+  display: grid;
+  place-items: center;
   min-height: 0;
   padding: 0 var(--sp-4) var(--sp-4);
 }
 
 .work-card__frame {
-  height: 100%;
+  position: relative;
+  width: 100%;
+  height: auto;
   overflow: hidden;
   /* ширина рамки не зависит от макета внутри: иначе макет в 1180px
      распирает колонку, а масштаб считается уже от распёртой */
@@ -323,10 +335,14 @@
 
 .work-card:has(.work-card__open:hover) .work-card__frame { transform: translateY(calc(var(--sp-1) * -1)); }
 
+/* Пустое превью второго кейса держит пропорцию экрана: рамки кейсов
+   в колоде получаются соразмерными, а не разной высоты */
 .work-card__blank {
   display: grid;
   place-items: center;
-  height: 100%;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  height: auto;
   border: 1px dashed var(--line);
   border-radius: var(--shot-r);
   corner-shape: squircle;
@@ -345,9 +361,8 @@
 
 /* ── Первый экран Ticket to Show ─────────────────────────────────────
    Главная редизайна, desktop, в натуральную ширину 1180px. Масштаб --k
-   ставит скрипт по ширине рамки; на узкой рамке масштаб не падает ниже
-   читаемого, и правая часть экрана уходит за край. Значения в px —
-   размеры макета. */
+   ставит скрипт по ширине рамки, поэтому экран виден целиком и на телефоне.
+   Значения в px — размеры макета. */
 
 .ttsm {
   width: 1180px;
@@ -678,6 +693,7 @@
   .work-card__open { align-self: end; }
 
   .work-card__shot { padding: var(--sp-6) var(--sp-6) var(--sp-6) 0; }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
