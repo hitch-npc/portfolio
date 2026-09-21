@@ -58,13 +58,19 @@ function csp() {
  * Хук config тут идёт после singlefile: оба плагина в группе post, а внутри
  * группы порядок — порядок списка. Путь приходит исходный, абсолютный.
  *
- * Папка постерам задаётся через assetFileNames, а не через assetsDir, и это
- * не прихоть. assetsDir уводит в ту же папку и сам скрипт, а ссылку на
- * картинку сборщик считает от места скрипта: singlefile потом вставляет
- * скрипт в index.html в корне, и путь оказывается короче на папку — все
- * постеры отдают 404. Скрипт всё равно встраивается и на диск не попадает,
- * поэтому его имя здесь только для того, чтобы он считался лежащим в корне.
+ * Куда класть постеры — вопрос тонкий, и на нём уже дважды обожглись.
+ * Сборщик считает адрес ресурса от того места, где лежит ссылающийся на него
+ * файл, а singlefile потом вынимает и скрипт, и стили и вставляет их в
+ * index.html в корне. Значит и скрипт, и стили обязаны считаться лежащими
+ * в корне, иначе путь уезжает: assetsDir: 'posters' увёл туда скрипт, и
+ * постеры потеряли папку (404); assetFileNames на все ресурсы увёл туда же
+ * стили, и уже шрифты стали искаться уровнем выше сайта (тоже 404).
+ *
+ * Поэтому имя задаётся функцией: в папку уходят только сами постеры, всё
+ * остальное остаётся в корне.
  */
+const POSTER_SRC = /[\\/]src[\\/]posters[\\/]/;
+
 function keepPosters() {
   return {
     name: 'portfolio:keep-posters',
@@ -72,10 +78,13 @@ function keepPosters() {
     enforce: 'post',
     config(config) {
       const out = config.build.rollupOptions.output;
-      out.assetFileNames = 'posters/[name]-[hash][extname]';
       out.entryFileNames = '[name]-[hash].js';
+      out.assetFileNames = (info) => {
+        const from = info.originalFileNames?.[0] ?? info.names?.[0] ?? info.name ?? '';
+        return POSTER_SRC.test(`/${from}`) ? 'posters/[name]-[hash][extname]' : '[name]-[hash][extname]';
+      };
       // true — встроить, false — оставить файлом
-      config.build.assetsInlineLimit = (file) => !/[\\/]src[\\/]posters[\\/]/.test(file);
+      config.build.assetsInlineLimit = (file) => !POSTER_SRC.test(file);
     },
   };
 }
