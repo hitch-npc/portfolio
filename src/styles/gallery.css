@@ -134,6 +134,12 @@
 
 .gallery.is-picked .gallery__cue { opacity: 0; }
 
+/* На телефоне рамка фокуса на карточке — след тапа, а не подсказка:
+   клавиатуры там нет, а Safari ставит её и после пальца (see poster.css) */
+@media (hover: none) and (pointer: coarse) {
+  .gallery__card:focus-visible { outline: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gallery__stage,
   .gallery__ring,
