@@ -84,13 +84,17 @@ export const IRIS = {
   blinkMax: 14,
   blinkDur: 0.15,
   dart: false,        // саккады и тремор: глаз прыгает по точкам, а не ведёт
-  follow: 3.2,        // как быстро взгляд догоняет цель, когда саккад нет
+  follow: 3.2,        // как быстро взгляд догоняет курсор, когда саккад нет
+  drift: 0.9,         // то же без курсора: глаз ходит сам, вдвое медленнее
+  wanderReach: 0.45,  // насколько далеко уходит взгляд без курсора, доля хода
+  wanderMin: 3.2,     // пауза между сменами цели без курсора
+  wanderMax: 6.8,
   spin: 0.07,         // собственное вращение радужки, рад/с — оборот за 90 с
   spinIn: 0.55,       // добавка к вращению в начале появления, рад/с
   spinEase: 2.5,      // за сколько секунд добавка сходит на нет
   trail: 0.36,        // гашение прошлого кадра: меньше — длиннее смаз
   refract: 0.09,      // выпуклость роговицы
-  wobble: 0.018,      // жидкое дрожание радужки
+  wobble: 0.010,      // жидкое дрожание радужки
   textFollow: 0.3,    // насколько строка едет за зрачком: 1 — вплотную, 0 — стоит
   textSquash: 0.14,   // насколько ракурс и моргание сплющивают строку
   glow: 0.6,          // сила короны по краю зрачка; 0 — без неё
@@ -329,7 +333,9 @@ export class Iris {
   pulse() {
     if (this.reduced) return;
     this.flash = 1;
-    this.pv -= 6;           // толчок пружине: зрачок дёргается, потом отпускает
+    // толчок пружине: зрачок поджимается и отпускает. Прежние −6 давали
+    // рывок, заметный даже боковым зрением, — смена пункта читается и мягче
+    this.pv -= 2.2;
     if (this.p.blink) this.blinkIn = Math.min(this.blinkIn, rand(0.5, 1.4));
   }
 
@@ -344,9 +350,12 @@ export class Iris {
     if (this.t - this.pointerAt > 3) {
       this.wanderIn = (this.wanderIn ?? 0) - dt;
       if (this.wanderIn <= 0) {
-        this.aimX = rand(-0.8, 0.8);
-        this.aimY = rand(-0.6, 0.6);
-        this.wanderIn = rand(1.4, 3.6);
+        // Цель ближе к центру и меняется реже прежнего: на пустой странице
+        // глаз мёл взглядом от края до края каждые пару секунд, и боковым
+        // зрением это читалось как дёрганье, хотя ход и был плавным
+        this.aimX = rand(-1, 1) * p.wanderReach;
+        this.aimY = rand(-1, 1) * p.wanderReach * 0.75;
+        this.wanderIn = rand(p.wanderMin, p.wanderMax);
       }
     }
 
@@ -357,8 +366,11 @@ export class Iris {
     const prevP = this.pitch;
 
     if (!p.dart) {
-      // экспоненциальный догон: к цели быстро, у цели мягко, без остатка
-      const k = 1 - Math.exp(-dt * p.follow);
+      // экспоненциальный догон: к цели быстро, у цели мягко, без остатка.
+      // За курсором глаз идёт живее, сам по себе — медленнее: собственное
+      // блуждание не должно спорить с текстом рядом
+      const speed = this.t - this.pointerAt > 3 ? p.drift : p.follow;
+      const k = 1 - Math.exp(-dt * speed);
       this.yaw += (ty - this.yaw) * k;
       this.pitch += (tp - this.pitch) * k;
       this.speed = Math.hypot(this.yaw - prevY, this.pitch - prevP) / Math.max(dt, 1e-3);
@@ -570,8 +582,10 @@ export class Iris {
       for (let j = 0; j < ray.dots; j++) {
         // внутри штриха точки загораются наружу — цепочка, а не полоса
         const dotLit = clamp(lit * 1.7 - (j / ray.dots) * 0.7, 0, 1);
-        const shimmer = this.reduced ? 1 : 0.9 + 0.1 * Math.sin(this.t * 1.3 + ray.phase + j);
-        const drift = this.reduced ? 0 : Math.sin(this.t * 0.6 + ray.phase) * this.step * 0.07;
+        // Мерцание и дыхание точек вдвое тише прежнего: рисунок остаётся
+        // живым, но по краю зрения уже не считывается как рябь
+        const shimmer = this.reduced ? 1 : 0.95 + 0.05 * Math.sin(this.t * 1.3 + ray.phase + j);
+        const drift = this.reduced ? 0 : Math.sin(this.t * 0.6 + ray.phase) * this.step * 0.035;
 
         const r = rp + this.step * (j + 0.7) + drift;
         const q = this._project(ray, r, cy, sy, cp, sp);

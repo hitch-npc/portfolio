@@ -279,42 +279,83 @@ function splitTitle(title) {
 /**
  * Блик на кнопке кейса.
  *
- * Запускать его наведением нельзя: нажимается вся карта, невидимый слой
- * кнопки растянут на неё целиком, поэтому :hover включался, едва курсор
- * касался края карты в трёх сотнях пикселей от слова, — свет проходил
- * в пустоту. На телефоне наведения нет вообще, и блика не было никогда.
+ * Ведёт его курсор, но не :hover. Нажимается вся карта — невидимый слой
+ * кнопки растянут на неё целиком, поэтому :hover на кнопке включается, едва
+ * курсор коснулся края карты в трёх сотнях пикселей от слова, и свет
+ * проходит в пустоту. Поэтому наведение считается геометрией: курсор внутри
+ * прямоугольника самого слова (плюс небольшой запас) — блик проходит, вышел
+ * наружу — взводится заново.
  *
- * Поэтому проход ведёт наблюдатель: кнопка целиком вошла в середину экрана —
- * по слову один раз проезжает полоса. Поля подрезаны сверху и снизу, чтобы
- * блик не случился на кнопке, которая только показалась из-за нижнего края
- * (замер на 709×921: кнопка карты видна целиком с --rise ≈ 0.31, а карта
- * встаёт в стопку на нуле, — проход попадает в этот отрезок).
+ * Прямоугольник кешируется и сбрасывается на прокрутке и resize: карта в
+ * колоде всё время едет, а читать геометрию на каждое движение мыши дорого.
  *
- * Класс снимается по концу анимации: в покое слово остаётся обычным текстом,
- * и следующий вход в кадр запускает блик заново.
+ * На пальце наведения нет, и там блик остаётся на наблюдателе: кнопка
+ * целиком вошла в середину экрана — свет прошёл один раз.
  */
 function bindShine(cards) {
   if (reduced()) return () => {};
 
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        const label = e.target.querySelector('.work-card__label');
-        if (!label || label.classList.contains('is-shine')) continue;
-        label.classList.add('is-shine');
-        label.addEventListener('animationend', () => label.classList.remove('is-shine'), { once: true });
-      }
-    },
-    { threshold: 1, rootMargin: '-12% 0px -22% 0px' },
-  );
+  const pairs = cards
+    .map((card) => ({ card, btn: card.querySelector('.work-card__open'), label: card.querySelector('.work-card__label') }))
+    .filter((x) => x.btn && x.label);
+  if (!pairs.length) return () => {};
 
-  for (const card of cards) {
-    const btn = card.querySelector('.work-card__open');
-    if (btn) io.observe(btn);
+  const play = (label) => {
+    if (label.classList.contains('is-shine')) return;
+    label.classList.add('is-shine');
+    label.addEventListener('animationend', () => label.classList.remove('is-shine'), { once: true });
+  };
+
+  // курсора нет — блик показывает наблюдатель
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) play(e.target.querySelector('.work-card__label'));
+      },
+      { threshold: 1, rootMargin: '-12% 0px -22% 0px' },
+    );
+    for (const { btn } of pairs) io.observe(btn);
+    return () => io.disconnect();
   }
 
-  return () => io.disconnect();
+  const PAD = 10;
+  const boxes = new Map();
+  const inside = new Set();
+
+  const boxOf = (label) => {
+    let box = boxes.get(label);
+    if (!box) {
+      box = label.getBoundingClientRect();
+      boxes.set(label, box);
+    }
+    return box;
+  };
+
+  const onMove = (e) => {
+    for (const { label } of pairs) {
+      const b = boxOf(label);
+      const hit = e.clientX >= b.left - PAD && e.clientX <= b.right + PAD
+        && e.clientY >= b.top - PAD && e.clientY <= b.bottom + PAD;
+      if (hit && !inside.has(label)) {
+        inside.add(label);
+        play(label);
+      } else if (!hit) {
+        inside.delete(label);
+      }
+    }
+  };
+
+  const forget = () => boxes.clear();
+
+  addEventListener('pointermove', onMove, { passive: true });
+  addEventListener('scroll', forget, { passive: true });
+  addEventListener('resize', forget);
+
+  return () => {
+    removeEventListener('pointermove', onMove);
+    removeEventListener('scroll', forget);
+    removeEventListener('resize', forget);
+  };
 }
 
 export function mountWork(section) {
