@@ -36,6 +36,15 @@
  * той, куда попала прокрутка (see motion/scrub.js). Наезд не ступенчатый:
  * приближение должно идти за прокруткой слитно.
  *
+ * Свайп вбок. На телефоне кольцо читается как карусель, и палец тянется
+ * листать вбок — а ведёт кольцо вертикальная прокрутка страницы. Поэтому
+ * горизонтальное движение переводится в прокрутку страницы: положение
+ * кольца по-прежнему считается только от неё, и рассинхрону взяться неоткуда.
+ * Вертикальный свайп при этом не трогается вовсе — им занимается браузер,
+ * с родной инерцией. Делит их touch-action: pan-y pinch-zoom (see gallery.css):
+ * вертикаль остаётся браузеру, горизонталь достаётся нам, и событие приходит
+ * отменяемым. Оба жеста живые, ни один не обязателен.
+ *
  * Конец ленты. В режиме страницы один проход — вся лента, от первой
  * карточки до последней; дальше кольцо стоит, а прокрутка уходит странице.
  * Хвост трека (tail) оставлен на то, чтобы последняя карточка успела
@@ -56,6 +65,7 @@
 
 import { onScrollFrame } from '../motion/frame.js';
 import { scrub } from '../motion/scrub.js';
+import { haptics } from '../motion/haptics.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -99,6 +109,8 @@ export const GALLERY = {
   smoothing: 9,       // 0…10 — инерция прокрутки
   maxSpeed: 15,       // потолок: карточек в секунду, сколько бы ни накрутили; 0 — снять
   snap: true,         // цель подтягивается к ближайшей карточке
+  buzz: true,         // тик пальцу на каждую карточку — где телефон это умеет
+  swipeCard: 110,     // пикселей пальца на карточку при свайпе вбок; 0 — выключить
   tail: 0.14,         // доля трека после последней карточки (drive: 'page')
   reach: 3,           // радиус действия курсора
   strength: 6,        // насколько сильно карточка отталкивается и растёт
@@ -156,6 +168,12 @@ export class CircularGallery {
     this._dragged = false;
     this._hubLast = '';
     this._snapAt = 0;
+    // отдача заводится один раз: где её нет, здесь остаётся null
+    this._buzz = this.p.buzz ? haptics() : null;
+    this._buzzAt = null;
+    this._run = 1;      // длина хода трека, снимается в кадре прокрутки
+    this._glideRaf = 0;
+    this._grown = false;
     this.tilt = { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0 };
     this._ringLast = '';
     this._stageLast = '';
@@ -460,9 +478,12 @@ export class CircularGallery {
       () => {
         const r = track.getBoundingClientRect();
         const run = Math.max(1, r.height - innerHeight);
-        return clamp(-r.top / run, 0, 1);
+        return { k: clamp(-r.top / run, 0, 1), run };
       },
-      (k) => {
+      ({ k, run }) => {
+        // длина хода нужна свайпу: по ней считается, сколько прокрутки
+        // стоит одна карточка
+        this._run = run;
         // хвост трека кольцо не крутит: он нужен, чтобы последняя карточка
         // успела встать и подержаться в кадре, прежде чем раздел уедет вверх
         const ride = clamp(k / Math.max(0.05, 1 - this.p.tail), 0, 1);
@@ -471,6 +492,100 @@ export class CircularGallery {
         this.target = ride * (this.entryFraction + (1 - this.entryFraction) * this.p.laps);
       },
     );
+
+    if (this.p.swipeCard > 0) this._bindSwipe();
+  }
+
+  /** Во сколько раз прокрутка страницы обгоняет палец. */
+  get _swipeGain() {
+    const steps = Math.max(1, this.p.entryCards + Math.max(1, Math.round(this.p.count)) - 1);
+    return (this._run * (1 - this.p.tail)) / steps / this.p.swipeCard;
+  }
+
+  /**
+   * Свайп вбок ведёт ту же прокрутку страницы, что и обычный.
+   *
+   * Направление выбирается на первом же движении и до конца жеста не
+   * меняется: пока браузер не начал прокрутку, её ещё можно забрать,
+   * а после — уже нет. Диагональ отдаётся странице: чтобы жест признали
+   * горизонтальным, вбок нужно пройти заметно больше, чем вверх.
+   *
+   * От самых краёв экрана жест игнорируется — там iOS ловит «назад».
+   */
+  _bindSwipe() {
+    const EDGE = 24;
+    // порог: пока палец не сдвинулся, о направлении говорить рано
+    const WAKE = 6;
+    let x0 = 0;
+    let y0 = 0;
+    let from = 0;
+    let xPrev = 0;
+    let tPrev = 0;
+    let vx = 0;
+    let side = false;   // false — не наш жест, null — ещё не решили, true — наш
+
+    this._onSwipeStart = (e) => {
+      side = false;
+      cancelAnimationFrame(this._glideRaf);
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (t.clientX < EDGE || t.clientX > innerWidth - EDGE) return;
+      x0 = xPrev = t.clientX;
+      y0 = t.clientY;
+      from = scrollY;
+      tPrev = e.timeStamp;
+      vx = 0;
+      side = null;
+    };
+
+    this._onSwipeMove = (e) => {
+      if (side === false || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - x0;
+      const dy = t.clientY - y0;
+
+      if (side === null) {
+        if (Math.abs(dx) < WAKE && Math.abs(dy) < WAKE) return;
+        side = Math.abs(dx) > Math.abs(dy) * 1.4;
+        if (!side) return;   // вертикаль — страница листает сама
+      }
+
+      if (e.cancelable) e.preventDefault();
+      if (e.timeStamp > tPrev) vx = (t.clientX - xPrev) / (e.timeStamp - tPrev);
+      xPrev = t.clientX;
+      tPrev = e.timeStamp;
+      // палец влево — лента вперёд, то есть страница вниз
+      scrollTo(0, Math.max(0, from - dx * this._swipeGain));
+    };
+
+    this._onSwipeEnd = () => {
+      if (side !== true) { side = false; return; }
+      side = false;
+      this._glide(-vx * this._swipeGain);
+    };
+
+    this.root.addEventListener('touchstart', this._onSwipeStart, { passive: true });
+    this.root.addEventListener('touchmove', this._onSwipeMove, { passive: false });
+    this.root.addEventListener('touchend', this._onSwipeEnd, { passive: true });
+    this.root.addEventListener('touchcancel', this._onSwipeEnd, { passive: true });
+  }
+
+  /**
+   * Доводка после броска: страница едет сама и затухает. Своя, потому что
+   * жест мы у браузера забрали, а вместе с ним и его инерцию. Дальше кольцо
+   * всё равно подтянет к ближайшей карточке — сюда точность не нужна.
+   * @param {number} v пикселей страницы на миллисекунду в момент отпускания
+   */
+  _glide(v) {
+    let speed = clamp(v, -4, 4) * 16;   // в пиксели за кадр
+    if (Math.abs(speed) < 1) return;
+    const step = () => {
+      speed *= 0.94;
+      if (Math.abs(speed) < 0.4) return;
+      scrollTo(0, Math.max(0, scrollY + speed));
+      this._glideRaf = requestAnimationFrame(step);
+    };
+    this._glideRaf = requestAnimationFrame(step);
   }
 
   /* ─── кадр ─────────────────────────────────────────────────────── */
@@ -550,6 +665,20 @@ export class CircularGallery {
     }
 
     this.entry = smoothstep(clamp(this.progress / this.entryFraction, 0, 1));
+
+    // тик на каждую прошедшую фокус карточку. Считается по progress, а не
+    // по цели: на броске мимо зрителя проходит десяток карточек, и отдача
+    // должна отсчитать их все, а не щёлкнуть один раз в конце. Наезд молчит:
+    // карточек там ещё нет, есть приближение
+    if (this._buzz && this.entry > 0.9) {
+      const at = Math.round((this.progress - this.entryFraction) / this.cardStep);
+      if (at !== this._buzzAt) {
+        if (this._buzzAt !== null) this._buzz();
+        this._buzzAt = at;
+      }
+    } else if (this._buzzAt !== null) {
+      this._buzzAt = null;
+    }
     const ride = this.entryFraction < 1
       ? Math.max(0, (this.progress - this.entryFraction) / (1 - this.entryFraction))
       : 0;
@@ -595,6 +724,17 @@ export class CircularGallery {
       this.ring.style.transform = ring;
       this._ringLast = ring;
       this.writes += 1;
+    }
+
+    // Наезд доигран — отпускаем слой. Пока кольцо росло, слой был нужен:
+    // масштаб менялся каждый кадр. Но растр в него снимается один раз, на
+    // том масштабе, какой был в момент подъёма слоя, и Safari его потом не
+    // пересобирает — постер так и остаётся растянутым с маленькой копии.
+    // Отпустили — браузер перерисовал уже в конечном масштабе.
+    const grown = this.entry > 0.999;
+    if (grown !== this._grown) {
+      this._grown = grown;
+      this.root.classList.toggle('is-grown', grown);
     }
 
     // надпись уходит из центра вниз, под постер, и там остаётся: мельче
@@ -678,6 +818,11 @@ export class CircularGallery {
     this.root.removeEventListener('touchend', this._onTouchEnd);
     this.root.removeEventListener('touchcancel', this._onTouchEnd);
     this._offScroll?.();
+    cancelAnimationFrame(this._glideRaf);
+    this.root.removeEventListener('touchstart', this._onSwipeStart);
+    this.root.removeEventListener('touchmove', this._onSwipeMove);
+    this.root.removeEventListener('touchend', this._onSwipeEnd);
+    this.root.removeEventListener('touchcancel', this._onSwipeEnd);
     this.stage.remove();
     this.cue.remove();
   }
