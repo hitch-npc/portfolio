@@ -511,6 +511,26 @@
 
 .ttsm-filter svg { width: 13px; height: 13px; }
 
+/* Переключатель темы: в продукте он в шапке давно, и макет в кейсе,
+   где рядом идёт разговор про две темы из одного файла токенов, без него
+   выглядел бы старее продукта. */
+.ttsm-theme {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-md);
+  color: var(--n300);
+}
+
+.ttsm-theme svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
 .ttsm-city {
   padding: 8px 14px;
   border: 1px solid var(--n800);
@@ -676,6 +696,32 @@
   letter-spacing: 0.18em;
 }
 
+/* Диапазон месяцев — кнопка, а не подпись: в продукте он открывает выбор
+   периода, и шеврон об этом говорит. Стрелки рядом остались перелистыванием. */
+.ttsm-month b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--n800);
+  border-radius: var(--r-sm);
+  color: var(--n300);
+  font-weight: 600;
+  letter-spacing: inherit;
+}
+
+.ttsm-month b svg {
+  width: 11px;
+  height: 11px;
+  margin-left: 2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .ttsm-month i {
   display: grid;
   place-items: center;
@@ -726,18 +772,22 @@
 
 .ttsm-day.is-off span { color: var(--n600); }
 
+/* Сегодняшний день помечен светлым, а не синим. Синий в этой системе —
+   действие (кнопка «купить», активная категория), и когда им же подсвечена
+   дата, она читается как нажатая кнопка. Светлая плашка из премиальной пары
+   токенов метит день, ничего не обещая по нажатию. */
 .ttsm-day.is-today {
-  background: var(--accent-ghost);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--premium-bg);
+  box-shadow: inset 0 0 0 1px var(--n100);
 }
 
 .ttsm-day.is-today b {
-  color: var(--accent-soft);
+  color: var(--premium-ink);
   font-size: 8px;
   font-weight: 600;
 }
 
-.ttsm-day.is-today span { color: var(--accent-soft); }
+.ttsm-day.is-today span { color: var(--premium-ink); }
 
 /* ── Десктоп: описание слева, продукт справа ─────────────────────────── */
 
