@@ -276,6 +276,47 @@ function splitTitle(title) {
   title.append(frag);
 }
 
+/**
+ * Блик на кнопке кейса.
+ *
+ * Запускать его наведением нельзя: нажимается вся карта, невидимый слой
+ * кнопки растянут на неё целиком, поэтому :hover включался, едва курсор
+ * касался края карты в трёх сотнях пикселей от слова, — свет проходил
+ * в пустоту. На телефоне наведения нет вообще, и блика не было никогда.
+ *
+ * Поэтому проход ведёт наблюдатель: кнопка целиком вошла в середину экрана —
+ * по слову один раз проезжает полоса. Поля подрезаны сверху и снизу, чтобы
+ * блик не случился на кнопке, которая только показалась из-за нижнего края
+ * (замер на 709×921: кнопка карты видна целиком с --rise ≈ 0.31, а карта
+ * встаёт в стопку на нуле, — проход попадает в этот отрезок).
+ *
+ * Класс снимается по концу анимации: в покое слово остаётся обычным текстом,
+ * и следующий вход в кадр запускает блик заново.
+ */
+function bindShine(cards) {
+  if (reduced()) return () => {};
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const label = e.target.querySelector('.work-card__label');
+        if (!label || label.classList.contains('is-shine')) continue;
+        label.classList.add('is-shine');
+        label.addEventListener('animationend', () => label.classList.remove('is-shine'), { once: true });
+      }
+    },
+    { threshold: 1, rootMargin: '-12% 0px -22% 0px' },
+  );
+
+  for (const card of cards) {
+    const btn = card.querySelector('.work-card__open');
+    if (btn) io.observe(btn);
+  }
+
+  return () => io.disconnect();
+}
+
 export function mountWork(section) {
   if (!section) return null;
 
@@ -300,6 +341,7 @@ export function mountWork(section) {
 
   const shots = fitShots(section);
   const undepth = bindDepth(section, cards);
+  const unshine = bindShine(cards);
 
   // прямая ссылка на кейс
   views.get(location.hash)?.open({ instant: true, push: false });
@@ -309,6 +351,7 @@ export function mountWork(section) {
     destroy() {
       shots.disconnect();
       undepth();
+      unshine();
     },
   };
 }

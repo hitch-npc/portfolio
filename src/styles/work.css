@@ -243,46 +243,105 @@
 
 /* Вся карта нажимается: невидимый слой кнопки растянут на карту. Поэтому
    своего position у кнопки нет, и неоновый ореол рисует её лицо */
+/* Ссылка, а не пластина. Прежняя кнопка была тёмной плашкой с бегущим
+   по кольцу светом, и в этом была беда: в каждый момент горела только
+   часть рамки, поэтому она читалась не как свет, а как недорисованный
+   прямоугольник. Плюс плашка оказывалась самым тяжёлым пятном карточки
+   и спорила с заголовком. Осталось слово, стрелка и черта под словом —
+   форма, которая на сайте уже есть у тегов постера. */
 .work-card__open {
   justify-self: start;
   display: inline-flex;
-  margin-top: var(--sp-2);
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
   padding: 0;
   border: 0;
   border-radius: var(--r-xs);
   background: none;
-  color: var(--accent);
+  color: var(--fg-muted);
   font-family: var(--f-ui);
-  font-size: 1rem;
+  font-size: 0.6875rem;
   font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-caption);
+  text-transform: uppercase;
   cursor: pointer;
+  transition: color var(--dur-base) var(--ease-out);
 }
+
+.work-card__open:hover { color: var(--accent-hover); }
+.work-card__open:hover .work-card__label { text-decoration-color: currentColor; }
+
+/* Черта только под словом: стрелка отъезжает, и подчёркивать пустоту
+   за ней было бы странно.
+
+   Блик: на время прохода буквы залиты не цветом, а градиентом, обрезанным
+   по их контуру, — в градиенте узкая тёплая полоса, и она проезжает по слову
+   один раз. Цвет остаётся в color — им же красится черта и им подхватывает
+   currentColor сам градиент; прозрачной делается только заливка букв
+   (-webkit-text-fill-color), иначе currentColor ссылался бы сам на себя. */
+.work-card__label {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  text-decoration-color: var(--fg-faint);
+  transition: text-decoration-color var(--dur-base) var(--ease-out);
+}
+
+/* Блик заводит не курсор, а появление кнопки в кадре.
+
+   На :hover он был равносилен отсутствию: нажимается вся карта, невидимый
+   слой кнопки растянут на все её 668×758, поэтому наведение срабатывало в тот
+   миг, когда курсор только коснулся угла карты в 325 px от слова, — проход
+   заканчивался раньше, чем взгляд доходил до кнопки. А на телефоне наведения
+   нет вовсе, и блик не показывался никогда. Теперь проход запускает
+   наблюдатель, когда кнопка целиком входит в середину экрана
+   (see sections/work.js): одинаково на мыши и на пальце.
+
+   Обрезка фона по буквам живёт только на время прохода. В покое слово —
+   обычный текст своим цветом: если бы прозрачная заливка висела всегда,
+   любая осечка с фоном (а она случается: ширина фона, no-repeat, inline-бокс)
+   оставляла бы на карточке пустое место вместо кнопки. */
+.work-card__label.is-shine {
+  background-image: linear-gradient(
+    100deg,
+    currentColor 0%,
+    currentColor 44%,
+    var(--brand-light-core) 50%,
+    currentColor 56%,
+    currentColor 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: case-shine 1100ms linear both;
+}
+
+/* Фон втрое шире слова, полоса света сидит ровно в его середине. В окно
+   шириной в слово она попадает на сдвигах от 75% до 25%: на 75% стоит
+   у левого края слова, на 25% уходит за правый. Ход 82 → 18 добавляет по
+   запасу с обеих сторон, чтобы в кадр попали вход и выход, а не одна
+   середина. За 0 и 100% фон съезжает со строки, и при no-repeat непокрытые
+   буквы нечем залить — поэтому границы держим внутри. Ход равномерный:
+   на ease-out весь проход съедался за первые полторы сотни миллисекунд. */
+@keyframes case-shine {
+  from { background-position: 82% 0; text-decoration-color: var(--fg-faint); }
+  /* середина прохода: черта под словом загорается вместе с ним — на кегле
+     11 px одного света по буквам мало, вторая линия делает проход заметным.
+     Сдвиг фона здесь не задан нарочно: он идёт ровно от первого кадра
+     к последнему, промежуточная точка его не ломает */
+  50% { text-decoration-color: currentColor; }
+  to { background-position: 18% 0; text-decoration-color: var(--fg-faint); }
+}
+
 
 .work-card__open::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 2;
-}
-
-/* Лицо кнопки — тёмная пластина со светом по кольцу (light.css): бегут два
-   тёплых луча, ореол лежит под непрозрачной заливкой. Почти белый текст
-   на чёрном — 19:1 */
-.work-card__face {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-6);
-  border-radius: inherit;
-  background: var(--brand-ground);
-  transition:
-    background var(--dur-base) var(--ease-out),
-    color var(--dur-base) var(--ease-out);
-}
-
-.work-card__open:hover .work-card__face {
-  background: color-mix(in srgb, var(--fg) 4%, var(--brand-ground));
-  color: var(--accent-hover);
 }
 
 .work-card__arrow {
@@ -312,10 +371,17 @@
    по центру свободного места. Обрезать справа, как раньше, нельзя — на
    телефоне от макета оставалась левая треть, постер резало пополам,
    а подпись обрывалась на полуслове */
+/* Макет выше своей ячейки: ширину он берёт по колонке, высота получается
+   какая получается. Раньше он был отцентрован и вылезал вверх и вниз
+   поровну — верхним краем наезжал на описание и закрывал собой кнопку
+   «View case». Теперь висит от верха: снизу его и так подрезает карточка,
+   а наверх не пускает overflow. */
 .work-card__shot {
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-items: start;
   min-height: 0;
+  overflow: hidden;
   padding: 0 var(--sp-4) var(--sp-4);
 }
 
@@ -698,9 +764,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .work-card,
-  .work-card__face,
+  .work-card__open,
+  .work-card__label,
   .work-card__arrow,
   .work-card__frame { transition: none; }
+
+  .work-card__label.is-shine { animation: none; }
 
   .work-card { transform: none; }
   .work-card::after { opacity: 0; }
