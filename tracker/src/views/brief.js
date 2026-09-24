@@ -87,7 +87,7 @@ export function briefView() {
     weekList(b.week),
 
     h('div', { class: 'bento' },
-      tile(`Tomorrow · ${fmtWeekday(b.tomorrow)}`, b.planned.length, '/3',
+      tile('Tomorrow', b.planned.length, '/3',
         b.planned.length
           ? h('ol', { class: 'lines lines-sm' }, b.planned.map((t, i) => line(t, spheres, { num: i + 1 })))
           : h('p', { class: 'hint' }, 'Not planned yet'),
