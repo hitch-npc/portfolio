@@ -2,13 +2,13 @@
 /**
  * Трекер — шрифт
  * ──────────────
- * Забирает Inter Tight с Google Fonts в tracker/fonts. Запускается руками,
+ * Забирает Commissioner с Google Fonts в tracker/fonts. Запускается руками,
  * один раз на смену шрифта: приложение работает офлайн, и браузер к Google
  * не ходит ни за CSS, ни за файлами.
  *
- * Inter Tight, а не Switzer: у Switzer нет кириллицы, а задачи пишутся
- * по-русски. Лицензия SIL OFL 1.1 разрешает держать файлы в публичном
- * репозитории — лицензия лежит рядом.
+ * Commissioner — самый близкий к Switzer по пропорциям из гротесков
+ * с кириллицей (у Switzer её нет, а задачи пишутся по-русски). Лицензия
+ * SIL OFL 1.1 разрешает держать файлы в публичном репозитории — она рядом.
  *
  * Подмножества — latin и cyrillic с их -ext: браузер скачивает файл, только
  * когда на странице есть символ из его диапазона.
@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'tracker', 'fonts');
 
-const FAMILY = { css: 'Inter+Tight:wght@400..800', dir: 'intertight', file: 'inter-tight' };
+const FAMILY = { css: 'Commissioner:wght@400..800', dir: 'commissioner', file: 'commissioner', name: 'Commissioner' };
 const SUBSETS = new Set(['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext']);
 
 // без современного UA Google отдаёт ttf вместо woff2
@@ -52,7 +52,7 @@ for (const [, subset, block] of css.matchAll(/\/\*\s*([\w-]+)\s*\*\/\s*@font-fac
   writeFileSync(join(OUT_DIR, name), buf);
   bytes += buf.length;
   faces.push(
-    `/* ${subset} */\n@font-face {\n  font-family: 'Inter Tight';\n  font-style: normal;\n` +
+    `/* ${subset} */\n@font-face {\n  font-family: '${FAMILY.name}';\n  font-style: normal;\n` +
     `  font-weight: ${prop(block, 'font-weight')};\n  font-display: swap;\n` +
     `  src: url('${name}') format('woff2');\n  unicode-range: ${prop(block, 'unicode-range')};\n}\n`,
   );
@@ -61,7 +61,7 @@ for (const [, subset, block] of css.matchAll(/\/\*\s*([\w-]+)\s*\*\/\s*@font-fac
 writeFileSync(join(OUT_DIR, 'OFL.txt'), await get(`https://raw.githubusercontent.com/google/fonts/main/ofl/${FAMILY.dir}/OFL.txt`));
 writeFileSync(
   join(OUT_DIR, 'fonts.css'),
-  `/* Inter Tight, SIL OFL 1.1 (лицензия — OFL.txt рядом). Файл генерируется —\n` +
+  `/* ${FAMILY.name}, SIL OFL 1.1 (лицензия — OFL.txt рядом). Файл генерируется —\n` +
   `   node tooling/tracker-fonts.mjs, руками не править. */\n\n` +
   faces.join('\n'),
 );

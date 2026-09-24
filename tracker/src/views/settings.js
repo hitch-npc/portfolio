@@ -122,5 +122,7 @@ export function settingsView() {
         pillButton('download', 'Export backup', exportBackup, 'is-on pill-wide'),
         pillButton('upload', 'Import from file', () => picker.click(), 'pill-wide'),
         picker)),
-    h('p', { class: 'version' }, `Version ${VERSION}`));
+    h('p', { class: 'version' }, `Version ${VERSION}`),
+    // кредит шрифта: лицензия OFL его не требует, но автору — спасибо
+    h('p', { class: 'credit' }, 'Typeface: Commissioner by The Commissioner Project Authors, SIL Open Font License 1.1.'));
 }

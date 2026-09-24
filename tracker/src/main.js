@@ -5,6 +5,7 @@
  */
 import { h, icon, keepFocus, renderSheet, closeSheet, toast } from './ui.js';
 import { addDays, todayISO } from './dates.js';
+import { overdue } from './logic.js';
 import * as store from './store.js';
 import { VERSION } from './version.js';
 import { ui, setRerender } from './views/common.js';
@@ -34,6 +35,8 @@ const TABS = [
 
 const main = document.getElementById('main');
 let navLinks = [];
+let tabs;
+let lateDot;
 
 function route() {
   const [name, arg] = location.hash.replace(/^#\/?/, '').split('/');
@@ -55,19 +58,28 @@ function render() {
     const bg = getComputedStyle(document.body).getPropertyValue('--screen').trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
   }
+  // светлая плашка под открытой вкладкой переезжает на её место;
+  // на экранах вне вкладок (настройки) — прячется
+  const at = TABS.findIndex(([id]) => id === r.name);
+  tabs.style.setProperty('--at', String(Math.max(at, 0)));
+  tabs.classList.toggle('is-idle', at < 0);
   for (const a of navLinks) {
     const on = a.dataset.tab === r.name;
     a.classList.toggle('is-on', on);
     on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   }
+  // красная точка на «Today» — есть просроченное: ровно то, что значит акцент
+  lateDot.hidden = !overdue(store.getState(), ui.day).length;
 }
 
 function buildNav() {
+  lateDot = h('span', { class: 'tab-dot', hidden: true });
   navLinks = TABS.map(([id, label]) =>
-    h('a', { class: 'tab', href: `#/${id}`, 'data-tab': id, 'aria-label': label },
-      h('span', { class: 'tab-icon' }, icon(id)),
-      h('span', { class: 'tab-label', 'aria-hidden': 'true' }, label)));
-  document.getElementById('nav').replaceChildren(h('div', { class: 'tabs' }, navLinks));
+    h('a', { class: 'tab', href: `#/${id}`, 'data-tab': id },
+      h('span', { class: 'tab-icon' }, icon(id), id === 'today' && lateDot),
+      h('span', { class: 'tab-label' }, label)));
+  tabs = h('div', { class: 'tabs' }, h('span', { class: 'tab-indicator', 'aria-hidden': 'true' }), navLinks);
+  document.getElementById('nav').replaceChildren(tabs);
 }
 
 let enterTimer;

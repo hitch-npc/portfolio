@@ -33,7 +33,7 @@
   --r-sm: 14px;
   --r-pill: 999px;
 
-  --font: 'Inter Tight', -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font: 'Commissioner', -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   --pad: 16px;
   --gap: 6px;
   --nav-h: 80px;
@@ -69,7 +69,6 @@ body {
   line-height: 1.3;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  font-feature-settings: 'tnum' 0, 'ss01' 0;
 }
 
 /* бумажное зерно поверх всего экрана; касания проходят насквозь */
@@ -111,8 +110,7 @@ a:active,
 .check,
 .pick,
 .replace,
-.glyph-pick,
-.tab-icon {
+.glyph-pick {
   transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
 }
 
@@ -122,8 +120,7 @@ a:active,
 .pick:active,
 .replace:active,
 .glyph-pick:active,
-.add .chip:active,
-.tab:active .tab-icon {
+.add .chip:active {
   transform: scale(0.93);
 }
 
@@ -169,8 +166,7 @@ textarea:focus-visible {
 }
 
 .icon {
-  width: 22px;
-  height: 22px;
+  display: block;
   flex: none;
 }
 
@@ -206,7 +202,6 @@ textarea:focus-visible {
   font-size: 34px;
   font-weight: 700;
   line-height: 1.02;
-  letter-spacing: -0.03em;
 }
 
 .title-main,
@@ -273,11 +268,6 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
-.chip .icon {
-  width: 18px;
-  height: 18px;
-}
-
 /* мелкая подпись секции: название чернилами, число приглушённо */
 .label {
   display: flex;
@@ -286,7 +276,6 @@ textarea:focus-visible {
   margin: 0 0 10px 4px;
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0;
 }
 
 .label .glyph {
@@ -341,8 +330,6 @@ textarea:focus-visible {
 }
 
 .entry .icon {
-  width: 20px;
-  height: 20px;
   color: var(--ink-muted);
 }
 
@@ -419,7 +406,6 @@ textarea:focus-visible {
   font-size: 34px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
@@ -445,24 +431,14 @@ textarea:focus-visible {
   color: transparent;
 }
 
-.check .icon {
-  width: 18px;
-  height: 18px;
-}
-
 .check.is-on {
   background: var(--ink);
   color: var(--bg);
 }
 
 .check-sm {
-  width: 22px;
-  height: 22px;
-}
-
-.check-sm .icon {
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
 }
 
 .task-main {
@@ -556,7 +532,6 @@ textarea:focus-visible {
   font-size: 19px;
   font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.01em;
 }
 
 .task-close {
@@ -745,16 +720,6 @@ textarea:focus-visible {
   color: var(--ink-muted);
 }
 
-.sub .icon-btn .icon,
-.step .icon-btn .icon {
-  width: 18px;
-  height: 18px;
-}
-
-.card-edit .entry-sm .icon {
-  width: 22px;
-}
-
 .card-foot {
   display: flex;
   justify-content: space-between;
@@ -792,10 +757,15 @@ textarea:focus-visible {
   background: var(--bg-card);
 }
 
-.version {
-  margin-top: 24px;
+.version,
+.credit {
+  margin: 24px 4px 0;
   font-size: 13px;
   color: var(--ink-muted);
+}
+
+.credit {
+  margin-top: 6px;
 }
 
 .fold {
@@ -815,8 +785,6 @@ textarea:focus-visible {
 
 .fold-head .icon {
   margin-left: auto;
-  width: 20px;
-  height: 20px;
   transition: transform 0.16s ease;
 }
 
@@ -904,7 +872,6 @@ textarea:focus-visible {
   font-size: 22px;
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: -0.02em;
 }
 
 .goal-head .icon-btn {
@@ -922,7 +889,6 @@ textarea:focus-visible {
   font-size: 44px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -969,10 +935,6 @@ textarea:focus-visible {
 .step.is-done .step-title {
   color: var(--ink-muted);
   text-decoration: line-through;
-}
-
-.goal .entry-sm .icon {
-  width: 22px;
 }
 
 .screen-goals > .entry {
@@ -1141,74 +1103,101 @@ textarea:focus-visible {
   right: 0;
   bottom: 0;
   z-index: 10;
-  padding: 8px 12px calc(10px + var(--safe-bottom));
-  background: var(--screen);
+  padding: 0 12px calc(10px + var(--safe-bottom));
+  pointer-events: none;
 }
 
-/* одна плашка: иконки в кружках, подпись — только у открытого раздела */
+/*
+ * Чёрная плавающая плашка: пять вкладок, у каждой иконка и подпись.
+ * Светлая пилюля под открытой вкладкой переезжает с пружинкой.
+ */
 .tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  max-width: 420px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: 440px;
+  height: 70px;
   margin: 0 auto;
   padding: 6px;
-  background: var(--bg-card);
+  background: var(--ink);
   border-radius: var(--r-pill);
+  pointer-events: auto;
+}
+
+.tab-indicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc((100% - 12px) / 5);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  transform: translateX(calc(var(--at, 0) * 100%));
+  transition: transform 0.5s var(--spring), opacity 0.2s ease;
+}
+
+.tabs.is-idle .tab-indicator {
+  opacity: 0;
 }
 
 .tab {
+  position: relative;
+  z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0;
-  height: 48px;
-  padding: 0 6px;
-  border-radius: var(--r-pill);
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  color: var(--ink-muted);
   text-decoration: none;
+  transition: color 0.25s ease;
+}
+
+.tab.is-on {
+  color: var(--ink);
 }
 
 .tab-icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-pill);
-  background: var(--bg-alt);
-}
-
-.tab-icon .icon {
-  width: 18px;
-  height: 18px;
-}
-
-.tab-label {
-  max-width: 0;
-  overflow: hidden;
-  opacity: 0;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: max-width 0.34s var(--ease), opacity 0.2s ease, margin 0.34s var(--ease);
+  transition: transform 0.14s var(--ease);
 }
 
 .tab.is-on .tab-icon {
-  background: var(--ink);
-  color: var(--bg);
+  animation: tab-pop 0.5s var(--spring);
 }
 
-.tab.is-on .tab-label {
-  max-width: 96px;
-  margin: 0 10px 0 8px;
-  opacity: 1;
+.tab:active .tab-icon {
+  transform: scale(0.88);
 }
 
-@media (max-width: 350px) {
-  .tab.is-on .tab-label {
-    max-width: 0;
-    margin: 0;
-    opacity: 0;
-  }
+.tab-dot {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  /* вырез вокруг точки — цветом плашки, не тенью */
+  outline: 2px solid var(--ink);
+}
+
+.tab.is-on .tab-dot {
+  outline-color: var(--bg);
+}
+
+.tab-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@keyframes tab-pop {
+  0% { transform: scale(0.8) translateY(2px); }
+  100% { transform: none; }
 }
 
 /* ── шторка и тост ──────────────────────────────────────────────────── */
@@ -1253,7 +1242,6 @@ textarea:focus-visible {
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.03em;
 }
 
 .sheet-text {
@@ -1287,7 +1275,6 @@ textarea:focus-visible {
   padding: 6px 0;
   font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.02em;
 }
 
 .glyph-grid {
@@ -1357,7 +1344,6 @@ textarea:focus-visible {
   font-size: 30px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.05em;
 }
 
 .replace-title {
@@ -1464,7 +1450,6 @@ textarea:focus-visible {
   font-size: 48px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1520,24 +1505,17 @@ textarea:focus-visible {
   color: var(--ink-muted);
 }
 
-.tile-link .icon {
-  width: 18px;
-  height: 18px;
-}
-
 .big {
   margin: 0 0 12px;
   font-size: 48px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .big .muted {
   margin-left: 2px;
   font-size: 17px;
-  letter-spacing: 0;
 }
 
 .big.is-late {
@@ -1631,7 +1609,6 @@ textarea:focus-visible {
   font-size: 48px;
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 

@@ -45,6 +45,14 @@ Settings → Import from file. Файл копии заменяет данные
 шаги цели ложатся на текущий месяц. Глифы сфер: `circle pill square bar
 triangle ring half diamond`.
 
+## Шрифт
+
+Commissioner (The Commissioner Project Authors, SIL OFL 1.1) — гротеск
+с кириллицей, по пропорциям ближе всего к Switzer. Файлы и лицензия —
+в `tracker/fonts`, кредит — в Settings. Switzer (Fontshare, ITF FFL)
+не подошёл: в нём нет кириллицы, а его лицензия не разрешает держать
+файлы в открытом репозитории.
+
 ## Устройство
 
 Обычный JavaScript (ES-модули) и CSS, без фреймворка и без пакетов; сборщика нет —
@@ -64,7 +72,7 @@ triangle ring half diamond`.
 ```
 npm run test:tracker    # правила без браузера (входит в npm run check)
 npm run build:tracker   # dist/tracker; в npm run build идёт последним
-npm run tracker:fonts   # один раз на смену шрифта: Inter Tight → tracker/fonts
+npm run tracker:fonts   # один раз на смену шрифта: Commissioner → tracker/fonts
 npm run tracker:icons   # один раз на смену иконки: PNG → tracker/icons
 ```
 

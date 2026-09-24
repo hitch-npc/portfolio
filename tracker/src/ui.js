@@ -40,31 +40,45 @@ function svg(viewBox, markup, cls) {
   return el;
 }
 
-const STROKE = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const S = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const F = 'fill="currentColor"';
 
+/*
+ * Иконки: сетка 24×24, только контур 2 px, прямые — на целых координатах,
+ * чтобы края ложились в пиксель. Ничего лишнего: предмет и всё.
+ * Солнце — сегодня, месяц — вечернее планирование, флаг — цели, лист — бриф.
+ */
 const ICONS = {
-  today: '<circle cx="12" cy="12" r="6.5" fill="currentColor"/>',
-  plan: '<path d="M14.5 3.5a8.5 8.5 0 1 0 6 13.2A7 7 0 0 1 14.5 3.5z" fill="currentColor"/>',
-  spheres:
-    '<circle cx="7" cy="7" r="3.5" fill="currentColor"/><rect x="13" y="4.5" width="8" height="5" rx="2.5" fill="currentColor"/>' +
-    '<rect x="3.5" y="13.5" width="7" height="7" fill="currentColor"/><rect x="13" y="15.5" width="8" height="3" fill="currentColor"/>',
-  goals: `<circle cx="12" cy="12" r="8" ${STROKE}/><circle cx="12" cy="12" r="3" fill="currentColor"/>`,
-  brief: '<rect x="4" y="5" width="16" height="2.5" fill="currentColor"/><rect x="4" y="10.75" width="16" height="2.5" fill="currentColor"/><rect x="4" y="16.5" width="10" height="2.5" fill="currentColor"/>',
-  settings:
-    `<path d="M4 8h9M17 8h3M4 16h3M11 16h9" ${STROKE}/><circle cx="15" cy="8" r="2" ${STROKE}/><circle cx="9" cy="16" r="2" ${STROKE}/>`,
-  plus: `<path d="M12 5v14M5 12h14" ${STROKE}/>`,
-  check: `<path d="M6 12.5l4 4 8-9" ${STROKE} stroke-width="2.5"/>`,
-  close: `<path d="M7 7l10 10M17 7L7 17" ${STROKE}/>`,
-  back: `<path d="M14.5 5.5L8 12l6.5 6.5" ${STROKE}/>`,
-  more: '<circle cx="6" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="18" cy="12" r="1.8" fill="currentColor"/>',
-  drag: `<path d="M6 9h12M6 15h12" ${STROKE}/>`,
-  copy: `<rect x="8.5" y="8.5" width="11" height="11" rx="2" ${STROKE}/><path d="M15.5 5.5v-.5a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 5v8A1.5 1.5 0 0 0 6 14.5h.5" ${STROKE}/>`,
-  download: `<path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" ${STROKE}/>`,
-  upload: `<path d="M12 16V5M7 9.5l5-5 5 5M5 19.5h14" ${STROKE}/>`,
-  chevron: `<path d="M9.5 5.5L16 12l-6.5 6.5" ${STROKE}/>`,
+  today: `<circle cx="12" cy="12" r="4" ${S}/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" ${S}/>`,
+  plan: `<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" ${S}/>`,
+  spheres: `<circle cx="7" cy="7" r="3" ${S}/><rect x="14" y="4" width="6" height="6" rx="1" ${S}/><path d="M7 14l4 6H3z" ${S}/><rect x="13" y="15" width="8" height="4" rx="2" ${S}/>`,
+  goals: `<path d="M5 21V4M5 4h12l-3 5 3 5H5" ${S}/>`,
+  brief: `<rect x="5" y="3" width="14" height="18" rx="2" ${S}/><path d="M9 8h6M9 12h6M9 16h3" ${S}/>`,
+  // шестерёнка: зубья — пунктир обводки, 8 штук, той же толщины на вид, что остальные линии
+  settings: `<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="2.8 3.876"/><circle cx="12" cy="12" r="6.5" ${S}/><circle cx="12" cy="12" r="2" ${S}/>`,
+  plus: `<path d="M12 5v14M5 12h14" ${S}/>`,
+  check: `<path d="M5 12l4 4 10-10" ${S}/>`,
+  close: `<path d="M6 6l12 12M18 6L6 18" ${S}/>`,
+  back: `<path d="M15 5l-7 7 7 7" ${S}/>`,
+  chevron: `<path d="M9 5l7 7-7 7" ${S}/>`,
+  more: `<circle cx="5" cy="12" r="1.5" ${F}/><circle cx="12" cy="12" r="1.5" ${F}/><circle cx="19" cy="12" r="1.5" ${F}/>`,
+  drag: `<g ${F}><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></g>`,
+  copy: `<rect x="8" y="8" width="12" height="12" rx="2" ${S}/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" ${S}/>`,
+  download: `<path d="M12 4v11M7 10l5 5 5-5M5 20h14" ${S}/>`,
+  upload: `<path d="M12 15V4M7 9l5-5 5 5M5 20h14" ${S}/>`,
 };
 
-export const icon = (name) => svg('0 0 24 24', ICONS[name], `icon icon-${name}`);
+/**
+ * Иконка size×size без масштабирования: меньший размер — это обрезка поля
+ * вокруг рисунка, а не уменьшение, так что 2 px остаются 2 px.
+ */
+export function icon(name, size = 24) {
+  const o = (24 - size) / 2;
+  const el = svg(`${o} ${o} ${size} ${size}`, ICONS[name], `icon icon-${name}`);
+  el.setAttribute('width', size);
+  el.setAttribute('height', size);
+  return el;
+}
 
 const GLYPH_SVG = {
   circle: '<circle cx="7" cy="7" r="6"/>',
@@ -126,7 +140,7 @@ export function entry(key, placeholder, onSubmit, { cls = '' } = {}) {
       input.value = '';
       onSubmit(v);
     },
-  }, icon('plus'), input);
+  }, icon('plus', 20), input);
 }
 
 /** textarea, растущая по тексту. */

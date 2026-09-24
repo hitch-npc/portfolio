@@ -42,7 +42,7 @@ function build() {
       store.createTask(title);
       toast('Added to Inbox');
     },
-  }, h('span', { class: 'chip' }, icon('plus')), input);
+  }, h('span', { class: 'chip' }, icon('plus', 20)), input);
 
   const head = header('Today', '', h('a', { class: 'icon-btn', href: '#/settings', 'aria-label': 'Settings', title: 'Settings' }, icon('settings')));
   sub = head.querySelector('.title-sub');
