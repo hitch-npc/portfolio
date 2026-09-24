@@ -1237,9 +1237,13 @@ textarea:focus-visible {
 
 /* ── шторка и тост ──────────────────────────────────────────────────── */
 
+/* слой — по видимой части экрана: с клавиатурой iOS шторка стоит над ней */
 .sheet-layer {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top, 0px);
+  height: var(--vv-h, 100%);
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -1256,9 +1260,10 @@ textarea:focus-visible {
   position: relative;
   width: 100%;
   max-width: 560px;
-  max-height: 85dvh;
+  max-height: min(85dvh, calc(var(--vv-h, 100dvh) - 16px));
   margin: 0 auto;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 22px var(--pad) calc(16px + var(--safe-bottom));
   background: var(--bg);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
