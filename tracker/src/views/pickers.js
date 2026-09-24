@@ -2,7 +2,7 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd } from '../ui.js';
+import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -41,14 +41,28 @@ export function menu(host, items, onPick, label) {
         onclick: () => { closeMenu(); onPick(value); },
       },
         h('span', { class: 'menu-check' }, on && icon('check', 20)),
-        mark && (mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark)),
+        h('span', { class: 'menu-mark' }, mark && (mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
         h('span', null, text))));
   host.append(menuEl);
-  const room = (globalThis.visualViewport?.height ?? innerHeight) - 96;
-  if (menuEl.getBoundingClientRect().bottom > room && host.getBoundingClientRect().top > menuEl.offsetHeight + 16) {
-    menuEl.classList.add('is-up');
-  }
+  place(menuEl, host);
   document.addEventListener('pointerdown', outside, true);
+}
+
+/**
+ * Меню — там, где его видно целиком: под якорем, а если снизу клавиатура или
+ * панель вкладок — над всем полем (не поверх набираемого текста). Видимая
+ * часть экрана — по visualViewport: клавиатура iOS страницу не сжимает.
+ */
+function place(el, host) {
+  const vv = globalThis.visualViewport;
+  const nav = document.getElementById('nav')?.getBoundingClientRect().top ?? innerHeight;
+  const bottom = Math.min(vv ? vv.offsetTop + vv.height : innerHeight, nav) - 8;
+  const top = (vv?.offsetTop ?? 0) + 8;
+  const below = bottom - el.getBoundingClientRect().top;
+  const above = host.getBoundingClientRect().top - 6 - top;
+  const up = el.scrollHeight > below && above > below;
+  el.classList.toggle('is-up', up);
+  el.style.maxHeight = `${Math.max(120, Math.floor(up ? above : below))}px`;
 }
 
 const sphereItems = (current) => [
@@ -214,8 +228,11 @@ export const dropDraft = (key) => drafts.delete(key);
  * opts: { sphereId — сфера по умолчанию, day — 'today' | null, placeholder }.
  * Возвращает элемент с методом refresh() — перерисовать чипы.
  */
+const PRIO_LEVEL = { low: 1, medium: 2, high: 3 };
+const PRIO_CHOICES = [[null, 'None', 0], ['low', 'Low', 1], ['medium', 'Medium', 2], ['high', 'High', 3]];
+
 export function composer(key, { sphereId = null, day = null, placeholder = 'Add a task' } = {}) {
-  const fresh = () => ({ day: day === 'today' ? ui.day : day, time: null, repeat: null, priority: null });
+  const fresh = () => ({ day: day === 'today' ? ui.day : day, time: null, repeat: null, priority: null, prioOpen: false });
   let d = drafts.get(key);
   if (!d) {
     d = { title: '', sphereId, ...fresh() };
@@ -281,6 +298,20 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     const sphere = st.spheres.find((s) => s.id === d.sphereId);
     const when = whenLabel(d);
     const pri = PRIORITIES.find(([v]) => v === d.priority)?.[1];
+    if (d.prioOpen) {
+      // приоритет выбирается прямо в поле: ни меню поверх текста, ни клавиатуры поверх меню
+      chips.replaceChildren(h('div', { class: 'prio-pick', role: 'radiogroup', 'aria-label': 'Priority' },
+        PRIO_CHOICES.map(([v, text, level]) => h('button', {
+          class: ['prio-opt', d.priority === v && 'is-on'], type: 'button', role: 'radio',
+          'aria-checked': String(d.priority === v), onpointerdown: keep, onmousedown: keep,
+          onclick: () => {
+            d.priority = v;
+            d.prioOpen = false;
+            refresh();
+          },
+        }, prioIcon(level, 18), h('span', null, text)))));
+      return;
+    }
     chips.replaceChildren(
       chip([glyph(sphere ? sphere.glyph : 'inbox'), h('span', null, sphere ? sphere.name : 'Inbox')], 'Sphere',
         () => menu(form, sphereItems(d.sphereId), (v) => { d.sphereId = v; refresh(); }, 'Sphere')),
@@ -291,11 +322,13 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
           focusEnd(input);
         }, { full: 'drop' });
       }, Boolean(d.day)),
-      chip([icon('flag', 20), pri && h('span', null, pri)], 'Priority',
-        () => menu(form, [
-          ...PRIORITIES.map(([v, text]) => [v, text, 'icon:flag', d.priority === v]),
-          [null, 'None', null, d.priority == null],
-        ], (v) => { d.priority = v; refresh(); }, 'Priority'), Boolean(d.priority)),
+      chip(d.priority ? [prioIcon(PRIO_LEVEL[d.priority], 20), h('span', null, pri)] : icon('flag', 20),
+        d.priority ? `Priority: ${pri}` : 'Priority',
+        () => {
+          closeMenu();
+          d.prioOpen = true;
+          refresh();
+        }, Boolean(d.priority)),
     );
   }
 

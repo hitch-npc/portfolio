@@ -161,6 +161,16 @@ export function icon(name, size = 24) {
   return el;
 }
 
+/** Уровень приоритета — три столбика по росту, как сигнал: закрашено столько, какой уровень (0–3). */
+export function prioIcon(level, size = 20) {
+  const bars = [[4, 13, 5], [10, 9, 9], [16, 5, 13]]; // x, y, высота; низ у всех на 18
+  const el = svg('0 0 24 24', bars.map(([x, y, hh], i) =>
+    `<rect x="${x}" y="${y}" width="4" height="${hh}" ${F}${i < level ? '' : ' opacity="0.28"'}/>`).join(''), 'icon icon-prio');
+  el.setAttribute('width', size);
+  el.setAttribute('height', size);
+  return el;
+}
+
 const GLYPH_SVG = {
   circle: '<circle cx="7" cy="7" r="6"/>',
   pill: '<rect x="0.5" y="3.5" width="13" height="7" rx="3.5"/>',
@@ -204,24 +214,38 @@ export function keepFocus(render) {
 
 const drafts = new Map();
 
-/** Одна строка ввода: Enter добавляет, поле очищается и остаётся в фокусе. */
+/**
+ * Одна строка ввода. Добавляет кнопка-стрелка — она появляется, как только
+ * есть текст, — или Enter. Поле очищается и остаётся в фокусе: можно
+ * вводить шаги и подзадачи подряд.
+ */
 export function entry(key, placeholder, onSubmit, { cls = '' } = {}) {
   const input = h('input', {
     class: 'entry-input', type: 'text', placeholder, 'aria-label': placeholder, autocomplete: 'off',
-    'data-key': key, value: drafts.get(key) ?? '',
-    oninput: (e) => drafts.set(key, e.target.value),
+    enterkeyhint: 'done', 'data-key': key, value: drafts.get(key) ?? '',
+    oninput: (e) => {
+      drafts.set(key, e.target.value);
+      form.classList.toggle('has-text', Boolean(e.target.value.trim()));
+    },
   });
-  return h('form', {
-    class: ['entry', cls],
+  const form = h('form', {
+    class: ['entry', cls, (drafts.get(key) ?? '').trim() && 'has-text'],
     onsubmit: (e) => {
       e.preventDefault();
       const v = input.value.trim();
       if (!v) return;
       drafts.delete(key);
       input.value = '';
+      form.classList.remove('has-text');
       onSubmit(v);
     },
-  }, icon('plus', 20), input);
+  }, icon('plus', 20), input,
+  h('button', {
+    class: 'entry-send', type: 'submit', 'aria-label': `Add: ${placeholder}`,
+    // фокус остаётся в поле — клавиатура не прячется между записями
+    onpointerdown: (e) => e.preventDefault(), onmousedown: (e) => e.preventDefault(),
+  }, icon('send', 18)));
+  return form;
 }
 
 /** textarea, растущая по тексту. */
@@ -246,6 +270,21 @@ export function toast(message) {
   toastEl.classList.add('is-on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), 2200);
+}
+
+/** Текст — в буфер обмена. false — не получилось. */
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // запасной путь для браузеров без Clipboard API
+    const area = document.body.appendChild(h('textarea', { class: 'offscreen', readonly: true, value: text }));
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    return ok;
+  }
 }
 
 /* ── шторка ──────────────────────────────────────────────────────────── */
@@ -478,6 +517,7 @@ let swiped = null; // открытая строка
 let blockClick = 0; // до этого момента тап не срабатывает: палец смахивал, а не нажимал
 
 document.addEventListener('click', (e) => {
+  if (e.target instanceof Element && e.target.closest('.haptic')) return;
   if (performance.now() < blockClick) {
     e.preventDefault();
     e.stopPropagation();
@@ -594,17 +634,47 @@ export function removeRow(row, done) {
 
 /**
  * Порядок перетаскиванием. Тянуть можно за элемент с data-drag внутри
- * строки с data-id. Соседи расступаются на высоту строки, по отпусканию
- * onDrop получает id в новом порядке. Скролл страницы за ручку не цепляется
- * (touch-action: none в стилях).
+ * строки с data-id — сразу, или долгим нажатием на любое место строки
+ * (hold: как в списках iPhone). Соседи расступаются на высоту строки, по
+ * отпусканию onDrop получает id в новом порядке. Скролл страницы за ручку
+ * не цепляется (touch-action: none), а после долгого нажатия его держит
+ * touchmove с preventDefault.
  */
-export function sortable(list, onDrop) {
+export function sortable(list, onDrop, { hold = false } = {}) {
   list.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
     const handle = e.target.closest('[data-drag]');
-    const item = handle?.closest('[data-id]');
-    if (!item || item.parentElement !== list || e.button > 0) return;
-    e.preventDefault();
+    const item = e.target.closest('[data-id]');
+    if (!item || item.parentElement !== list) return;
+    if (handle) {
+      e.preventDefault();
+      drag(item, e, handle);
+      return;
+    }
+    // долгое нажатие: только в списке, где есть что двигать, и не в полях раскрытой карточки
+    if (!hold || !item.querySelector('[data-drag]') || e.target.closest('input, textarea, select, .card-edit')) return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const wait = (ev) => {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 8) stop(); // это прокрутка
+    };
+    const stop = () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', wait);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+    };
+    const timer = setTimeout(() => {
+      stop();
+      haptic();
+      drag(item, e, item, true);
+    }, 380);
+    window.addEventListener('pointermove', wait);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+  });
 
+  function drag(item, e, target, held = false) {
     const items = [...list.children].filter((n) => n.dataset.id);
     const rects = items.map((n) => n.getBoundingClientRect());
     const from = items.indexOf(item);
@@ -614,13 +684,23 @@ export function sortable(list, onDrop) {
     let to = from;
 
     item.classList.add('is-dragging');
-    handle.setPointerCapture(e.pointerId);
+    if (held) item.classList.add('is-held');
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      /* палец уже отпущен */
+    }
+    // после долгого нажатия страница не должна уехать вместе со строкой
+    const noScroll = (ev) => ev.preventDefault();
+    if (held) document.addEventListener('touchmove', noScroll, { passive: false });
 
     const move = (ev) => {
       const dy = ev.clientY - startY;
-      item.style.transform = `translateY(${dy}px)`;
+      item.style.transform = `translateY(${dy}px)${held ? ' scale(1.02)' : ''}`;
       const center = rects[from].top + rects[from].height / 2 + dy;
-      to = items.filter((_, i) => i !== from && rects[i].top + rects[i].height / 2 < center).length;
+      const next = items.filter((_, i) => i !== from && rects[i].top + rects[i].height / 2 < center).length;
+      if (next !== to) haptic();
+      to = next;
       items.forEach((n, i) => {
         if (i === from) return;
         const s = i > from && i <= to ? -shift : i < from && i >= to ? shift : 0;
@@ -629,11 +709,13 @@ export function sortable(list, onDrop) {
     };
 
     const end = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', end);
-      handle.removeEventListener('pointercancel', end);
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', end);
+      target.removeEventListener('pointercancel', end);
+      document.removeEventListener('touchmove', noScroll);
       items.forEach((n) => (n.style.transform = ''));
-      item.classList.remove('is-dragging');
+      item.classList.remove('is-dragging', 'is-held');
+      if (held) blockClick = performance.now() + 400; // отпускание — не тап по задаче
       if (to === from) return;
       const ids = items.map((n) => n.dataset.id);
       ids.splice(from, 1);
@@ -641,11 +723,29 @@ export function sortable(list, onDrop) {
       onDrop(ids);
     };
 
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', end);
-    handle.addEventListener('pointercancel', end);
-  });
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', end);
+    target.addEventListener('pointercancel', end);
+  }
   return list;
+}
+
+/* ── отклик ──────────────────────────────────────────────────────────── */
+
+/**
+ * Лёгкий щелчок вибрацией на iPhone (iOS 18+): переключатель <input switch>
+ * даёт системный отклик, когда его переключают. На других устройствах —
+ * ничего. Работает только в ответ на касание.
+ */
+export function haptic() {
+  try {
+    const label = h('label', { class: 'haptic', 'aria-hidden': 'true' }, h('input', { type: 'checkbox', switch: true, tabindex: '-1' }));
+    document.head.append(label);
+    label.click();
+    label.remove();
+  } catch {
+    /* нет — и не надо */
+  }
 }
 
 /* ── движение ────────────────────────────────────────────────────────── */

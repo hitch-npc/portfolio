@@ -57,6 +57,13 @@ export function dayLabel(day, today) {
  * Следующий день повторяющейся задачи. Месяц вперёд с 31-го — последний день
  * следующего месяца, а не перескок через него.
  */
+/** Через n месяцев, тем же числом; 31 января + 1 → 28 (29) февраля. */
+export function addMonths(day, n) {
+  const d = parse(day);
+  const last = new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate();
+  return iso(new Date(d.getFullYear(), d.getMonth() + n, Math.min(d.getDate(), last)));
+}
+
 export function nextRepeat(day, repeat) {
   if (repeat === 'daily') return addDays(day, 1);
   if (repeat === 'weekly') return addDays(day, 7);
@@ -64,11 +71,7 @@ export function nextRepeat(day, repeat) {
     const wd = parse(day).getDay();
     return addDays(day, wd === 5 ? 3 : wd === 6 ? 2 : 1);
   }
-  if (repeat === 'monthly') {
-    const d = parse(day);
-    const last = new Date(d.getFullYear(), d.getMonth() + 2, 0).getDate();
-    return iso(new Date(d.getFullYear(), d.getMonth() + 1, Math.min(d.getDate(), last)));
-  }
+  if (repeat === 'monthly') return addMonths(day, 1);
   return null;
 }
 

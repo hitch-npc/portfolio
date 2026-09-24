@@ -1,13 +1,16 @@
 /**
- * Настройки: день и ввод, экран при запуске, движение; данные — резервная
+ * Настройки: день и ввод, экран при запуске, движение; ИИ — инструкция для
+ * любого чата (с данными или без) и вставка его ответа; данные — резервная
  * копия, импорт из файла (копия, JSON, CSV, текст, Markdown) и вставка
  * списка. Копия уходит через «Поделиться» (на iPhone — «Сохранить в Файлы»),
  * где его нет — скачиванием. Импорт показывает, что изменится, и ждёт
  * подтверждения.
  */
-import { h, openSheet, closeSheet, toast, autosize } from '../ui.js';
-import { backupName, detect, makeBackup, packFiles, planImport, readBackup, readImportText } from '../io.js';
-import { settingsOf } from '../logic.js';
+import { h, openSheet, closeSheet, toast, autosize, copyText } from '../ui.js';
+import {
+  aiData, aiPrompt, backupName, detect, makeBackup, packFiles, planImport, readBackup, readImportText,
+} from '../io.js';
+import { dayLimit, settingsOf } from '../logic.js';
 import * as store from '../store.js';
 import { VERSION } from '../version.js';
 import { ui, header, backLink, pillButton } from './common.js';
@@ -88,19 +91,27 @@ function importData(data) {
   if (kind === 'import') {
     const plan = planImport(st, data, { uid: store.uid });
     const s = plan.summary;
-    if (!s.tasks && !s.spheres && !s.goals && !s.steps) {
+    const adds = s.tasks + s.spheres + s.goals + s.steps;
+    if (!adds && !s.changed && !s.deleted.length) {
       toast(s.skipped ? `Nothing new — ${plural(s.skipped, 'duplicate')} skipped` : 'Nothing to import');
       return;
     }
     const planned = plan.tasks.filter((t) => t.day).length;
-    confirmSheet('Import?', [
-      `Add ${plural(s.tasks, 'task')}${planned ? `, ${planned} with a date` : ''}`,
-      `${plural(s.spheres, 'new sphere')}, ${plural(s.goals, 'new goal')}, ${plural(s.steps, 'step')}`,
+    const shown = s.deleted.slice(0, 5).map((t) => `“${t}”`).join(', ');
+    confirmSheet(s.changed || s.deleted.length ? 'Apply changes?' : 'Import?', [
+      s.tasks > 0 && `Add ${plural(s.tasks, 'task')}${planned ? `, ${planned} with a date` : ''}`,
+      (s.spheres || s.goals || s.steps) > 0 && `${plural(s.spheres, 'new sphere')}, ${plural(s.goals, 'new goal')}, ${plural(s.steps, 'step')}`,
+      s.changed > 0 && `Change ${plural(s.changed, 'entry').replace('entrys', 'entries')}${s.done ? ` — ${s.done} marked done` : ''}`,
+      s.deleted.length > 0 && `Delete ${plural(s.deleted.length, 'entry').replace('entrys', 'entries')}: ${shown}${s.deleted.length > 5 ? '…' : ''}`,
       s.skipped > 0 && `${plural(s.skipped, 'duplicate')} skipped`,
-      'Existing data stays as it is.',
-    ].filter(Boolean), 'Import', async () => {
+      s.noRoom > 0 && `${plural(s.noRoom, 'task')} not moved — the day is full`,
+      s.notFound > 0 && `${s.notFound} not found — skipped`,
+      !s.changed && !s.deleted.length && 'Existing data stays as it is.',
+    ].filter(Boolean), s.changed || s.deleted.length ? 'Apply' : 'Import', async () => {
       await store.applyImport(plan);
-      toast(`Imported ${plural(s.tasks, 'task')}`);
+      toast([
+        s.tasks && `+${plural(s.tasks, 'task')}`, s.changed && `${s.changed} changed`, s.deleted.length && `${s.deleted.length} deleted`,
+      ].filter(Boolean).join(' · ') || 'Imported');
     });
     return;
   }
@@ -124,26 +135,39 @@ const EXAMPLE = `# Work
 # Home
 - Buy a lamp @tomorrow`;
 
-/** Шторка «вставить список»: текст или Markdown прямо из заметок. */
-function pasteSheet() {
+/**
+ * Шторка «вставить»: список текстом или Markdown прямо из заметок — или
+ * ответ ИИ целиком (JSON найдётся в блоке кода).
+ */
+function pasteSheet(ai = false) {
   let text = '';
   openSheet(() => [
-    h('h2', { class: 'sheet-title' }, 'Paste a list'),
-    h('p', { class: 'sheet-text' }, 'One task per line. Headings become spheres, indented lines — subtasks.'),
+    h('h2', { class: 'sheet-title' }, ai ? 'Paste AI answer' : 'Paste a list'),
+    h('p', { class: 'sheet-text' }, ai
+      ? 'Paste the whole reply — the app finds the JSON in it and shows what will change.'
+      : 'One task per line. Headings become spheres, indented lines — subtasks.'),
     autosize(h('textarea', {
-      class: 'paste', rows: 6, placeholder: EXAMPLE, 'aria-label': 'Tasks', 'data-key': 'paste', value: text,
+      class: 'paste', rows: 6, placeholder: ai ? 'Sure! Here is your plan… ```json { "tasks": [ … ] } ```' : EXAMPLE,
+      'aria-label': ai ? 'AI answer' : 'Tasks', 'data-key': 'paste', value: text,
       oninput: (e) => { text = e.target.value; },
     })),
     h('div', { class: 'sheet-actions' },
       pillButton(null, 'Cancel', closeSheet),
       pillButton(null, 'Preview', () => {
         if (!text.trim()) {
-          toast('Paste or type some tasks first');
+          toast(ai ? 'Paste the AI answer first' : 'Paste or type some tasks first');
           return;
         }
         importData(readImportText('pasted.txt', text, ui.day));
       }, 'is-on')),
   ]);
+}
+
+/** Инструкция для ИИ — в буфер; с данными — чтобы ИИ мог и поменять, а не только добавить. */
+async function copyPrompt(withData) {
+  const st = store.getState();
+  const prompt = aiPrompt({ today: ui.day, limit: dayLimit(st), data: withData ? aiData(st) : null });
+  toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
 }
 
 /** Строка настройки: подпись и пилюли вариантов, выбранный — чёрный. */
@@ -186,13 +210,24 @@ export function settingsView() {
       choice('Open on launch', 'start', [['today', 'Today'], ['plan', 'Plan'], ['spheres', 'Spheres'], ['goals', 'Goals'], ['brief', 'Brief']]),
       choice('Motion', 'motion', [['system', 'As in system'], ['reduced', 'Reduced']])),
 
+    h('h2', { class: 'label' }, 'AI'),
+    h('section', { class: 'block-alt' },
+      h('p', { class: 'block-text' },
+        'Let any AI chat — ChatGPT, Claude, Gemini — fill or change the tracker. Copy the instructions, paste them into the chat and write what you want. Then copy its answer and paste it here: you see every change before it is saved.'),
+      h('div', { class: 'stack' },
+        pillButton('copy', 'Copy instructions', () => copyPrompt(false), 'pill-wide'),
+        pillButton('copy', 'Copy with my data', () => copyPrompt(true), 'pill-wide'),
+        pillButton('plus', 'Paste AI answer', () => pasteSheet(true), 'is-on pill-wide')),
+      h('p', { class: 'setting-hint' },
+        'Without data the AI can only add. With my data it also sees open tasks, spheres and goals, so it can complete, move or delete them. The data goes only to the chat you paste it into.')),
+
     h('h2', { class: 'label' }, 'Data'),
     h('section', { class: 'block-alt' },
       h('p', { class: 'block-text' }, 'Everything lives on this device only. Nothing is sent anywhere. Export a backup now and then — it is also how you move to a new phone. Attachments are included.'),
       h('div', { class: 'stack' },
         pillButton('download', 'Export backup', exportBackup, 'is-on pill-wide'),
         pillButton('upload', 'Import from file', () => picker.click(), 'pill-wide'),
-        pillButton('plus', 'Paste a list', pasteSheet, 'pill-wide'),
+        pillButton('plus', 'Paste a list', () => pasteSheet(false), 'pill-wide'),
         picker),
       h('p', { class: 'setting-hint' },
         'Files: backup, JSON, CSV (columns title, sphere, status, priority, deadline, day, note), text or Markdown. ',

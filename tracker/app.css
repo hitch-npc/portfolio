@@ -373,6 +373,40 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
+/* стрелка «добавить»: видна, когда в поле есть текст — Enter не обязателен */
+.entry-send {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  margin-right: -6px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  opacity: 0;
+  transform: scale(0.6);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform var(--release);
+}
+
+.entry.has-text .entry-send {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.entry.has-text .entry-send:active {
+  transform: scale(var(--press));
+  transition: transform var(--press-in) var(--ease);
+}
+
+.entry-sm .entry-send {
+  width: 30px;
+  height: 30px;
+  margin-right: 0;
+}
+
 .entry-card {
   background: var(--bg-card);
   border-radius: var(--r-card);
@@ -421,6 +455,18 @@ textarea:focus-visible {
   z-index: 2;
   background: var(--bg-olive-card);
   transition: none;
+}
+
+/* долгое нажатие подняло строку: она чуть больше и тянется за пальцем */
+.task.is-held {
+  transform: scale(1.02);
+}
+
+/* в списке дня долгое нажатие — это перетаскивание, а не выделение текста */
+.day-list .task-row {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .task-row {
@@ -1740,6 +1786,41 @@ body:has(.select-bar) .toast {
   gap: 8px;
 }
 
+/* приоритет прямо в поле: четыре уровня, столбики — как сигнал */
+.prio-pick {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  animation: rise 0.24s var(--ease) both;
+}
+
+.prio-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  height: 50px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: transform var(--release), background-color 0.25s ease, color 0.25s ease;
+}
+
+.prio-opt:active {
+  transform: scale(var(--press));
+  transition: transform var(--press-in) var(--ease), background-color 0.25s ease, color 0.25s ease;
+}
+
+.prio-opt.is-on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
 .compose-chips {
   display: flex;
   gap: 6px;
@@ -1815,7 +1896,15 @@ body:has(.select-bar) .toast {
 
 .menu.is-up {
   top: auto;
-  bottom: 52px;
+  bottom: calc(100% + 6px);
+}
+
+/* место под глиф есть у каждого пункта — подписи в одну линию */
+.menu-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  flex: none;
 }
 
 .menu-item {
@@ -2379,6 +2468,12 @@ body:has(.select-bar) .toast {
   flex: none;
 }
 
+/* длинное число (4 000/29 999 €) на узком экране — мельче, но в строку */
+.goal-progress.is-long .fraction {
+  font-size: min(44px, 10.5vw);
+  white-space: nowrap;
+}
+
 .fraction-unit {
   margin-left: 8px;
   font-size: 20px;
@@ -2422,6 +2517,291 @@ body:has(.select-bar) .toast {
   flex: 1;
   background: var(--ink);
   color: var(--bg);
+}
+
+/* шаг кнопок −/+ меняется в любой момент: тап — шторка с крутилкой */
+.bump-step {
+  gap: 2px;
+  padding: 0 12px;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.bump-step .icon {
+  color: var(--ink-muted);
+}
+
+/* ── крутилка ─────────────────────────────────────────────────────────
+   линейка с делениями: тянется пальцем, докатывается и встаёт на деление */
+.dial {
+  position: relative;
+  height: 48px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  touch-action: none;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.dial:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.dial.is-active {
+  cursor: grabbing;
+}
+
+.dial-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  margin-left: -5px;
+  display: flex;
+  will-change: transform;
+}
+
+.dial-tick {
+  position: relative;
+  width: 10px;
+  height: 100%;
+  flex: none;
+}
+
+.dial-tick::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  width: 1px;
+  height: 11px;
+  margin-left: -0.5px;
+  background: var(--ink-muted);
+}
+
+.dial-tick.is-major::before {
+  top: 9px;
+  width: 2px;
+  height: 17px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+
+.dial-num {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink-muted);
+}
+
+.dial-needle {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  pointer-events: none;
+}
+
+/* деление прошло под стрелкой — она вздрагивает */
+.dial-needle.is-tick {
+  animation: needle-tick 0.2s var(--ease);
+}
+
+@keyframes needle-tick {
+  40% {
+    transform: scaleY(1.28) scaleX(1.3);
+  }
+}
+
+.dial.is-off {
+  background: var(--hatch-fine);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dial.is-off .dial-track,
+.dial.is-off .dial-needle {
+  visibility: hidden;
+}
+
+/* шторка шага */
+.step-for {
+  margin-bottom: 4px;
+}
+
+.dial-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.dial-readout {
+  width: auto;
+  min-width: 0;
+  max-width: 80%;
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dial-unit {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.step-auto {
+  margin-top: 14px;
+}
+
+/* в шторке фон — как у страницы: линейке и пилюле нужен свой */
+.sheet .dial,
+.step-auto .pill {
+  background: var(--bg-card);
+}
+
+/* ── новая цель: крутилки над полем ─────────────────────────────────── */
+
+.goal-compose {
+  padding: 8px;
+}
+
+.goal-compose-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-compose-row .compose-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.gd {
+  display: none;
+}
+
+.goal-compose.is-open .gd {
+  display: grid;
+  gap: 6px;
+  padding: 2px 2px 8px;
+}
+
+/* крутилки проявляются один раз — когда поле открыли, а не на каждый тап */
+.goal-compose.is-opening .gd > * {
+  animation: rise 0.34s var(--ease) both;
+}
+
+.goal-compose.is-opening .gd > :nth-child(2) { animation-delay: 30ms; }
+
+.goal-compose.is-opening .gd > :nth-child(3) { animation-delay: 60ms; }
+
+.goal-compose.is-opening .gd > :nth-child(4) { animation-delay: 90ms; }
+
+.goal-compose.is-opening .gd > :nth-child(n + 5) { animation-delay: 120ms; }
+
+.gd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 8px;
+}
+
+.gd-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.25s ease;
+}
+
+.gd-row.is-off {
+  opacity: 0.5;
+}
+
+.gd-row.is-off .gd-chips {
+  pointer-events: none;
+}
+
+.gd-label {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.gd-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.gd-value,
+.gd-shown {
+  width: 100%;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gd-value::placeholder {
+  color: var(--ink-muted);
+}
+
+.gd-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.gd-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.gd-chip {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.gd-other {
+  flex: none;
+  width: 84px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.gd-hint {
+  margin: 2px 8px 0;
+  font-size: 14px;
+  color: var(--ink-muted);
 }
 
 .goal-form {

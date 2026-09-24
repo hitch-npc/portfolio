@@ -6,7 +6,7 @@
  * onError показывает это пользователю.
  */
 import * as db from './db.js';
-import { DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, dayTasks, isDayFull, isDone } from './logic.js';
+import { DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, dayTasks, isDayFull, isDone, timeSlot } from './logic.js';
 import { addDays, diffDays, nextRepeat, todayISO } from './dates.js';
 
 /** files — вложения задач: { id, taskId, name, type, size, createdAt, blob }. */
@@ -57,13 +57,16 @@ const findTask = (id) => state.tasks.find((t) => t.id === id);
 /** Место в конце дня: порядок следующий за последней задачей этого дня. */
 const endOf = (day) => Math.max(-1, ...state.tasks.filter((t) => t.day === day).map((t) => t.dayOrder ?? 0)) + 1;
 
+/** Место в дне: со временем — по времени (logic.timeSlot), без — в конец. */
+const slotOf = (t, day) => (t.time ? timeSlot(state, t, day) : endOf(day));
+
 export function createTask(title, patch = {}) {
   const t = {
     id: uid(), title, sphereId: null, priority: null, deadline: null, status: 'todo',
     subtasks: [], note: '', day: null, dayOrder: 0, time: null, repeat: null, createdAt: stamp(), doneAt: null,
     ...patch,
   };
-  if (t.day) t.dayOrder = endOf(t.day);
+  if (t.day) t.dayOrder = slotOf(t, t.day);
   state.tasks.push(t);
   emit();
   persist(db.put('tasks', t));
@@ -107,12 +110,14 @@ function spawnNext(t) {
   let day = nextRepeat(t.day ?? today, t.repeat);
   while (day <= today) day = nextRepeat(day, t.repeat);
   const shift = diffDays(t.day ?? today, day);
-  return {
+  const next = {
     id: uid(), title: t.title, sphereId: t.sphereId, priority: t.priority,
     deadline: t.deadline ? addDays(t.deadline, shift) : null,
     status: 'todo', subtasks: t.subtasks.map((x) => ({ ...x, id: uid(), done: false })), note: t.note,
-    day, dayOrder: endOf(day), time: t.time ?? null, repeat: t.repeat, createdAt: stamp(), doneAt: null,
+    day, dayOrder: 0, time: t.time ?? null, repeat: t.repeat, createdAt: stamp(), doneAt: null,
   };
+  next.dayOrder = slotOf(next, day);
+  return next;
 }
 
 /** Отмечает или снимает отметку. Для повторяющейся возвращает созданную следующую задачу. */
@@ -167,18 +172,23 @@ export function planTask(id, day, replaceId = null, extra = {}) {
   }
   const ops = [];
   let order = t.dayOrder;
+  const timeChanged = 'time' in extra && (extra.time ?? null) !== (t.time ?? null);
   if (t.day !== day || isDone(t)) {
     if (replaceId) {
+      // замена занимает место заменённой — его выбрали руками
       const old = findTask(replaceId);
       order = old.dayOrder;
       Object.assign(old, { day: null, dayOrder: 0 });
       ops.push({ store: 'tasks', value: old });
     } else {
       if (!isDone(t) && isDayFull(state, day)) return false;
-      order = endOf(day);
+      order = null;
     }
+  } else if (timeChanged) {
+    order = null; // время поменяли — задача встаёт по новому времени
   }
-  Object.assign(t, extra, { day, dayOrder: order, updatedAt: stamp() });
+  Object.assign(t, extra, { day, updatedAt: stamp() });
+  t.dayOrder = order ?? slotOf(t, day);
   if (t.status === 'paused') t.status = 'todo';
   ops.push({ store: 'tasks', value: t });
   emit();
@@ -200,7 +210,7 @@ export function planMany(ids, day) {
     if (!t) continue;
     if (!day) Object.assign(t, { day: null, dayOrder: 0, time: null, repeat: null });
     else if (t.day === day) { placed++; continue; }
-    else if (isDone(t) || !isDayFull(state, day)) Object.assign(t, { day, dayOrder: endOf(day), status: t.status === 'paused' ? 'todo' : t.status });
+    else if (isDone(t) || !isDayFull(state, day)) Object.assign(t, { day, dayOrder: slotOf(t, day), status: t.status === 'paused' ? 'todo' : t.status });
     else continue;
     placed++;
     t.updatedAt = stamp();
@@ -214,7 +224,9 @@ export function planMany(ids, day) {
 /** Одно и то же изменение нескольким задачам (сфера, приоритет). */
 export function updateMany(ids, patch) {
   const ops = ids.map(findTask).filter(Boolean).map((t) => {
+    const timeChanged = 'time' in patch && (patch.time ?? null) !== (t.time ?? null);
     Object.assign(t, patch, { updatedAt: stamp() });
+    if (timeChanged && t.day) t.dayOrder = slotOf(t, t.day);
     return { store: 'tasks', value: t };
   });
   emit();
@@ -332,10 +344,12 @@ function saveGoal(g) {
  * Цель: название, необязательные число (target, current, unit) и срок,
  * шаги — простой чек-лист.
  */
-export function createGoal(title) {
+/** fields — сразу число, единица, шаг, срок (из поля новой цели). */
+export function createGoal(title, fields = {}) {
   const g = {
-    id: uid(), title, steps: [], target: null, current: 0, unit: '', deadline: null, createdAt: stamp(),
+    id: uid(), title, steps: [], target: null, current: 0, unit: '', step: null, deadline: null, createdAt: stamp(),
     order: Math.max(-1, ...state.goals.map((x) => x.order)) + 1,
+    ...fields,
   };
   state.goals.push(g);
   saveGoal(g);
@@ -387,19 +401,46 @@ export function deleteStep(goalId, stepId) {
 /* ── импорт и восстановление ─────────────────────────────────────────── */
 
 /** План из io.planImport: новые сферы и задачи, новые и дополненные цели. */
+/**
+ * Импорт по плану (io.planImport): новое добавляется, правки по id заменяют
+ * записи, удаления убирают задачи с вложениями и цели. Повторяющаяся задача,
+ * которую импорт отметил сделанной, ставит следующий раз — как галочка руками.
+ */
 export async function applyImport(plan) {
-  await db.batch([
-    ...plan.spheres.map((value) => ({ store: 'spheres', value })),
-    ...plan.tasks.map((value) => ({ store: 'tasks', value })),
-    ...plan.goals.map((value) => ({ store: 'goals', value })),
-  ]);
-  state.spheres.push(...plan.spheres);
-  state.tasks.push(...plan.tasks);
-  for (const g of plan.goals) {
-    const i = state.goals.findIndex((x) => x.id === g.id);
-    if (i >= 0) state.goals[i] = g;
-    else state.goals.push(g);
+  const ch = plan.changes ?? { spheres: [], tasks: [], deleteTasks: [], deleteGoals: [] };
+  const goneTasks = new Set(ch.deleteTasks);
+  const goneGoals = new Set(ch.deleteGoals);
+  const files = state.files.filter((f) => goneTasks.has(f.taskId));
+  const spawned = [];
+  for (const t of ch.tasks) {
+    const before = findTask(t.id);
+    if (isDone(t) && before && !isDone(before) && t.repeat && t.repeat !== 'none' && !t.nextId) {
+      const next = spawnNext(t);
+      t.nextId = next.id;
+      spawned.push(next);
+    }
   }
+  await db.batch([
+    ...[...plan.spheres, ...ch.spheres].map((value) => ({ store: 'spheres', value })),
+    ...[...plan.tasks, ...ch.tasks, ...spawned].map((value) => ({ store: 'tasks', value })),
+    ...plan.goals.map((value) => ({ store: 'goals', value })),
+    ...[...goneTasks].map((id) => ({ store: 'tasks', id, remove: true })),
+    ...files.map((f) => ({ store: 'files', id: f.id, remove: true })),
+    ...[...goneGoals].map((id) => ({ store: 'goals', id, remove: true })),
+  ]);
+  const put = (list, items) => {
+    for (const x of items) {
+      const i = list.findIndex((y) => y.id === x.id);
+      if (i >= 0) list[i] = x;
+      else list.push(x);
+    }
+  };
+  put(state.spheres, [...plan.spheres, ...ch.spheres]);
+  put(state.tasks, [...plan.tasks, ...ch.tasks, ...spawned]);
+  put(state.goals, plan.goals);
+  state.tasks = state.tasks.filter((t) => !goneTasks.has(t.id));
+  state.files = state.files.filter((f) => !goneTasks.has(f.taskId));
+  state.goals = state.goals.filter((g) => !goneGoals.has(g.id));
   emit();
 }
 
