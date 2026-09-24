@@ -1,14 +1,14 @@
 /**
  * «Бриф» — собирается на устройстве из данных: завтра, просроченное,
- * неделя дедлайнов, цели месяца. «Export for Claude» кладёт компактный
+ * неделя дедлайнов, цели. «Export for Claude» кладёт компактный
  * JSON в буфер обмена — дальше его вставляют в чат руками.
  */
 import { h, glyph, icon, toast, countUp } from '../ui.js';
-import { dueLabel, fmtDay, fmtWeekday, monthName, parse } from '../dates.js';
-import { brief, exportForClaude } from '../logic.js';
+import { dueLabel, fmtDay, fmtWeekday, parse } from '../dates.js';
+import { brief, dayLimit, exportForClaude, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
 import { ui, header, pillButton, plot, stat } from './common.js';
-import { fraction, meter } from './goals.js';
+import { fraction, goalDue, meter } from './goals.js';
 
 async function copy(text) {
   try {
@@ -77,8 +77,8 @@ export function briefView() {
   const b = brief(st, ui.day);
   const spheres = new Map(st.spheres.map((s) => [s.id, s]));
   const deadlines = b.week.reduce((n, d) => n + d.tasks.length, 0);
-  const stepsDone = b.goals.reduce((n, g) => n + g.done, 0);
-  const stepsAll = b.goals.reduce((n, g) => n + g.total, 0);
+  const reached = b.goals.filter(({ goal }) => isGoalDone(goal)).length;
+  const limit = dayLimit(st);
 
   return h('section', { class: 'screen screen-brief' },
     header('Brief', fmtDay(b.today)),
@@ -87,7 +87,7 @@ export function briefView() {
     weekList(b.week),
 
     h('div', { class: 'bento' },
-      tile('Tomorrow', b.planned.length, '/3',
+      tile('Tomorrow', b.planned.length, limit ? `/${limit}` : null,
         b.planned.length
           ? h('ol', { class: 'lines lines-sm' }, b.planned.map((t, i) => line(t, spheres, { num: i + 1 })))
           : h('p', { class: 'hint' }, 'Not planned yet'),
@@ -100,12 +100,16 @@ export function briefView() {
           : h('p', { class: 'hint' }, 'All clear'),
         { late: b.overdue.length > 0 }),
 
-      tile(`Goals · ${monthName(b.month)}`, stepsDone, `/${stepsAll} steps`,
+      tile('Goals', reached, `/${b.goals.length} reached`,
         b.goals.length
-          ? h('div', { class: 'brief-goals' }, b.goals.map(({ goal, done, total }) =>
-            h('article', { class: 'brief-goal' },
-              h('div', { class: 'brief-goal-head' }, h('h3', null, goal.title), fraction(done, total)),
-              meter(done, total))))
+          ? h('div', { class: 'brief-goals' }, b.goals.map(({ goal, done, total, kind, current }) => {
+            const due = goalDue(goal, ui.day);
+            return h('article', { class: 'brief-goal' },
+              h('div', { class: 'brief-goal-head' },
+                h('h3', null, goal.title, due && h('span', { class: ['brief-goal-due', due.late && 'is-late'] }, due.text)),
+                kind === 'value' ? fraction(current, total, goal.unit) : fraction(done, total)),
+              meter(done, total));
+          }))
           : h('p', { class: 'hint' }, 'No goals yet'),
         { wide: true, href: '#/goals' })),
 

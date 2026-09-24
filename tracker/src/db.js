@@ -1,10 +1,12 @@
 /**
- * IndexedDB без библиотек. Данные живут только на устройстве: четыре
- * хранилища, записи целиком, ключ — id (у meta — key).
+ * IndexedDB без библиотек. Данные живут только на устройстве: пять
+ * хранилищ, записи целиком, ключ — id (у meta — key). Версия 2 добавила
+ * files — вложения задач; существующие данные при обновлении не трогаются.
  */
 const NAME = 'tracker';
-const VERSION = 1;
-export const STORES = ['spheres', 'tasks', 'goals', 'meta'];
+const VERSION = 2;
+export const STORES = ['spheres', 'tasks', 'goals', 'meta', 'files'];
+const DATA = ['spheres', 'tasks', 'goals', 'files'];
 
 let opening;
 
@@ -50,15 +52,15 @@ export const remove = (name, id) => tx([name], 'readwrite', (s) => void s[name].
 
 /** Несколько записей в одной транзакции: [{ store, value }] и [{ store, id, remove: true }]. */
 export const batch = (ops) =>
-  tx([...new Set(ops.map((o) => o.store))], 'readwrite', (s) => {
+  !ops.length ? Promise.resolve() : tx([...new Set(ops.map((o) => o.store))], 'readwrite', (s) => {
     for (const o of ops) o.remove ? s[o.store].delete(o.id) : s[o.store].put(o.value);
   });
 
 /** Полная замена данных одной транзакцией: либо вся копия, либо ничего. */
 export const replaceAll = (data) =>
-  tx(['spheres', 'tasks', 'goals'], 'readwrite', (s) => {
-    for (const name of ['spheres', 'tasks', 'goals']) {
+  tx(DATA, 'readwrite', (s) => {
+    for (const name of DATA) {
       s[name].clear();
-      for (const v of data[name]) s[name].put(v);
+      for (const v of data[name] ?? []) s[name].put(v);
     }
   });

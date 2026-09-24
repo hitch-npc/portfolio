@@ -2,10 +2,13 @@
  * Правила трекера — чистые функции над состоянием { spheres, tasks, goals }.
  * Ни DOM, ни IndexedDB: всё здесь проверяется node --test (tracker/test).
  */
-import { addDays, monthOf } from './dates.js';
+import { addDays } from './dates.js';
 
-/** «Сегодня» и «завтра» вмещают по три незавершённые задачи — не больше. */
-export const DAY_LIMIT = 3;
+/** Настройки по умолчанию. dayLimit — сколько незавершённых задач помещается в день (0 — без лимита). */
+export const DEFAULT_SETTINGS = { dayLimit: 3, addTo: 'today', motion: 'system', start: 'today' };
+
+export const settingsOf = (st) => ({ ...DEFAULT_SETTINGS, ...st.settings });
+export const dayLimit = (st) => settingsOf(st).dayLimit;
 
 export const STATUSES = [
   ['todo', 'To do'],
@@ -27,6 +30,15 @@ export const DEFAULT_SPHERES = [
   ['Career', 'triangle'],
   ['Personal', 'square'],
   ['Documents', 'bar'],
+];
+
+/** Повтор: сделанная задача ставит следующую на следующий день по правилу. */
+export const REPEATS = [
+  ['none', 'None'],
+  ['daily', 'Every day'],
+  ['weekdays', 'Weekdays'],
+  ['weekly', 'Every week'],
+  ['monthly', 'Every month'],
 ];
 
 const PRI_RANK = { high: 0, medium: 1, low: 2 };
@@ -66,7 +78,16 @@ export function dayTasks(st, day) {
   };
 }
 
-export const isDayFull = (st, day) => dayTasks(st, day).open.length >= DAY_LIMIT;
+export function isDayFull(st, day) {
+  const limit = dayLimit(st);
+  return limit > 0 && dayTasks(st, day).open.length >= limit;
+}
+
+/** Поставленные на прошедшие дни и не сделанные — чтобы не пропадали из виду. */
+export function carriedOver(st, today) {
+  const visible = visibility(st);
+  return st.tasks.filter((t) => isActive(t) && t.day && t.day < today && visible(t)).sort(compareTasks);
+}
 
 /**
  * Просроченные на день `day`. На экране «Сегодня» задачи, уже стоящие в дне,
@@ -81,7 +102,8 @@ export function overdue(st, day, { withPlanned = false } = {}) {
 
 /**
  * Кандидаты на завтра. Не сделанное «на сегодня» и раньше — первым блоком,
- * дальше «Входящие» и сферы по порядку. Выбранные на завтра остаются в своих
+ * потом поставленное на даты дальше завтра (Upcoming, по датам), дальше
+ * «Входящие» и сферы по порядку. Выбранные на завтра остаются в своих
  * группах — отмечены номером, повторный тап снимает выбор.
  */
 export function planGroups(st, today) {
@@ -89,10 +111,12 @@ export function planGroups(st, today) {
   const visible = visibility(st);
   const pool = st.tasks.filter((t) => isActive(t) && visible(t));
   const isCarried = (t) => t.day && t.day <= today;
-  const rest = pool.filter((t) => !isCarried(t));
+  const isLater = (t) => t.day && t.day > target;
+  const rest = pool.filter((t) => !isCarried(t) && !isLater(t));
   return {
     target,
     carried: pool.filter(isCarried).sort(compareTasks),
+    upcoming: pool.filter(isLater).sort((a, b) => a.day.localeCompare(b.day) || (a.dayOrder ?? 0) - (b.dayOrder ?? 0)),
     inbox: rest.filter((t) => !t.sphereId).sort(compareTasks),
     spheres: activeSpheres(st)
       .map((sphere) => ({ sphere, tasks: rest.filter((t) => t.sphereId === sphere.id).sort(compareTasks) }))
@@ -121,14 +145,37 @@ export function sphereTasks(st, sphereId) {
   };
 }
 
-/** Цели с шагами месяца `month` ('YYYY-MM') и прогрессом. */
-export function goalsForMonth(st, month) {
-  return [...st.goals]
-    .sort((a, b) => a.order - b.order)
-    .map((goal) => {
-      const steps = goal.steps.filter((s) => s.month === month);
-      return { goal, steps, done: steps.filter((s) => s.done).length, total: steps.length };
-    });
+/** Поиск по названию, заметке и подзадачам: незавершённые сверху. */
+export function searchTasks(st, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const hit = (v) => (v ?? '').toLowerCase().includes(q);
+  return st.tasks
+    .filter((t) => hit(t.title) || hit(t.note) || t.subtasks.some((x) => hit(x.title)))
+    .sort((a, b) => isDone(a) - isDone(b) || compareTasks(a, b));
+}
+
+/**
+ * Прогресс цели: если задано числовое значение (например, 10 откликов),
+ * считается по нему; иначе — по шагам.
+ */
+export function goalProgress(goal) {
+  const steps = goal.steps ?? [];
+  if (goal.target > 0) {
+    const current = Math.max(0, goal.current ?? 0);
+    return { kind: 'value', done: Math.min(current, goal.target), total: goal.target, current, steps };
+  }
+  return { kind: 'steps', done: steps.filter((s) => s.done).length, total: steps.length, current: null, steps };
+}
+
+export const isGoalDone = (goal) => {
+  const p = goalProgress(goal);
+  return p.total > 0 && p.done >= p.total;
+};
+
+/** Все цели по порядку, с прогрессом. */
+export function goalsOverview(st) {
+  return [...st.goals].sort((a, b) => a.order - b.order).map((goal) => ({ goal, ...goalProgress(goal) }));
 }
 
 /** Всё для брифа: завтра, просроченное, неделя дедлайнов от сегодня, цели месяца. */
@@ -146,8 +193,7 @@ export function brief(st, today) {
     planned: dayTasks(st, tomorrow).open,
     overdue: overdue(st, today, { withPlanned: true }),
     week,
-    month: monthOf(today),
-    goals: goalsForMonth(st, monthOf(today)),
+    goals: goalsOverview(st),
   };
 }
 
@@ -166,6 +212,7 @@ export function exportForClaude(st, today) {
   const b = brief(st, today);
   const names = new Map(st.spheres.map((s) => [s.id, s.name]));
   const visible = visibility(st);
+  const files = (id) => (st.files ?? []).filter((f) => f.taskId === id).map((f) => f.name);
   const task = (t) =>
     compact({
       title: t.title,
@@ -174,8 +221,11 @@ export function exportForClaude(st, today) {
       priority: t.priority,
       deadline: t.deadline,
       planned: t.day && t.day >= today ? t.day : null,
+      time: t.time,
+      repeat: t.repeat && t.repeat !== 'none' ? t.repeat : null,
       subtasks: t.subtasks.map((s) => compact({ title: s.title, done: s.done || null })),
       note: t.note,
+      files: files(t.id),
     });
   const data = {
     date: today,
@@ -185,12 +235,13 @@ export function exportForClaude(st, today) {
       week: Object.fromEntries(b.week.filter((d) => d.tasks.length).map((d) => [d.date, d.tasks.map((t) => t.title)])),
     },
     tasks: st.tasks.filter((t) => !isDone(t) && visible(t)).sort(compareTasks).map(task),
-    goals: b.goals.map(({ goal, steps, done, total }) =>
+    goals: b.goals.map(({ goal, steps, done, total, kind }) =>
       compact({
         title: goal.title,
-        month: b.month,
+        deadline: goal.deadline,
         progress: `${done}/${total}`,
-        steps: steps.map((s) => compact({ title: s.title, done: s.done || null })),
+        unit: kind === 'value' ? goal.unit : null,
+        steps: steps.map((s) => compact({ title: s.title, done: s.done || null, date: s.date })),
       }),
     ),
   };

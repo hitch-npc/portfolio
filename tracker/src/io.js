@@ -1,29 +1,66 @@
 /**
  * Резервная копия и импорт — чистые функции, без DOM и базы.
  *
- * Два вида файлов:
+ * Два вида данных:
  *  · резервная копия (свой экспорт: app = 'tracker') — заменяет всё;
- *  · файл импорта (tasks / spheres / goals) — добавляется к тому, что есть:
+ *  · импорт (tasks / spheres / goals) — добавляется к тому, что есть:
  *    сферы и цели сопоставляются по названию, повторы задач пропускаются.
+ *    Импорт приходит JSON-ом, таблицей CSV или простым списком
+ *    (текст, Markdown) — всё сводится к одному виду и дальше идёт общим путём.
  *
  * Разбор импорта терпимый: поля принимаются под разными именами
  * (title/name, deadline/due, …) и значениями (high/высокий/1, …).
  */
-import { GLYPHS, DAY_LIMIT, isDone } from './logic.js';
-import { monthOf } from './dates.js';
+import { GLYPHS, dayLimit, isDone } from './logic.js';
+import { addDays } from './dates.js';
 
 export const APP = 'tracker';
-export const SCHEMA = 1;
+/** 2 — вложения (files, base64) и настройки в копии. */
+export const SCHEMA = 2;
 
-export function makeBackup(st, now = new Date()) {
+/** files — уже упакованные packFiles: копия — это текст, Blob в JSON не ложится. */
+export function makeBackup(st, now = new Date(), files = []) {
   return {
     app: APP,
     schema: SCHEMA,
     exportedAt: now.toISOString(),
+    settings: st.settings,
     spheres: st.spheres,
     tasks: st.tasks,
     goals: st.goals,
+    files,
   };
+}
+
+/* Base64 кусками: String.fromCharCode(...огромный массив) переполняет стек. */
+function toBase64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+/* atob, а не fetch('data:…'): политика безопасности страницы fetch к data: не пускает. */
+function fromBase64(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/** Вложения → записи для копии: всё, кроме Blob, как есть, байты — base64 в data. */
+export async function packFiles(files) {
+  const out = [];
+  for (const { blob, ...meta } of files) out.push({ ...meta, data: toBase64(new Uint8Array(await blob.arrayBuffer())) });
+  return out;
+}
+
+function unpackFiles(list, taskIds) {
+  return list
+    .filter((f) => f && f.id && taskIds.has(f.taskId) && typeof f.data === 'string')
+    .map(({ data, ...meta }) => {
+      const blob = new Blob([fromBase64(data)], { type: meta.type || 'application/octet-stream' });
+      return { ...meta, name: text(meta.name) || 'file', size: blob.size, blob };
+    });
 }
 
 export const backupName = (day) => `tracker-backup-${day}.json`;
@@ -65,8 +102,27 @@ function fromWords(table, v) {
   return null;
 }
 
+const REPEAT_WORDS = {
+  daily: ['daily', 'every day', 'day', 'каждый день', 'ежедневно'],
+  weekdays: ['weekdays', 'workdays', 'every weekday', 'по будням', 'будни'],
+  weekly: ['weekly', 'every week', 'week', 'каждую неделю', 'еженедельно'],
+  monthly: ['monthly', 'every month', 'month', 'каждый месяц', 'ежемесячно'],
+};
+
 export const normStatus = (v) => fromWords(STATUS_WORDS, v);
 export const normPriority = (v) => fromWords(PRIORITY_WORDS, v);
+export const normRepeat = (v) => fromWords(REPEAT_WORDS, v);
+
+/** '9:05', '09:05' → '09:05'; остальное — null. */
+export function normTime(v) {
+  const m = text(v).match(/^(\d{1,2}):(\d{2})$/);
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? `${m[1].padStart(2, '0')}:${m[2]}` : null;
+}
+
+function normNumber(v) {
+  const n = typeof v === 'number' ? v : Number(text(v).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
 
 /** 'YYYY-MM-DD', ISO с временем или 'DD.MM.YYYY' → 'YYYY-MM-DD'; остальное — null. */
 export function normDate(v) {
@@ -76,11 +132,6 @@ export function normDate(v) {
   m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   return null;
-}
-
-function normMonth(v) {
-  const m = text(v).match(/^(\d{4})-(\d{2})/);
-  return m ? `${m[1]}-${m[2]}` : null;
 }
 
 function normChecklist(list, uid) {
@@ -102,9 +153,9 @@ function normChecklist(list, uid) {
  *
  * ctx: { uid, now: Date, today: 'YYYY-MM-DD' }
  */
-export function planImport(st, data, { uid, now = new Date(), today }) {
+export function planImport(st, data, { uid, now = new Date() }) {
   const stamp = now.toISOString();
-  const month = monthOf(today);
+  const limit = dayLimit(st);
 
   // сферы: существующие по названию (сначала активные), новые — в конец
   const spheres = new Map();
@@ -170,7 +221,7 @@ export function planImport(st, data, { uid, now = new Date(), today }) {
 
     // «на день» из файла принимаем, только пока день не полон
     let day = normDate(pick(r, 'day', 'planned', 'plannedFor', 'planned_for', 'scheduled', 'today'));
-    if (day && (status === 'done' || status === 'paused' || openOn(day) >= DAY_LIMIT)) day = null;
+    if (day && (status === 'done' || status === 'paused' || (limit > 0 && openOn(day) >= limit))) day = null;
     if (day) dayCount.set(day, openOn(day) + 1);
 
     newTasks.push({
@@ -184,12 +235,14 @@ export function planImport(st, data, { uid, now = new Date(), today }) {
       note: text(pick(r, 'note', 'notes', 'description', 'comment')),
       day,
       dayOrder: day ? nextOrder(day) : 0,
+      time: day ? normTime(pick(r, 'time', 'at')) : null,
+      repeat: day ? normRepeat(pick(r, 'repeat', 'recurrence', 'recurring')) : null,
       createdAt: stamp,
       doneAt: status === 'done' ? stamp : null,
     });
   }
 
-  // цели: по названию; шаги добавляются, если такого шага в этом месяце ещё нет
+  // цели: по названию; у существующей заполняются пустые поля и добавляются новые шаги
   const goals = new Map(st.goals.map((g) => [key(g.title), g]));
   const newGoals = [];
   const changedGoals = new Map();
@@ -200,15 +253,27 @@ export function planImport(st, data, { uid, now = new Date(), today }) {
     const title = text(typeof raw === 'string' ? raw : pick(raw, 'title', 'name', 'goal'));
     if (!title) continue;
     const r = typeof raw === 'object' ? raw : {};
-    const goalMonth = normMonth(pick(r, 'month')) ?? month;
+    const fields = {
+      target: normNumber(pick(r, 'target', 'targetValue', 'target_value', 'of')),
+      current: normNumber(pick(r, 'current', 'value', 'progress')),
+      unit: text(pick(r, 'unit', 'units')),
+      deadline: normDate(pick(r, 'deadline', 'due', 'by')),
+    };
 
     let goal = goals.get(key(title));
     if (!goal) {
-      goal = { id: uid(), title, order: goalOrder++, steps: [], createdAt: stamp };
+      goal = {
+        id: uid(), title, order: goalOrder++, steps: [], createdAt: stamp,
+        target: fields.target > 0 ? fields.target : null, current: Math.max(0, fields.current ?? 0),
+        unit: fields.unit, deadline: fields.deadline,
+      };
       goals.set(key(title), goal);
       newGoals.push(goal);
     } else {
       goal = changedGoals.get(goal.id) ?? { ...goal, steps: [...goal.steps] };
+      if (!(goal.target > 0) && fields.target > 0) Object.assign(goal, { target: fields.target, current: Math.max(0, fields.current ?? goal.current ?? 0) });
+      if (!goal.unit && fields.unit) goal.unit = fields.unit;
+      if (!goal.deadline && fields.deadline) goal.deadline = fields.deadline;
       changedGoals.set(goal.id, goal);
       goals.set(key(title), goal);
     }
@@ -217,12 +282,10 @@ export function planImport(st, data, { uid, now = new Date(), today }) {
     for (const s of Array.isArray(steps) ? steps : []) {
       const stepTitle = text(typeof s === 'object' ? pick(s, 'title', 'name', 'text') : s);
       if (!stepTitle) continue;
-      const stepMonth = (typeof s === 'object' && normMonth(pick(s, 'month'))) || goalMonth;
-      if (goal.steps.some((x) => x.month === stepMonth && key(x.title) === key(stepTitle))) continue;
+      if (goal.steps.some((x) => key(x.title) === key(stepTitle))) continue;
       goal.steps.push({
         id: uid(),
         title: stepTitle,
-        month: stepMonth,
         done: typeof s === 'object' && Boolean(pick(s, 'done', 'completed', 'checked')),
       });
       newSteps++;
@@ -250,13 +313,168 @@ export function readBackup(data) {
   if (detect(data) !== 'backup') throw new Error('Not a tracker backup');
   if (data.schema > SCHEMA) throw new Error('Backup is from a newer version of the app');
   const list = (v) => (Array.isArray(v) ? v : []);
+  const tasks = list(data.tasks)
+    .filter((t) => t && t.id && text(t.title))
+    .map((t) => ({ ...t, subtasks: list(t.subtasks) }));
   return {
+    settings: data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings) ? data.settings : null,
     spheres: list(data.spheres).filter((s) => s && s.id && text(s.name)),
-    tasks: list(data.tasks)
-      .filter((t) => t && t.id && text(t.title))
-      .map((t) => ({ ...t, subtasks: list(t.subtasks) })),
+    tasks,
     goals: list(data.goals)
       .filter((g) => g && g.id && text(g.title))
       .map((g) => ({ ...g, steps: list(g.steps) })),
+    files: unpackFiles(list(data.files), new Set(tasks.map((t) => t.id))),
   };
+}
+
+/* ── импорт из текста: список, Markdown, CSV ─────────────────────────── */
+
+const RELATIVE = { today: 0, сегодня: 0, tomorrow: 1, завтра: 1 };
+
+function dateToken(v, today) {
+  const k = key(v);
+  if (k in RELATIVE) return addDays(today, RELATIVE[k]);
+  return normDate(v);
+}
+
+/**
+ * Метки в строке задачи: `@today` / `@2026-10-01` — день, `due:2026-10-05` —
+ * дедлайн, `!` / `!high` / `!low` — приоритет. Возвращает поля и чистое название.
+ */
+function tokens(line, today) {
+  const out = {};
+  let title = line.replace(/(^|\s)due:(\S+)/gi, (m, sp, v) => ((out.deadline = dateToken(v, today)) ? sp : m));
+  title = title.replace(/(^|\s)@(\S+)/g, (m, sp, v) => ((out.day = dateToken(v, today)) ? sp : m));
+  title = title.replace(/(^|\s)!(high|medium|low|h|m|l|1|2|3)?(?=\s|$)/gi, (m, sp, v) => {
+    out.priority = v ? normPriority(v) : 'high';
+    return sp;
+  });
+  return { ...out, title: title.replace(/\s+/g, ' ').trim() };
+}
+
+/**
+ * Список задач из текста или Markdown. Заголовок (`# Работа`) или строка
+ * с двоеточием в конце (`Работа:`) — сфера для задач ниже; пункт списка
+ * (`-`, `*`, `1.`, `- [ ]`, `- [x]`) или просто строка — задача; пункт
+ * с отступом под задачей — её подзадача.
+ */
+export function parseList(src, today) {
+  const tasks = [];
+  let sphere = null;
+  let last = null;
+  let lastIndent = 0;
+  for (const raw of String(src).split(/\r?\n/)) {
+    if (!raw.trim() || /^\s*(```|---+\s*$|\*\*\*+\s*$|>)/.test(raw)) continue;
+    const heading = raw.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (heading) {
+      sphere = heading[1];
+      last = null;
+      continue;
+    }
+    const m = raw.match(/^(\s*)([-*+•]|\d+[.)])?\s*(?:\[([ xX✓])\]\s*)?(.*)$/);
+    const indent = m[1].replace(/\t/g, '    ').length;
+    const body = m[4].trim();
+    if (!body) continue;
+    if (!m[2] && !m[3] && indent === 0 && /:$/.test(body)) {
+      sphere = body.slice(0, -1).trim();
+      last = null;
+      continue;
+    }
+    const done = Boolean(m[3] && m[3] !== ' ');
+    if (last && indent > lastIndent) {
+      const sub = tokens(body, today).title;
+      if (sub) last.subtasks.push({ title: sub, done });
+      continue;
+    }
+    const t = tokens(body, today);
+    if (!t.title) continue;
+    last = { ...t, sphere, status: done ? 'done' : 'todo', subtasks: [] };
+    lastIndent = indent;
+    tasks.push(last);
+  }
+  return { tasks };
+}
+
+/** Строки CSV с кавычками (в том числе переносы внутри кавычек). */
+function csvRows(src, delim) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quoted) {
+      if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && src[i + 1] === '\n') i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else cell += c;
+  }
+  if (cell || row.length) rows.push([...row, cell]);
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+
+const COLUMNS = {
+  title: ['title', 'name', 'task', 'задача', 'название'],
+  sphere: ['sphere', 'project', 'area', 'list', 'category', 'сфера', 'проект', 'список'],
+  status: ['status', 'state', 'статус'],
+  priority: ['priority', 'prio', 'приоритет'],
+  deadline: ['deadline', 'due', 'due date', 'date', 'срок', 'дедлайн'],
+  day: ['day', 'planned', 'scheduled', 'do date', 'день'],
+  note: ['note', 'notes', 'description', 'заметка', 'описание'],
+  subtasks: ['subtasks', 'checklist', 'подзадачи'],
+};
+
+/**
+ * Таблица CSV (Excel, Numbers, Google Sheets, Notion): разделитель — запятая,
+ * точка с запятой или табуляция, по первой строке. Столбцы узнаются
+ * по названию; без узнаваемой шапки первый столбец — название задачи.
+ */
+export function parseCSV(src) {
+  const body = String(src).replace(/^\uFEFF/, '');
+  const first = body.split(/\r?\n/, 1)[0];
+  const delim = [',', ';', '\t'].map((d) => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = csvRows(body, delim);
+  if (!rows.length) return { tasks: [] };
+  const head = rows[0].map(key);
+  const col = {};
+  for (const [field, names] of Object.entries(COLUMNS)) {
+    const i = head.findIndex((c) => names.includes(c));
+    if (i >= 0) col[field] = i;
+  }
+  const hasHead = 'title' in col;
+  if (!hasHead) col.title = 0;
+  const tasks = rows.slice(hasHead ? 1 : 0).map((r) => {
+    const get = (f) => (f in col ? text(r[col[f]]) : '');
+    const t = {};
+    for (const f of Object.keys(COLUMNS)) if (get(f)) t[f] = get(f);
+    if (t.subtasks) t.subtasks = t.subtasks.split(/\s*[;|\n]\s*/).filter(Boolean);
+    return t;
+  });
+  return { tasks: tasks.filter((t) => t.title) };
+}
+
+/**
+ * Любой текст импорта → данные: JSON (копия или импорт; массив — это задачи),
+ * CSV (по расширению), остальное — список. null — если JSON битый.
+ */
+export function readImportText(name, src, today) {
+  const trimmed = String(src).trim();
+  if (/\.json$/i.test(name) || /^[[{]/.test(trimmed)) {
+    try {
+      const data = JSON.parse(trimmed);
+      return Array.isArray(data) ? { tasks: data } : data;
+    } catch {
+      if (/\.json$/i.test(name)) return null;
+    }
+  }
+  if (/\.(csv|tsv)$/i.test(name)) return parseCSV(trimmed);
+  return parseList(trimmed, today);
 }
