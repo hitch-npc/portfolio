@@ -30,7 +30,7 @@ const TABS = [
   ['plan', 'Plan'],
   ['spheres', 'Spheres'],
   ['goals', 'Goals'],
-  ['brief', 'Brief'],
+  ['brief', 'Overview'],
 ];
 
 const main = document.getElementById('main');
@@ -106,15 +106,42 @@ function enter() {
   enterTimer = setTimeout(() => main.classList.remove('is-entering'), 900);
 }
 
+let shown = null; // экран, который сейчас на месте
+
+/**
+ * Переход между экранами. Настройки въезжают справа поверх, шестерёнка
+ * перетекает в крестик; закрытие — обратно вправо, и экран под ними стоит,
+ * как оставили (появление не проигрывается заново). Между вкладками —
+ * короткий наплыв. Без View Transitions (старый iOS) и при «меньше
+ * движения» — сразу.
+ */
+function navigate(dir, update) {
+  if (!document.startViewTransition || calm()) {
+    update();
+    return;
+  }
+  const root = document.documentElement;
+  root.dataset.nav = dir;
+  document.startViewTransition(update).finished.finally(() => {
+    delete root.dataset.nav;
+  });
+}
+
 function onRoute() {
+  const next = route().name;
+  const dir = next === 'settings' ? 'push' : shown === 'settings' ? 'pop' : 'tab';
+  shown = next;
   ui.expanded = null;
   ui.confirm = null;
   ui.select = null;
   ui.query = '';
-  closeSheet(false);
-  window.scrollTo(0, 0);
-  enter();
-  if (route().name === 'today') focusInput();
+  navigate(dir, () => {
+    closeSheet(false);
+    window.scrollTo(0, 0);
+    if (dir === 'pop') render();
+    else enter();
+    if (next === 'today' && dir !== 'pop') focusInput();
+  });
 }
 
 async function boot() {
@@ -138,8 +165,9 @@ async function boot() {
   const start = settingsOf(store.getState()).start;
   if (start !== 'today' && ROUTES[start] && /^#?\/?(today)?$/.test(location.hash)) location.replace(`#/${start}`);
 
+  shown = route().name;
   enter();
-  if (route().name === 'today') focusInput();
+  if (shown === 'today') focusInput();
   window.addEventListener('hashchange', onRoute);
 
   // новый день, пока приложение открыто или свёрнуто

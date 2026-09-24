@@ -7,8 +7,8 @@
  * (круг, пилюля, квадрат, полоса) чернилами на фоне приложения. Красного
  * в иконке нет: акцент значит «требует внимания сейчас», и только это.
  *
- * Ещё — плитка бумажного зерна (tracker/textures/grain.png): чёрные точки
- * с едва заметной прозрачностью. Картинка, а не SVG-фильтр: политика
+ * Ещё — плитка бумажного зерна (tracker/textures/grain.png): тёмные и
+ * светлые крупинки с едва заметной прозрачностью, в три раза плотнее экрана. Картинка, а не SVG-фильтр: политика
  * безопасности страницы не пускает data:-адреса, а шум на лету дорог для телефона.
  *
  * Пакетов нет: пиксели считаются с суперсэмплингом 4×4, PNG собирается
@@ -107,21 +107,51 @@ function png(size, rgba) {
   ]);
 }
 
-/* Зерно: детерминированный шум (одинаковый при каждом запуске — без лишних диффов) */
+/*
+ * Зерно: детерминированный шум (одинаковый при каждом запуске — без лишних
+ * диффов). Плитка в три раза плотнее, чем показывается (384 px на 128 pt):
+ * на экране iPhone одна крупинка — один пиксель, а не квадрат 3×3. Шум чуть
+ * размыт по кругу (плитка без шва) — крупинки разного размера, как у плёнки;
+ * тёмные и изредка светлые — как у бумаги.
+ */
+const GRAIN = 384;
+
 function grain(size) {
-  const px = Buffer.alloc(size * size * 4);
   let seed = 7;
   const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  for (let i = 0; i < size * size; i++) {
-    const r = rand();
-    px[i * 4 + 3] = r > 0.5 ? Math.round((r - 0.5) * 2 * 14) : 0; // альфа 0…14 из 255
+  let v = new Float32Array(size * size).map(() => rand() + rand() - 1);
+  // один проход [1 2 1]/4 по строкам и столбцам, с заворотом через край:
+  // крупинки мягкие, но не слипаются в пятна
+  const at = (x, y) => ((y + size) % size) * size + ((x + size) % size);
+  for (let pass = 0; pass < 1; pass++) {
+    for (const [dx, dy] of [[1, 0], [0, 1]]) {
+      const out = new Float32Array(v.length);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          out[at(x, y)] = (v[at(x - dx, y - dy)] + 2 * v[at(x, y)] + v[at(x + dx, y + dy)]) / 4;
+        }
+      }
+      v = out;
+    }
+  }
+  const mean = v.reduce((a, b) => a + b, 0) / v.length;
+  const sd = Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length);
+  const px = Buffer.alloc(size * size * 4);
+  for (let i = 0; i < v.length; i++) {
+    const z = (v[i] - mean) / sd;
+    if (z > 0.2) {
+      px[i * 4 + 3] = Math.min(22, Math.round((z - 0.2) * 11)); // тёмная крупинка
+    } else if (z < -1.3) {
+      px.fill(255, i * 4, i * 4 + 3); // светлая — реже и слабее
+      px[i * 4 + 3] = Math.min(12, Math.round((-z - 1.3) * 10));
+    }
   }
   return px;
 }
 
 mkdirSync(OUT, { recursive: true });
 mkdirSync(join(ROOT, 'tracker', 'textures'), { recursive: true });
-writeFileSync(join(ROOT, 'tracker', 'textures', 'grain.png'), png(160, grain(160)));
+writeFileSync(join(ROOT, 'tracker', 'textures', 'grain.png'), png(GRAIN, grain(GRAIN)));
 console.log('✓ tracker/textures/grain.png');
 
 const ICONS = [

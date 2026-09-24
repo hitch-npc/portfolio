@@ -6,14 +6,14 @@
  * где его нет — скачиванием. Импорт показывает, что изменится, и ждёт
  * подтверждения.
  */
-import { h, openSheet, closeSheet, toast, autosize, copyText } from '../ui.js';
+import { h, icon, openSheet, closeSheet, toast, autosize, copyText } from '../ui.js';
 import {
   aiData, aiPrompt, backupName, detect, makeBackup, packFiles, planImport, readBackup, readImportText,
 } from '../io.js';
 import { dayLimit, settingsOf } from '../logic.js';
 import * as store from '../store.js';
 import { VERSION } from '../version.js';
-import { ui, header, backLink, pillButton } from './common.js';
+import { ui, header, pillButton } from './common.js';
 
 async function exportBackup() {
   const st = store.getState();
@@ -196,8 +196,10 @@ export function settingsView() {
   });
 
   return h('section', { class: 'screen screen-settings' },
-    backLink('#/today', 'Today'),
-    header('Settings'),
+    // закрыть — там же, где была шестерёнка: палец уже знает это место
+    header('Settings', null, h('a', {
+      class: 'icon-btn corner-btn', href: '#/today', 'aria-label': 'Close settings', title: 'Close',
+    }, icon('close'))),
 
     h('h2', { class: 'label' }, 'Planning'),
     h('section', { class: 'block-alt settings' },
@@ -207,8 +209,9 @@ export function settingsView() {
 
     h('h2', { class: 'label' }, 'Interface'),
     h('section', { class: 'block-alt settings' },
-      choice('Open on launch', 'start', [['today', 'Today'], ['plan', 'Plan'], ['spheres', 'Spheres'], ['goals', 'Goals'], ['brief', 'Brief']]),
-      choice('Motion', 'motion', [['system', 'As in system'], ['reduced', 'Reduced']])),
+      choice('Open on launch', 'start', [['today', 'Today'], ['plan', 'Plan'], ['spheres', 'Spheres'], ['goals', 'Goals'], ['brief', 'Overview']]),
+      choice('Animations', 'motion', [['system', 'Full'], ['reduced', 'Fewer']],
+        'Fewer — no sliding and bouncing, for when motion is tiring. With Reduce Motion on in iPhone settings, animations are fewer anyway.')),
 
     h('h2', { class: 'label' }, 'AI'),
     h('section', { class: 'block-alt' },

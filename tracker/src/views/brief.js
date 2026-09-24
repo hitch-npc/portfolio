@@ -1,11 +1,13 @@
 /**
- * «Бриф» — собирается на устройстве из данных: завтра, просроченное,
- * неделя дедлайнов, цели. «Export for Claude» кладёт компактный
- * JSON в буфер обмена — дальше его вставляют в чат руками.
+ * «Обзор» (Overview) — собирается на устройстве из данных: завтра,
+ * просроченное, неделя дедлайнов, цели. «Ask AI about my plans» кладёт
+ * в буфер инструкцию с открытыми задачами и целями — её вставляют в любой
+ * ИИ-чат и спрашивают; предложенные правки вставляются обратно в Settings → AI.
  */
 import { h, glyph, icon, toast, countUp, copyText } from '../ui.js';
 import { dueLabel, fmtDay, fmtWeekday, parse } from '../dates.js';
-import { brief, dayLimit, exportForClaude, isGoalDone } from '../logic.js';
+import { brief, dayLimit, isGoalDone } from '../logic.js';
+import { aiData, aiPrompt } from '../io.js';
 import * as store from '../store.js';
 import { ui, header, pillButton, plot, stat } from './common.js';
 import { fraction, goalDue, meter } from './goals.js';
@@ -67,7 +69,8 @@ export function briefView() {
   const limit = dayLimit(st);
 
   return h('section', { class: 'screen screen-brief' },
-    header('Brief', fmtDay(b.today)),
+    header('Overview', fmtDay(b.today)),
+    h('p', { class: 'hint hint-top' }, 'What needs attention, at a glance: tomorrow, overdue, deadlines this week and goals. Tap a block to open it.'),
     week(b.week),
     stat('Deadlines, next 7 days', deadlines),
     weekList(b.week),
@@ -99,7 +102,11 @@ export function briefView() {
           : h('p', { class: 'hint' }, 'No goals yet'),
         { wide: true, href: '#/goals' })),
 
-    pillButton('copy', 'Export for Claude', async () => {
-      toast((await copyText(exportForClaude(st, ui.day))) ? 'Copied — paste it into Claude' : 'Could not copy');
-    }, 'is-on pill-wide pill-export'));
+    pillButton('copy', 'Ask AI about my plans', async () => {
+      const prompt = aiPrompt({ today: ui.day, limit: dayLimit(st), data: aiData(st) });
+      toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
+    }, 'is-on pill-wide pill-export'),
+    h('p', { class: 'setting-hint ask-hint' },
+      'Copies your open tasks, deadlines and goals with instructions. Paste them into ChatGPT, Claude or Gemini and ask — what to focus on, how to split a big task. ',
+      'If it suggests changes, paste its answer in Settings → AI → Paste AI answer.'));
 }

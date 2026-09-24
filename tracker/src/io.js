@@ -779,6 +779,7 @@ export function aiPrompt({ today, limit = 3, data = null }) {
     '- Do not invent tasks, dates or numbers I did not mention — suggest them in the text instead.',
     '- One task is one action: long details go to note, parts to subtasks.',
     '- Do not show ids in the text of your answer.',
+    '- If I only ask a question or for advice, just answer — no JSON needed.',
     ...(data ? ['', '## My current data', '```json', json(data), '```'] : []),
     '',
     '## My request',
