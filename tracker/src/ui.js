@@ -137,7 +137,7 @@ const ICONS = {
   calendar: `<rect x="4" y="5" width="16" height="15" rx="3" ${S}/><path d="M4 10h16M8 3v4M16 3v4" ${S}/><g ${F}><circle cx="8.5" cy="14" r="1"/><circle cx="12" cy="14" r="1"/><circle cx="15.5" cy="14" r="1"/><circle cx="8.5" cy="17" r="1"/><circle cx="12" cy="17" r="1"/></g>`,
   clock: `<circle cx="12" cy="12" r="8" ${S}/><path d="M12 7v5l3 2" ${S}/>`,
   repeat: `<path d="M5 11V9a3 3 0 0 1 3-3h11M16 3l3 3-3 3M19 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3" ${S}/>`,
-  flag: `<path d="M6 21V4M6 5h11l-2.5 4L17 13H6" ${S}/>`,
+  flag: `<path d="M7 20.5v-17M7 4.5h11l-2.5 4 2.5 4H7" ${S}/>`,
   next: `<rect x="4" y="4" width="16" height="16" rx="3" ${S}/><path d="M8 12h8M13 9l3 3-3 3" ${S}/>`,
   clip: `<path d="M16.5 11.5l-5.8 5.8a3.5 3.5 0 0 1-5-5l6.9-6.9a2.3 2.3 0 0 1 3.3 3.3l-6.6 6.6a1.1 1.1 0 0 1-1.6-1.6l5.6-5.6" ${S}/>`,
   file: `<path d="M7 3h7l4 4v14H7z" ${S}/><path d="M14 3v4h4" ${S}/>`,
@@ -428,6 +428,15 @@ if (vv) {
 // iOS включает :active (кнопка проседает под пальцем), только если страница слушает касания
 document.addEventListener('touchstart', () => {}, { passive: true });
 
+// Щипок не увеличивает экран. Safari не всегда слушается user-scalable=no и
+// touch-action, поэтому ещё и его жесты (gesture*) и движение двумя пальцами
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener('touchmove', (e) => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
 const PRESSABLE = '.pill, .chip, .icon-btn, .check, .pick, .replace, .glyph-pick, .compose-chip, .compose-send, .quick-pick, .bump, .switch';
 const RELEASE_MS = 500;
 let pressed = null; // { el, at, from, start }
@@ -538,7 +547,7 @@ function paint(row, x) {
 }
 
 function settle(row, open) {
-  row.classList.remove('is-dragging');
+  row.classList.remove('is-swiping');
   paint(row, open ? -SWIPE_W : 0);
   if (open) swiped = row;
   else if (swiped === row) swiped = null;
@@ -567,9 +576,14 @@ export function swipeable(list) {
     const y0 = e.clientY;
     let x = base;
     let mode = null; // 'x' — смахивание, 'y' — прокрутка
+    let over = base < 0; // за половиной ширины кнопки
     let last = { x: x0, t: e.timeStamp };
     let v = 0;
     const move = (ev) => {
+      if (row.classList.contains('is-held')) {
+        stop(); // строку подняли долгим нажатием — это перетаскивание, не смахивание
+        return;
+      }
       const dx = ev.clientX - x0;
       const dy = ev.clientY - y0;
       if (!mode) {
@@ -579,9 +593,14 @@ export function swipeable(list) {
           stop();
           return;
         }
-        row.classList.add('is-dragging');
+        row.classList.add('is-swiping');
       }
       x = base + dx;
+      const past = x < -SWIPE_W / 2;
+      if (past !== over) {
+        over = past;
+        haptic(); // перешла половину — отпустишь, и откроется (и наоборот)
+      }
       if (x > 0) x /= 5; // вправо открывать нечего — только упругость
       if (x < -SWIPE_W) x = -SWIPE_W + (x + SWIPE_W) / 3;
       v = (ev.clientX - last.x) / Math.max(1, ev.timeStamp - last.t);
@@ -618,6 +637,7 @@ export function swipeable(list) {
 /** Строка уходит влево и схлопывается, потом done() удаляет её из данных. */
 export function removeRow(row, done) {
   swiped = null;
+  haptic();
   if (calm()) {
     done();
     return;

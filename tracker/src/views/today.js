@@ -10,7 +10,7 @@
  * на сегодня, это настройка), места дня, отдельно — не сделанное
  * в прошлые дни и просроченные.
  */
-import { h, icon, sortable, toast, flip, countUp } from '../ui.js';
+import { h, icon, sortable, swipeable, toast, flip, countUp, haptic, calm } from '../ui.js';
 import { fmtDay } from '../dates.js';
 import { carriedOver, dayLimit, dayTasks, overdue, settingsOf } from '../logic.js';
 import * as store from '../store.js';
@@ -32,9 +32,9 @@ const HEIGHT = { high: 1, medium: 0.8, low: 0.62 };
    перерисовке (фокус и клавиатура остаются), пилюли переезжают, а не мигают. */
 function build() {
   compose = makeComposer();
-  const head = header('Today', '', h('a', { class: 'icon-btn', href: '#/settings', 'aria-label': 'Settings', title: 'Settings' }, icon('settings')));
+  const head = header('Today', '', h('a', { class: 'icon-btn corner-btn', href: '#/settings', 'aria-label': 'Settings', title: 'Settings' }, icon('settings')));
   sub = head.querySelector('.title-sub');
-  chart = h('div', { class: 'day-chart', role: 'img' });
+  chart = h('div', { class: 'day-chart', role: 'img', onclick: tapShape });
   stat = h('div', { class: 'stat' });
   body = h('div', { class: 'today-body' });
   shell = h('section', { class: 'screen screen-today' }, head, plot(chart), stat, compose, body);
@@ -65,7 +65,7 @@ function drawChart(open, done) {
     want.forEach(([k, state, t], i) => {
       let el = shapes.get(k);
       if (!el) {
-        el = h('span', { class: 'shape' });
+        el = h('span', { class: 'shape', 'data-key': k });
         shapes.set(k, el);
       }
       el.className = `shape is-${state}`;
@@ -75,6 +75,36 @@ function drawChart(open, done) {
     });
   });
   chart.setAttribute('aria-label', `${done.length} of ${done.length + open.length} tasks done today`);
+}
+
+/**
+ * Пилюли дня отзываются на тап: пружинят и щёлкают. Пилюля задачи
+ * подсвечивает её строку в списке; пустое место открывает поле новой задачи.
+ */
+function tapShape(e) {
+  const el = e.target.closest('.shape');
+  if (!el) return;
+  haptic();
+  if (!calm()) {
+    el.animate([
+      { transform: 'scale(1, 1)' },
+      { transform: 'scale(1.08, 0.86)', offset: 0.25 },
+      { transform: 'scale(0.96, 1.06)', offset: 0.55 },
+      { transform: 'scale(1, 1)' },
+    ], { duration: 520, easing: 'cubic-bezier(0.34, 1.3, 0.64, 1)' });
+  }
+  const key = el.dataset.key;
+  if (key.startsWith('empty-')) {
+    focusInput();
+    return;
+  }
+  const row = body.querySelector(`[data-id="${CSS.escape(key)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ block: 'nearest', behavior: calm() ? 'auto' : 'smooth' });
+  if (calm()) return;
+  row.classList.remove('is-ping');
+  void row.offsetWidth; // тапнули ещё раз — подсветка сначала
+  row.classList.add('is-ping');
 }
 
 function drawStat(open, done) {
@@ -112,14 +142,14 @@ export function todayView() {
   drawStat(open, done);
 
   // пустые места — в том же списке, после задач: перетаскивание их не трогает (у них нет data-id)
-  const slots = sortable(h('ol', { class: 'tasks day-list', 'aria-label': 'Today' },
+  const slots = sortable(swipeable(h('ol', { class: 'tasks day-list', 'aria-label': 'Today' },
     open.map((t, i) => taskItem(t, { num: i + 1, accent: i === 0, drag: open.length > 1, inDay: true })),
-    emptySlots(open.length)), (ids) => store.reorderDay(ids), { hold: true });
+    emptySlots(open.length))), (ids) => store.reorderDay(ids), { hold: true });
 
   body.replaceChildren(...[
     slots,
     !open.length && !done.length && h('p', { class: 'hint' }, 'Type a task above — it lands on today. Or open any task and pick a date.'),
-    done.length > 0 && h('ul', { class: 'tasks done-list', 'aria-label': 'Done today' }, done.map((t) => taskItem(t, { inDay: true }))),
+    done.length > 0 && swipeable(h('ul', { class: 'tasks done-list', 'aria-label': 'Done today' }, done.map((t) => taskItem(t, { inDay: true })))),
     carried.length > 0 && h('section', { class: 'block block-alt' },
       h('div', { class: 'block-head' },
         h('h2', { class: 'label' }, 'Not done yet', h('span', { class: 'count' }, carried.length)),
@@ -127,10 +157,10 @@ export function todayView() {
           const n = store.planMany(carried.map((t) => t.id), ui.day);
           toast(n === carried.length ? `Moved ${n} to today` : n ? `Moved ${n} — today is full` : 'Today is full');
         }, 'pill-sm')),
-      h('ul', { class: 'tasks tasks-compact' }, carried.map((t) => taskItem(t)))),
+      swipeable(h('ul', { class: 'tasks tasks-compact' }, carried.map((t) => taskItem(t))))),
     late.length > 0 && h('section', { class: 'block block-alt' },
       h('h2', { class: 'label' }, 'Overdue', h('span', { class: 'count' }, late.length)),
-      h('ul', { class: 'tasks tasks-compact' }, late.map((t) => taskItem(t)))),
+      swipeable(h('ul', { class: 'tasks tasks-compact' }, late.map((t) => taskItem(t))))),
   ].filter(Boolean));
   return shell;
 }

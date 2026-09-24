@@ -2,7 +2,7 @@
  * Общее для экранов: шапка, строка задачи с раскрывающейся карточкой,
  * шторка «день полон — заменить одну из задач», выбор нескольких задач.
  */
-import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast, countUp } from '../ui.js';
+import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast, countUp, removeRow, haptic } from '../ui.js';
 import { addDays, dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { PRIORITIES, REPEATS, STATUSES, activeSpheres, dayLimit, dayTasks } from '../logic.js';
 import * as store from '../store.js';
@@ -121,6 +121,7 @@ export function checkButton(done, label, onclick, cls = '') {
 
 /** Галочка, которую только что поставили: у неё короткая анимация. Повтор — подсказка, когда следующий. */
 function toggle(t) {
+  haptic();
   ui.popped = t.status === 'done' ? null : t.id;
   const next = store.toggleDone(t.id);
   if (next) toast(`Repeats — next ${dayLabel(next.day, ui.day)}`);
@@ -238,11 +239,19 @@ export function taskItem(t, opts = {}) {
   if (ui.select) return selectItem(t, opts);
   const expanded = ui.expanded === t.id;
   const done = t.status === 'done';
+  // смахивание влево открывает Delete — как в Plan; раскрытую карточку не смахивают
   return h('li', {
     class: ['task', done && 'is-done', t.status === 'paused' && 'is-paused', expanded && 'is-open', ui.popped === t.id && 'is-pop', opts.cls],
-    'data-id': t.id,
+    'data-id': t.id, 'data-swipe': expanded ? null : '',
   },
-    h('div', { class: 'task-row' },
+    !expanded && h('button', {
+      class: 'swipe-action', type: 'button', 'aria-label': `Delete “${t.title}”`,
+      onclick: (e) => removeRow(e.currentTarget.closest('li'), () => {
+        store.deleteTask(t.id);
+        toast('Task deleted');
+      }),
+    }, icon('close', 20), h('span', null, 'Delete')),
+    h('div', { class: 'swipe-body' }, h('div', { class: 'task-row' },
       opts.num != null && h('span', {
         class: ['task-num', opts.accent && 'is-accent'],
         'data-drag': opts.drag ? '' : null,
@@ -264,7 +273,7 @@ export function taskItem(t, opts = {}) {
             meta(t, opts)),
           checkButton(done, done ? 'Mark as not done' : 'Mark as done', () => toggle(t), ui.popped === t.id ? 'is-pop' : ''),
         ]),
-    expanded && taskCard(t));
+    expanded && taskCard(t)));
 }
 
 function collapse() {

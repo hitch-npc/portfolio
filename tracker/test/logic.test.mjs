@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addDays, dayLabel, diffDays, dueLabel, fmtDay, fmtMonth, nextRepeat, nextWeek } from '../src/dates.js';
 import {
-  brief, carriedOver, dayTasks, exportForClaude, goalProgress, isDayFull, isGoalDone, overdue, planGroups,
+  brief, carriedOver, dayTasks, goalProgress, isDayFull, isGoalDone, overdue, planGroups,
   searchTasks, sphereCounts, sphereTasks, timeSlot,
 } from '../src/logic.js';
 import {
@@ -149,7 +149,7 @@ test('сферы: счётчик без паузы и готовых; в сфе�
   assert.deepEqual(done.map((t) => t.title), ['a3']);
 });
 
-test('бриф и экспорт для Claude: неделя от сегодня, цели месяца, компактный JSON', () => {
+test('обзор: неделя от сегодня, цели целиком', () => {
   const st = world();
   st.tasks.push(
     task('tomorrow', { day: addDays(TODAY, 1), sphereId: 'sa', priority: 'high' }),
@@ -171,16 +171,7 @@ test('бриф и экспорт для Claude: неделя от сегодня
   assert.equal(b.goals[0].done, 1);
   assert.equal(b.goals[0].total, 3, 'шаги целиком, без деления по месяцам');
   assert.equal(b.goals[1].kind, 'value');
-
-  const out = exportForClaude(st, TODAY);
-  assert.ok(!out.includes('\n'));
-  const data = JSON.parse(out);
-  assert.deepEqual(data.brief.tomorrow, ['tomorrow']);
-  assert.equal(data.goals[0].progress, '1/3');
-  assert.deepEqual([data.goals[1].progress, data.goals[1].unit, data.goals[1].deadline], ['4/10', 'jobs', '2026-12-31']);
-  assert.deepEqual(data.tasks.find((t) => t.title === 'tomorrow').files, ['brief.pdf']);
-  assert.equal(data.tasks.find((t) => t.title === 'tomorrow').sphere, 'Alpha');
-  assert.equal(data.tasks.find((t) => t.title === 'far').priority, undefined);
+  assert.deepEqual(b.planned.map((t) => t.title), ['tomorrow']);
 });
 
 test('импорт: нормализация значений', () => {

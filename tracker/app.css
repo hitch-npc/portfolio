@@ -79,12 +79,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* двойной тап не увеличивает экран: быстрые тапы по −/+ и по списку — это
-   ввод, а не жест. Щипок для увеличения остаётся */
+/* экран не увеличивается ни двойным тапом, ни щипком: быстрые тапы по −/+
+   и случайное касание двумя пальцами — это ввод, а не жест. Прокрутка есть */
 *,
 *::before,
 *::after {
-  touch-action: manipulation;
+  touch-action: pan-x pan-y;
 }
 
 /* бумажное зерно поверх всего экрана; касания проходят насквозь */
@@ -94,7 +94,7 @@ body::after {
   inset: 0;
   z-index: 60;
   pointer-events: none;
-  background: url('textures/grain.png') 0 0 / 160px 160px;
+  background: url('textures/grain.png') 0 0 / 128px 128px;
 }
 
 button,
@@ -455,6 +455,44 @@ textarea:focus-visible {
   z-index: 2;
   background: var(--bg-olive-card);
   transition: none;
+}
+
+/* строка, которую можно смахнуть: фон — у сдвигаемого слоя, под ним Delete */
+.task[data-swipe] {
+  background: none;
+}
+
+.task[data-swipe] > .swipe-body {
+  background: var(--bg-card);
+  border-radius: var(--r-card);
+  transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.25s ease;
+}
+
+.task[data-swipe].is-dragging > .swipe-body {
+  background: var(--bg-olive-card);
+}
+
+/* только что добавленная: проявляется и на миг подсвечивается */
+.task.is-new {
+  animation: task-new 0.5s var(--ease) both;
+}
+
+.task.is-new > .swipe-body {
+  animation: task-glow 1.5s ease both;
+}
+
+@keyframes task-new {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+
+@keyframes task-glow {
+  0%,
+  35% {
+    background: var(--bg-olive-card);
+  }
 }
 
 /* долгое нажатие подняло строку: она чуть больше и тянется за пальцем */
@@ -1276,6 +1314,14 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+/* узкий экран (iPhone SE): «Overview» не упирается в край панели */
+@media (max-width: 350px) {
+  .tab-label {
+    font-size: 10px;
+    letter-spacing: -0.01em;
+  }
+}
+
 @keyframes tab-pop {
   0% { transform: scale(0.8) translateY(2px); }
   100% { transform: none; }
@@ -1539,6 +1585,16 @@ body:has(.select-bar) .toast {
   transition: height 0.5s var(--ease), max-width 0.5s var(--ease);
 }
 
+.day-chart .shape {
+  cursor: pointer;
+}
+
+/* тап по пилюле дня — её строка в списке на миг подсвечивается */
+.task.is-ping > .swipe-body,
+.task.is-ping:not([data-swipe]) {
+  animation: task-glow 1.2s ease both;
+}
+
 .shape.is-first {
   background: var(--accent);
 }
@@ -1792,7 +1848,6 @@ body:has(.select-bar) .toast {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  animation: rise 0.24s var(--ease) both;
 }
 
 .prio-opt {
@@ -1846,6 +1901,13 @@ body:has(.select-bar) .toast {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* только иконка (флажок без приоритета) — поля поровну, иначе она уезжает влево */
+.compose-chip:has(> svg:only-child) {
+  justify-content: center;
+  width: 44px;
+  padding: 0;
 }
 
 .compose-chip .glyph {
@@ -2436,17 +2498,18 @@ body:has(.select-bar) .toast {
   transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.is-dragging .swipe-body,
-.is-dragging .swipe-action {
+.is-swiping .swipe-body,
+.is-swiping .swipe-action {
   transition: none;
 }
 
 /* палец ведёт строку — кнопка под ним не проседает */
-.is-dragging .pick:active {
+.is-swiping .pick:active,
+.is-swiping .check:active {
   transform: none;
 }
 
-.pick-row.is-removing {
+[data-swipe].is-removing {
   overflow: hidden;
   margin-bottom: calc(-1 * var(--gap));
   opacity: 0;
@@ -2528,7 +2591,14 @@ body:has(.select-bar) .toast {
 }
 
 .bump-step .icon {
+  margin-right: -4px;
   color: var(--ink-muted);
+}
+
+/* у иконки по бокам свой воздух: рядом с текстом его убираем, иначе пара
+   «иконка + число» стоит не по центру кнопки */
+.bump-plus .icon {
+  margin-left: -3px;
 }
 
 /* ── крутилка ─────────────────────────────────────────────────────────
@@ -3010,6 +3080,103 @@ body:has(.select-bar) .toast {
 .select-count,
 .bar-btn {
   text-transform: uppercase;
+}
+
+/* ── переходы между экранами (View Transitions) ───────────────────────
+   настройки въезжают справа и уезжают туда же; экран под ними чуть уходит
+   влево и тускнеет — как стопка карточек. Между вкладками — наплыв. */
+.corner-btn {
+  view-transition-name: corner;
+}
+
+.nav {
+  view-transition-name: nav;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+}
+
+:root[data-nav='push']::view-transition-old(root),
+:root[data-nav='push']::view-transition-new(root),
+:root[data-nav='pop']::view-transition-old(root),
+:root[data-nav='pop']::view-transition-new(root) {
+  animation-duration: 0.46s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  mix-blend-mode: normal;
+}
+
+:root[data-nav='push']::view-transition-old(root) {
+  animation-name: vt-under-out;
+}
+
+:root[data-nav='push']::view-transition-new(root) {
+  animation-name: vt-over-in;
+}
+
+:root[data-nav='pop']::view-transition-old(root) {
+  z-index: 2;
+  animation-name: vt-over-out;
+}
+
+:root[data-nav='pop']::view-transition-new(root) {
+  animation-name: vt-under-in;
+}
+
+/* шестерёнка поворачивается и становится крестиком — и обратно */
+::view-transition-old(corner),
+::view-transition-new(corner) {
+  animation-duration: 0.46s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(corner) {
+  animation-name: vt-corner-out;
+}
+
+::view-transition-new(corner) {
+  animation-name: vt-corner-in;
+}
+
+@keyframes vt-over-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes vt-over-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes vt-under-out {
+  to {
+    transform: translateX(-24%);
+    opacity: 0.5;
+  }
+}
+
+@keyframes vt-under-in {
+  from {
+    transform: translateX(-24%);
+    opacity: 0.5;
+  }
+}
+
+@keyframes vt-corner-out {
+  to {
+    transform: rotate(90deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes vt-corner-in {
+  from {
+    transform: rotate(-90deg) scale(0.6);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

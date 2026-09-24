@@ -2,7 +2,7 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon } from '../ui.js';
+import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -38,7 +38,7 @@ export function menu(host, items, onPick, label) {
       h('button', {
         class: ['menu-item', on && 'is-on'], type: 'button', role: 'menuitemradio', 'aria-checked': String(Boolean(on)),
         onpointerdown: keep, onmousedown: keep,
-        onclick: () => { closeMenu(); onPick(value); },
+        onclick: () => { haptic(); closeMenu(); onPick(value); },
       },
         h('span', { class: 'menu-check' }, on && icon('check', 20)),
         h('span', { class: 'menu-mark' }, mark && (mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
@@ -228,6 +228,21 @@ export const dropDraft = (key) => drafts.delete(key);
  * opts: { sphereId — сфера по умолчанию, day — 'today' | null, placeholder }.
  * Возвращает элемент с методом refresh() — перерисовать чипы.
  */
+/**
+ * Новая задача в списке на экране: вспыхивает и, когда клавиатура уехала,
+ * показывается целиком. Не на этом экране (ушла во «Входящие») — ничего,
+ * там уже сказал тост.
+ */
+function showNew(id) {
+  const el = document.querySelector(`.tasks [data-id="${CSS.escape(id)}"]`);
+  if (!el) return;
+  haptic();
+  if (calm()) return;
+  el.classList.add('is-new');
+  setTimeout(() => el.isConnected && el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 340);
+  setTimeout(() => el.classList.remove('is-new'), 1600);
+}
+
 const PRIO_LEVEL = { low: 1, medium: 2, high: 3 };
 const PRIO_CHOICES = [[null, 'None', 0], ['low', 'Low', 1], ['medium', 'Medium', 2], ['high', 'High', 3]];
 
@@ -259,8 +274,10 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
       e.preventDefault();
       const title = input.value.trim();
       if (!title) return;
-      submit(title);
-      input.focus({ preventScroll: true });
+      const t = submit(title);
+      // клавиатура уходит — видно, что изменилось и куда встала задача
+      input.blur();
+      if (t) showNew(t.id);
     },
   }, input, h('div', { class: 'compose-bar' }, chips, send));
 
@@ -277,7 +294,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     Object.assign(d, { title: '', ...fresh() });
     input.value = '';
     send.classList.remove('is-ready');
-    store.createTask(title, {
+    return store.createTask(title, {
       sphereId: sid, priority, day: planned, time: planned ? time : null, repeat: planned ? repeat : null,
     });
   }
@@ -304,11 +321,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
         PRIO_CHOICES.map(([v, text, level]) => h('button', {
           class: ['prio-opt', d.priority === v && 'is-on'], type: 'button', role: 'radio',
           'aria-checked': String(d.priority === v), onpointerdown: keep, onmousedown: keep,
-          onclick: () => {
-            d.priority = v;
-            d.prioOpen = false;
-            refresh();
-          },
+          onclick: (e) => pickPrio(v, e.currentTarget),
         }, prioIcon(level, 18), h('span', null, text)))));
       return;
     }
@@ -323,13 +336,60 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
         }, { full: 'drop' });
       }, Boolean(d.day)),
       chip(d.priority ? [prioIcon(PRIO_LEVEL[d.priority], 20), h('span', null, pri)] : icon('flag', 20),
-        d.priority ? `Priority: ${pri}` : 'Priority',
-        () => {
-          closeMenu();
-          d.prioOpen = true;
-          refresh();
-        }, Boolean(d.priority)),
+        d.priority ? `Priority: ${pri}` : 'Priority', openPrio, Boolean(d.priority)),
     );
+  }
+
+  /* Приоритет разворачивается из самой кнопки-флажка: уровни вылетают из неё
+     в стороны; выбор — выбранный вздрагивает, все складываются обратно во
+     флажок, и он возвращается уже с уровнем. */
+  let flag = null; // центр флажка на экране — откуда вылетают и куда складываются
+  const center = (el) => {
+    const r = el.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  };
+  const fromFlag = (el, scale = 0.3) => {
+    const [x, y] = center(el);
+    return `translate(${flag[0] - x}px, ${flag[1] - y}px) scale(${scale})`;
+  };
+
+  function openPrio(e) {
+    closeMenu();
+    flag = center(e.currentTarget);
+    d.prioOpen = true;
+    refresh();
+    if (calm()) return;
+    [...chips.querySelectorAll('.prio-opt')].forEach((el, i) => el.animate(
+      [{ transform: fromFlag(el), opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: 480, delay: i * 40, easing: 'cubic-bezier(0.34, 1.3, 0.64, 1)', fill: 'backwards' },
+    ));
+  }
+
+  function pickPrio(v, chosen) {
+    haptic();
+    d.priority = v;
+    const opts = [...chips.querySelectorAll('.prio-opt')];
+    const done = () => {
+      d.prioOpen = false;
+      refresh();
+      if (calm()) return;
+      const back = chips.querySelector('[aria-label^="Priority"]');
+      back?.animate([{ transform: 'scale(0.6)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration: 420, easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)' });
+      [...chips.children].filter((c) => c !== back).forEach((c) =>
+        c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease' }));
+    };
+    if (calm() || !flag) {
+      done();
+      return;
+    }
+    opts.forEach((o) => o.classList.toggle('is-on', o === chosen));
+    Promise.allSettled(opts.map((o, i) => o.animate(
+      o === chosen
+        ? [{ transform: 'none' }, { transform: 'scale(1.08)', offset: 0.3 }, { transform: fromFlag(o, 0.5), opacity: 0 }]
+        : [{ transform: 'none', opacity: 1 }, { transform: fromFlag(o), opacity: 0 }],
+      { duration: o === chosen ? 380 : 260, delay: o === chosen ? 40 : (opts.length - 1 - i) * 25, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'forwards' },
+    ).finished)).then(done);
   }
 
   refresh();

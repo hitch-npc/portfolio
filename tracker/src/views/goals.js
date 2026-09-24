@@ -6,7 +6,7 @@
  * к месяцу. Срок необязателен. Новая цель набирается с крутилками над
  * полем: число, текущее, шаг, единица и срок — до создания, без Enter.
  */
-import { h, icon, entry, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
+import { h, icon, entry, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
 import { addMonths, diffDays, fmtLong } from '../dates.js';
 import { autoStep, goalProgress, goalStep, goalsOverview, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
@@ -203,11 +203,11 @@ function goalCard(goal) {
     p.kind === 'value' && h('div', { class: 'goal-bump' },
       h('button', {
         class: 'bump', type: 'button', 'aria-label': `Minus ${num(step)}`, disabled: !p.current,
-        onclick: () => store.bumpGoal(goal.id, -step),
+        onclick: () => { haptic(); store.bumpGoal(goal.id, -step); },
       }, icon('minus')),
       h('button', {
         class: 'bump bump-plus', type: 'button', 'aria-label': `Plus ${num(step)}`,
-        onclick: () => store.bumpGoal(goal.id, step),
+        onclick: () => { haptic(); store.bumpGoal(goal.id, step); },
       }, icon('plus'), h('span', null, num(step))),
       h('button', {
         class: 'bump bump-step', type: 'button', 'aria-label': `Step ${num(step)} — change`,

@@ -4,7 +4,7 @@
  * архив. Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
-import { h, glyph, icon, entry, sortableGrid, openSheet, closeSheet, toast } from '../ui.js';
+import { h, glyph, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, toast } from '../ui.js';
 import { GLYPHS, activeSpheres, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import {
@@ -86,7 +86,7 @@ function searchField() {
 function results(st) {
   const found = searchTasks(st, ui.query);
   return found.length
-    ? h('ul', { class: 'tasks' }, found.map((t) => taskItem(t)))
+    ? swipeable(h('ul', { class: 'tasks' }, found.map((t) => taskItem(t))))
     : h('p', { class: 'hint' }, 'Nothing found.');
 }
 
@@ -142,10 +142,10 @@ export function sphereView(id) {
       !isInbox && !sel && iconButton('more', `Edit ${name}`, () => editSphere(s.id))),
     !sel && composer(`add-${id}`, { sphereId: isInbox ? null : s.id, placeholder: `Add to ${name}` }),
     open.length
-      ? h('ul', { class: 'tasks' }, open.map((t) => taskItem(t, { showSphere: false })))
+      ? swipeable(h('ul', { class: 'tasks' }, open.map((t) => taskItem(t, { showSphere: false }))))
       : h('p', { class: 'hint' }, 'No open tasks here.'),
     done.length > 0 && foldout(`done:${id}`, 'Done', done.length, () =>
-      h('ul', { class: 'tasks' }, done.map((t) => taskItem(t, { showSphere: false })))),
+      swipeable(h('ul', { class: 'tasks' }, done.map((t) => taskItem(t, { showSphere: false }))))),
     sel && selectBar(open.map((t) => t.id)));
 }
 
