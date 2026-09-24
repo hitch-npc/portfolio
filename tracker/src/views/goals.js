@@ -4,7 +4,7 @@
  * остаток штриховкой.
  */
 import { h, entry, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
-import { fmtMonth, monthName, monthOf } from '../dates.js';
+import { monthName, monthOf } from '../dates.js';
 import { goalsForMonth } from '../logic.js';
 import * as store from '../store.js';
 import { ui, header, iconButton, pillButton, checkButton } from './common.js';
@@ -12,6 +12,7 @@ import { ui, header, iconButton, pillButton, checkButton } from './common.js';
 /** Большая дробь: сделано — чернилами, «/всего» — приглушённо. */
 export const fraction = (done, total) =>
   h('span', { class: 'fraction' }, String(done), h('span', { class: 'muted' }, `/${total}`));
+
 
 /** Полоса прогресса: сделанное сплошным, оставшееся штриховкой. */
 export function meter(done, total) {
@@ -82,7 +83,7 @@ export function goalsView() {
   const month = monthOf(ui.day);
   const goals = goalsForMonth(store.getState(), month);
   return h('section', { class: 'screen screen-goals' },
-    header('Goals', fmtMonth(month)),
+    header('Goals', monthName(month)),
     goals.length > 0 && h('div', { class: 'goal-list' }, goals.map((g) => goalCard(g, month))),
     !goals.length && h('p', { class: 'hint' }, 'No goals yet. Add a long-term goal, then this month’s steps under it.'),
     entry('goal-new', 'New goal', (title) => store.createGoal(title), { cls: 'entry-card' }));

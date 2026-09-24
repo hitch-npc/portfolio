@@ -36,7 +36,7 @@ function group(title, g, tasks, picked, spheres) {
   if (!tasks.length) return null;
   const showSphere = g == null;
   return h('section', { class: 'plan-group' },
-    h('h2', { class: 'group-title' }, g && glyph(g), title, h('span', { class: 'count' }, tasks.length)),
+    h('h2', { class: 'label' }, g && glyph(g), title, h('span', { class: 'count' }, tasks.length)),
     h('ul', { class: 'picks' }, tasks.map((t) => candidate(t, picked, spheres, showSphere))));
 }
 

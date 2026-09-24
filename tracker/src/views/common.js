@@ -20,11 +20,12 @@ export const ui = {
 export let rerender = () => {};
 export const setRerender = (fn) => (rerender = fn);
 
+/** Заголовок в две строки одного кегля: название чернилами, пояснение — приглушённо. */
 export function header(title, sub, ...actions) {
   return h('header', { class: 'head' },
-    h('div', { class: 'head-text' },
-      h('h1', { class: 'title' }, title),
-      sub && h('p', { class: 'sub' }, sub)),
+    h('h1', { class: 'title' },
+      h('span', { class: 'title-main' }, title),
+      sub != null && h('span', { class: 'title-sub' }, sub)),
     actions.length > 0 && h('div', { class: 'head-actions' }, actions));
 }
 
@@ -34,10 +35,24 @@ export function iconButton(name, label, onclick, cls = '') {
   return h('button', { class: ['icon-btn', cls], type: 'button', 'aria-label': label, title: label, onclick }, icon(name));
 }
 
-/** Кнопка-пилюля: иконка + подпись. */
+/** Кнопка-пилюля: иконка в кружке + подпись. */
 export function pillButton(name, label, onclick, cls = '') {
-  return h('button', { class: ['pill', 'pill-action', cls], type: 'button', onclick }, name && icon(name), label);
+  return h('button', { class: ['pill', 'pill-action', name && 'has-chip', cls], type: 'button', onclick },
+    name && h('span', { class: 'chip' }, icon(name)), label);
 }
+
+/** Карточка-панель: мелкая подпись сверху, справа — пояснение. */
+export function panel(label, aside, ...content) {
+  return h('section', { class: 'panel' },
+    h('div', { class: 'panel-head' },
+      h('span', { class: 'panel-label' }, label),
+      aside != null && aside !== false && h('span', { class: 'panel-aside' }, aside)),
+    content);
+}
+
+/** Крупное число; хвост (единицы, «/всего») — приглушённо. */
+export const bigNumber = (value, tail, cls = '') =>
+  h('p', { class: ['big', cls] }, String(value), tail && h('span', { class: 'muted' }, tail));
 
 export function toggleBlock(id) {
   ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id);

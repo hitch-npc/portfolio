@@ -49,6 +49,12 @@ function render() {
     if (main.firstChild !== node) main.replaceChildren(node);
     renderSheet();
   });
+  // у экрана свой фон (вечернее планирование — серое), строка состояния — в тон
+  if (document.body.dataset.screen !== r.name) {
+    document.body.dataset.screen = r.name;
+    const bg = getComputedStyle(document.body).getPropertyValue('--screen').trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+  }
   for (const a of navLinks) {
     const on = a.dataset.tab === r.name;
     a.classList.toggle('is-on', on);
@@ -58,7 +64,9 @@ function render() {
 
 function buildNav() {
   navLinks = TABS.map(([id, label]) =>
-    h('a', { class: 'tab', href: `#/${id}`, 'data-tab': id }, icon(id), h('span', { class: 'tab-label' }, label)));
+    h('a', { class: 'tab', href: `#/${id}`, 'data-tab': id, 'aria-label': label },
+      h('span', { class: 'tab-icon' }, icon(id)),
+      h('span', { class: 'tab-label', 'aria-hidden': 'true' }, label)));
   document.getElementById('nav').replaceChildren(h('div', { class: 'tabs' }, navLinks));
 }
 
@@ -99,10 +107,6 @@ async function boot() {
 
   // просим браузер не вычищать базу при нехватке места
   navigator.storage?.persist?.().catch(() => {});
-
-  // тема строки состояния — из токена, чтобы цвет жил в одном месте
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
 
   if ('serviceWorker' in navigator && VERSION !== 'dev') {
     navigator.serviceWorker.register('sw.js').catch((err) => console.error(err));

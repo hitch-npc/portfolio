@@ -12,7 +12,7 @@ import { header, backLink, iconButton, pillButton, foldout, taskItem } from './c
 function sphereRow(s, count, { drag = true } = {}) {
   return h('li', { class: 'sphere', 'data-id': s.id },
     h('a', { class: 'sphere-main', href: `#/spheres/${s.id}` },
-      glyph(s.glyph),
+      h('span', { class: 'chip' }, glyph(s.glyph)),
       h('span', { class: 'sphere-name' }, s.name),
       h('span', { class: ['sphere-count', !count && 'is-zero'] }, count ?? 0)),
     iconButton('more', `Edit ${s.name}`, () => editSphere(s.id)),
@@ -62,15 +62,16 @@ export function spheresView() {
   const inbox = h('ul', { class: 'spheres' },
     h('li', { class: 'sphere' },
       h('a', { class: 'sphere-main', href: '#/spheres/inbox' },
-        glyph('inbox'),
+        h('span', { class: 'chip' }, glyph('inbox')),
         h('span', { class: 'sphere-name' }, 'Inbox'),
         h('span', { class: ['sphere-count', !counts.get(null) && 'is-zero'] }, counts.get(null) ?? 0))));
 
   const list = sortable(h('ul', { class: 'spheres' }, active.map((s) => sphereRow(s, counts.get(s.id)))),
     (ids) => store.reorderSpheres(ids));
 
+  const open = [...counts.values()].reduce((a, b) => a + b, 0);
   return h('section', { class: 'screen screen-spheres' },
-    header('Spheres'),
+    header('Spheres', `${open} open`),
     inbox,
     list,
     entry('sphere-new', 'New sphere', (name) => store.createSphere(name)),
