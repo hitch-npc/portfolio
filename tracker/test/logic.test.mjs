@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import { addDays, dayLabel, diffDays, dueLabel, fmtDay, fmtMonth, nextRepeat, nextWeek } from '../src/dates.js';
 import {
   brief, carriedOver, dayTasks, exportForClaude, goalProgress, isDayFull, isGoalDone, overdue, planGroups,
-  searchTasks, sphereCounts, sphereTasks,
+  searchTasks, sphereCounts, sphereTasks, timeSlot,
 } from '../src/logic.js';
 import {
-  detect, icsName, makeBackup, packFiles, parseCSV, parseList, planImport, readBackup, readImportText, toICS,
-  normDate, normPriority, normRepeat, normStatus, normTime,
+  aiData, aiExample, aiPrompt, detect, extractJSON, icsName, makeBackup, packFiles, parseCSV, parseList, planImport,
+  readBackup, readImportText, toICS, normDate, normPriority, normRepeat, normStatus, normTime,
 } from '../src/io.js';
 
 const TODAY = '2026-09-24';
@@ -317,7 +317,7 @@ test('импорт: день из файла не переполняет лим�
   const file = { tasks: [{ title: 'c', day: TODAY, time: '9:30', repeat: 'daily' }, { title: 'd', day: TODAY }] };
   const plan = planImport(st, file, { uid });
   assert.deepEqual(plan.tasks.map((t) => t.day), [TODAY, null]);
-  assert.equal(plan.tasks[0].dayOrder, 2);
+  assert.equal(plan.tasks[0].dayOrder, -1, 'со временем — выше задач дня без времени, как при вводе руками');
   assert.deepEqual([plan.tasks[0].time, plan.tasks[0].repeat], ['09:30', 'daily']);
   // без лимита — встают обе
   assert.deepEqual(planImport({ ...st, settings: { dayLimit: 0 } }, file, { uid }).tasks.map((t) => t.day), [TODAY, TODAY]);
@@ -380,4 +380,120 @@ test('календарь: событие со временем, на весь д
   assert.equal(raw.map((l, i) => (i && l.startsWith(' ') ? l.slice(1) : `\n${l}`)).join('').includes('SUMMARY:Очень длинное'), true);
   assert.ok(!raw.some((l) => l.endsWith('\\') && !l.endsWith('\\\\')), 'экранированная пара не разрезана');
   assert.equal(icsName('a/b: c?'), 'a b c.ics');
+});
+
+test('день по времени: новая задача встаёт по времени, ручной порядок не пересчитывается', () => {
+  const order = (st) => dayTasks(st, TODAY).open.map((t) => t.title);
+  const put = (st, t) => {
+    t.dayOrder = timeSlot(st, t, TODAY);
+    st.tasks.push(t);
+  };
+  const st = { spheres: [], tasks: [], goals: [], settings: {} };
+  put(st, task('Milk', { day: TODAY }));
+  put(st, task('Gym', { day: TODAY, time: '09:00' }));
+  assert.deepEqual(order(st), ['Gym', 'Milk'], 'со временем — выше задач без времени');
+  put(st, task('Call', { day: TODAY, time: '14:00' }));
+  put(st, task('Lunch', { day: TODAY, time: '12:30' }));
+  put(st, task('Coffee', { day: TODAY, time: '07:15' }));
+  assert.deepEqual(order(st), ['Coffee', 'Gym', 'Lunch', 'Call', 'Milk'], 'от ранней к поздней');
+  put(st, task('Also gym', { day: TODAY, time: '09:00' }));
+  assert.deepEqual(order(st).slice(0, 3), ['Coffee', 'Gym', 'Also gym'], 'то же время — после уже стоящей');
+  put(st, task('Bread', { day: TODAY }));
+  assert.equal(order(st).at(-1), 'Bread', 'без времени — в конец');
+
+  // перетащили руками: Call наверх, Milk — второй. Порядок нарушает время, но он главнее
+  const manual = ['Call', 'Milk', 'Coffee', 'Gym', 'Also gym', 'Lunch', 'Bread'];
+  manual.forEach((title, i) => { st.tasks.find((t) => t.title === title).dayOrder = i; });
+  assert.deepEqual(order(st), manual);
+  put(st, task('Meeting', { day: TODAY, time: '10:00' }));
+  assert.deepEqual(order(st), ['Meeting', 'Call', 'Milk', 'Coffee', 'Gym', 'Also gym', 'Lunch', 'Bread'],
+    'новая — перед первой, что позже по времени; остальные стоят, как их поставили');
+  // готовые не мешают
+  st.tasks.find((t) => t.title === 'Coffee').status = 'done';
+  const late = task('Late', { day: TODAY, time: '23:00' });
+  put(st, late);
+  assert.deepEqual(order(st).slice(-3), ['Lunch', 'Late', 'Bread'], 'позже всех — за последней со временем');
+});
+
+test('ИИ: пример из инструкции импортируется целиком, JSON находится в ответе чата', () => {
+  const prompt = aiPrompt({ today: TODAY, limit: 3 });
+  assert.match(prompt, /Today is Thu 24 Sep 2026/);
+  assert.match(prompt, /at most 3 open tasks/);
+  assert.match(prompt, /ask me to copy the instructions "with my data"|with my data/);
+  assert.doesNotMatch(prompt, /My current data/);
+
+  // пример в инструкции — настоящий JSON, и импорт принимает его весь
+  const block = prompt.match(/```json\n([\s\S]*?)\n```/)[1];
+  assert.deepEqual(JSON.parse(block), aiExample(TODAY));
+  const st = { spheres: [], tasks: [], goals: [], settings: {} };
+  const plan = planImport(st, JSON.parse(block), { uid });
+  assert.deepEqual(plan.summary.spheres, 2);
+  assert.deepEqual(plan.tasks.map((t) => [t.title, t.day, t.time]), [
+    ['Send the quarterly report', TODAY, '10:00'], ['Morning run', TODAY, '07:30'], ['Renew passport', null, null]]);
+  assert.ok(plan.tasks[1].dayOrder < plan.tasks[0].dayOrder, '07:30 выше 10:00');
+  const car = plan.goals.find((g) => g.title === 'Save for a car');
+  assert.deepEqual([car.target, car.current, car.unit, car.step], [30000, 4000, '€', 250]);
+  assert.deepEqual(plan.goals.find((g) => g.title === 'Learn Dutch').steps.map((x) => x.done), [false, true]);
+
+  // ответ чата: текст вокруг, блок кода; markdown-список с [ ] — не JSON
+  const reply = `Sure! Here is your plan.\n\n\`\`\`json\n{"tasks": [{"title": "Call mom"}]}\n\`\`\`\nGood luck.`;
+  assert.deepEqual(extractJSON(reply), { tasks: [{ title: 'Call mom' }] });
+  assert.deepEqual(readImportText('pasted.txt', reply, TODAY), { tasks: [{ title: 'Call mom' }] });
+  assert.deepEqual(extractJSON('Plan: {"goals": [{"title": "Run"}]} — done'), { goals: [{ title: 'Run' }] });
+  assert.equal(extractJSON('- [ ] buy milk\n- [x] call'), undefined);
+  assert.equal(readImportText('pasted.txt', '- [ ] buy milk', TODAY).tasks[0].title, 'buy milk');
+});
+
+test('ИИ: правки по id — меняется только указанное, удаление, незнакомые id', () => {
+  const st = world();
+  const call = task('Call bank', { sphereId: 'sa', day: TODAY, time: '09:00', note: 'card', subtasks: [{ id: 's1', title: 'find contract', done: false }] });
+  const lamp = task('Buy lamp', { day: TODAY, dayOrder: 1 });
+  const old = task('Old idea');
+  st.tasks.push(call, lamp, old);
+  st.goals.push({ id: 'g1', title: 'Car', order: 0, target: 30000, current: 4000, unit: '€', step: null, deadline: null,
+    steps: [{ id: 'x1', title: 'Sell the bike', done: false }] });
+  st.spheres[1].id = 'sb';
+
+  const data = aiData(st);
+  assert.equal(data.tasks.find((t) => t.title === 'Call bank').id, call.id, 'в данных для ИИ есть id');
+  assert.match(aiPrompt({ today: TODAY, data }), /## My current data/);
+
+  const answer = {
+    spheres: [{ id: 'sb', name: 'Home', archived: true }],
+    tasks: [
+      { id: call.id, status: 'done', subtasks: [{ title: 'find contract', done: true }, 'sign'] },
+      { id: lamp.id, time: '08:00' },
+      { id: old.id, delete: true },
+      { id: 'made-up-by-ai', title: 'New with own id', sphere: 'Alpha' },
+      { id: 'missing', delete: true },
+    ],
+    goals: [{ id: 'g1', current: 5200, step: 250, steps: [{ title: 'Sell the bike', done: true }, 'Test drive'] }],
+  };
+  const plan = planImport(st, answer, { uid });
+  const byId = Object.fromEntries(plan.changes.tasks.map((t) => [t.id, t]));
+
+  assert.equal(byId[call.id].status, 'done');
+  assert.ok(byId[call.id].doneAt);
+  assert.deepEqual([byId[call.id].note, byId[call.id].time, byId[call.id].title], ['card', '09:00', 'Call bank'], 'остальное не тронуто');
+  assert.deepEqual(byId[call.id].subtasks.map((x) => [x.title, x.done]), [['find contract', true], ['sign', false]]);
+  assert.equal(byId[lamp.id].time, '08:00');
+  assert.ok(byId[lamp.id].dayOrder < call.dayOrder, '08:00 встала выше 09:00');
+  assert.deepEqual(plan.changes.deleteTasks, [old.id]);
+  assert.deepEqual(plan.tasks.map((t) => t.title), ['New with own id'], 'незнакомый id — новая задача');
+  assert.notEqual(plan.tasks[0].id, 'made-up-by-ai');
+
+  const car = plan.goals.find((g) => g.id === 'g1');
+  assert.deepEqual([car.current, car.step, car.target], [5200, 250, 30000]);
+  assert.deepEqual(car.steps.map((x) => [x.title, x.done]), [['Sell the bike', true], ['Test drive', false]]);
+  assert.deepEqual(plan.changes.spheres.map((x) => [x.name, x.archived]), [['Home', true]]);
+
+  assert.deepEqual(plan.summary.deleted, ['Old idea']);
+  assert.equal(plan.summary.done, 1);
+  assert.equal(plan.summary.notFound, 1);
+  assert.equal(st.tasks.find((t) => t.id === call.id).status, 'todo', 'до подтверждения ничего не меняется');
+  assert.equal(st.goals[0].current, 4000);
+
+  // удалить цель
+  const gone = planImport(st, { goals: [{ id: 'g1', delete: true }] }, { uid });
+  assert.deepEqual([gone.changes.deleteGoals, gone.summary.deleted], [['g1'], ['Car']]);
 });

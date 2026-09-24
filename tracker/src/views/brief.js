@@ -3,26 +3,12 @@
  * неделя дедлайнов, цели. «Export for Claude» кладёт компактный
  * JSON в буфер обмена — дальше его вставляют в чат руками.
  */
-import { h, glyph, icon, toast, countUp } from '../ui.js';
+import { h, glyph, icon, toast, countUp, copyText } from '../ui.js';
 import { dueLabel, fmtDay, fmtWeekday, parse } from '../dates.js';
 import { brief, dayLimit, exportForClaude, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
 import { ui, header, pillButton, plot, stat } from './common.js';
 import { fraction, goalDue, meter } from './goals.js';
-
-async function copy(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // запасной путь для браузеров без Clipboard API
-    const area = document.body.appendChild(h('textarea', { class: 'offscreen', readonly: true, value: text }));
-    area.select();
-    const ok = document.execCommand('copy');
-    area.remove();
-    return ok;
-  }
-}
 
 function line(t, spheres, { num, late } = {}) {
   const sphere = spheres.get(t.sphereId);
@@ -114,6 +100,6 @@ export function briefView() {
         { wide: true, href: '#/goals' })),
 
     pillButton('copy', 'Export for Claude', async () => {
-      toast((await copy(exportForClaude(st, ui.day))) ? 'Copied — paste it into Claude' : 'Could not copy');
+      toast((await copyText(exportForClaude(st, ui.day))) ? 'Copied — paste it into Claude' : 'Could not copy');
     }, 'is-on pill-wide pill-export'));
 }

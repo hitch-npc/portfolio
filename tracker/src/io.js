@@ -4,15 +4,18 @@
  * Два вида данных:
  *  · резервная копия (свой экспорт: app = 'tracker') — заменяет всё;
  *  · импорт (tasks / spheres / goals) — добавляется к тому, что есть:
- *    сферы и цели сопоставляются по названию, повторы задач пропускаются.
+ *    сферы и цели сопоставляются по названию, повторы задач пропускаются;
+ *    запись с id существующей задачи, цели или сферы меняет её (только
+ *    указанные поля), с "delete": true — удаляет. Так ИИ может не только
+ *    заполнить трекер, но и поправить его (см. aiPrompt).
  *    Импорт приходит JSON-ом, таблицей CSV или простым списком
  *    (текст, Markdown) — всё сводится к одному виду и дальше идёт общим путём.
  *
  * Разбор импорта терпимый: поля принимаются под разными именами
  * (title/name, deadline/due, …) и значениями (high/высокий/1, …).
  */
-import { GLYPHS, dayLimit, isDone } from './logic.js';
-import { addDays } from './dates.js';
+import { GLYPHS, dayLimit, isDone, timeSlot } from './logic.js';
+import { addDays, fmtLong, fmtWeekday } from './dates.js';
 
 export const APP = 'tracker';
 /** 2 — вложения (files, base64) и настройки в копии. */
@@ -82,6 +85,30 @@ function pick(obj, ...names) {
   if (!obj || typeof obj !== 'object') return undefined;
   for (const n of names) if (obj[n] != null && obj[n] !== '') return obj[n];
   return undefined;
+}
+
+/** Поле есть в записи — даже пустое или null: так правка может очистить значение. */
+const has = (obj, ...names) => names.some((n) => Object.hasOwn(obj, n));
+
+/** Запись просит удаления. */
+const wantsDelete = (r) => [r.delete, r.remove, r.deleted].includes(true);
+
+/** Пункты чек-листа (подзадачи, шаги цели): новые — в конец, у знакомых по названию — отметка. */
+function mergeChecklist(items, list, uid) {
+  let added = 0;
+  for (const s of Array.isArray(list) ? list : []) {
+    const title = text(typeof s === 'object' ? pick(s, 'title', 'name', 'text') : s);
+    if (!title) continue;
+    const done = typeof s === 'object' ? pick(s, 'done', 'completed', 'checked') : undefined;
+    const known = items.find((x) => key(x.title) === key(title));
+    if (known) {
+      if (typeof done === 'boolean') known.done = done;
+      continue;
+    }
+    items.push({ id: uid(), title, done: done === true });
+    added++;
+  }
+  return added;
 }
 
 const STATUS_WORDS = {
@@ -178,9 +205,27 @@ export function planImport(st, data, { uid, now = new Date() }) {
     return s;
   }
 
-  // сферы файла; id из файла запоминаем, чтобы задачи могли ссылаться по нему
-  const fileIds = new Map();
+  // сферы файла; id из файла запоминаем, чтобы задачи могли ссылаться по нему.
+  // id существующей сферы — правка: новое имя, глиф, архив
+  const fileIds = new Map(st.spheres.map((s) => [s.id, s]));
+  const changedSpheres = new Map();
   for (const raw of Array.isArray(data.spheres) ? data.spheres : []) {
+    const cur = raw && typeof raw === 'object' ? st.spheres.find((s) => s.id === text(pick(raw, 'id'))) : null;
+    if (cur) {
+      const s = changedSpheres.get(cur.id) ?? { ...cur };
+      const name = text(pick(raw, 'name', 'title'));
+      if (name && key(name) !== key(s.name) && !spheres.has(key(name))) {
+        spheres.delete(key(s.name));
+        s.name = name;
+        spheres.set(key(name), s);
+      }
+      const glyph = pick(raw, 'glyph', 'shape');
+      if (GLYPHS.includes(glyph)) s.glyph = glyph;
+      if (typeof raw.archived === 'boolean') s.archived = raw.archived;
+      changedSpheres.set(s.id, s);
+      fileIds.set(s.id, s);
+      continue;
+    }
     const name = typeof raw === 'string' ? raw : pick(raw, 'name', 'title');
     const s = sphereFor(name, typeof raw === 'object' ? pick(raw, 'glyph', 'shape') : undefined);
     const fileId = typeof raw === 'object' ? pick(raw, 'id', 'key', 'slug') : undefined;
@@ -195,21 +240,89 @@ export function planImport(st, data, { uid, now = new Date() }) {
   const dayCount = new Map();
   const openOn = (day) =>
     dayCount.get(day) ?? st.tasks.filter((t) => t.day === day && !isDone(t) && t.status !== 'paused').length;
-  const lastOrder = new Map();
-  const nextOrder = (day) => {
-    const n = (lastOrder.get(day) ?? Math.max(-1, ...st.tasks.filter((t) => t.day === day).map((t) => t.dayOrder ?? 0))) + 1;
-    lastOrder.set(day, n);
-    return n;
+  // место в дне — как у задач, добавленных руками: со временем — по времени (logic.timeSlot)
+  const work = { ...st, tasks: [...st.tasks] };
+  const place = (t) => {
+    work.tasks = work.tasks.filter((x) => x.id !== t.id);
+    t.dayOrder = t.day ? timeSlot(work, t, t.day) : 0;
+    work.tasks.push(t);
+  };
+  const SPHERE_KEYS = ['sphere', 'sphereName', 'sphere_name', 'sphereId', 'sphere_id', 'area', 'project'];
+  const sphereOf = (r) => {
+    const ref = pick(r, ...SPHERE_KEYS);
+    const refObj = ref && typeof ref === 'object' ? pick(ref, 'name', 'title') : ref;
+    return refObj != null && fileIds.has(String(refObj)) ? fileIds.get(String(refObj)) : sphereFor(refObj);
   };
 
-  for (const raw of Array.isArray(data.tasks) ? data.tasks : []) {
-    const title = text(typeof raw === 'string' ? raw : pick(raw, 'title', 'name', 'text', 'task'));
-    if (!title) continue;
-    const r = typeof raw === 'object' ? raw : {};
+  // правки существующих задач по id
+  const changedTasks = new Map();
+  const goneTasks = new Set();
+  let madeDone = 0;
+  let notFound = 0;
+  let noRoom = 0;
+  function changeTask(cur, r) {
+    if (wantsDelete(r)) {
+      goneTasks.add(cur.id);
+      changedTasks.delete(cur.id);
+      return;
+    }
+    const t = changedTasks.get(cur.id) ?? { ...cur, subtasks: cur.subtasks.map((x) => ({ ...x })) };
+    const title = text(pick(r, 'title', 'name', 'text', 'task'));
+    if (title) t.title = title;
+    if (has(r, ...SPHERE_KEYS)) t.sphereId = sphereOf(r)?.id ?? null;
+    if (has(r, 'note', 'notes', 'description')) t.note = text(pick(r, 'note', 'notes', 'description'));
+    if (has(r, 'priority', 'prio')) t.priority = normPriority(pick(r, 'priority', 'prio'));
+    if (has(r, 'deadline', 'due', 'dueDate', 'due_date')) t.deadline = normDate(pick(r, 'deadline', 'due', 'dueDate', 'due_date'));
+    const status = normStatus(pick(r, 'status', 'state')) ?? (r.done === true ? 'done' : r.done === false ? 'todo' : null);
+    if (status && status !== t.status) {
+      if (status === 'done' && cur.status !== 'done') madeDone++;
+      t.status = status;
+      t.doneAt = status === 'done' ? stamp : null;
+    }
+    let moved = false;
+    if (has(r, 'day', 'planned', 'plannedFor', 'planned_for', 'scheduled')) {
+      const day = normDate(pick(r, 'day', 'planned', 'plannedFor', 'planned_for', 'scheduled'));
+      if (day !== t.day) {
+        if (day && !isDone(t) && limit > 0 && openOn(day) >= limit) noRoom++;
+        else {
+          if (t.day && !isDone(t)) dayCount.set(t.day, openOn(t.day) - 1);
+          if (day && !isDone(t)) dayCount.set(day, openOn(day) + 1);
+          t.day = day;
+          moved = true;
+          if (!day) Object.assign(t, { time: null, repeat: null });
+        }
+      }
+    }
+    if (has(r, 'time', 'at') && t.day) {
+      const time = normTime(pick(r, 'time', 'at'));
+      if (time !== t.time) {
+        t.time = time;
+        moved = true;
+      }
+    }
+    if (has(r, 'repeat', 'recurrence', 'recurring') && t.day) t.repeat = normRepeat(pick(r, 'repeat', 'recurrence', 'recurring'));
+    if (moved) place(t);
+    mergeChecklist(t.subtasks, pick(r, 'subtasks', 'checklist', 'items'), uid);
+    t.updatedAt = stamp;
+    changedTasks.set(t.id, t);
+  }
 
-    const ref = pick(r, 'sphere', 'sphereName', 'sphere_name', 'sphereId', 'sphere_id', 'area', 'project');
-    const refObj = ref && typeof ref === 'object' ? pick(ref, 'name', 'title') : ref;
-    const sphere = refObj != null && fileIds.has(String(refObj)) ? fileIds.get(String(refObj)) : sphereFor(refObj);
+  for (const raw of Array.isArray(data.tasks) ? data.tasks : []) {
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const id = text(pick(r, 'id'));
+    const cur = id ? st.tasks.find((t) => t.id === id) : null;
+    if (cur) {
+      changeTask(cur, r);
+      continue;
+    }
+    // незнакомый id: удалять нечего; иначе это просто новая задача (ИИ мог придумать id сам)
+    if (id && wantsDelete(r)) {
+      notFound++;
+      continue;
+    }
+    const title = text(typeof raw === 'string' ? raw : pick(r, 'title', 'name', 'text', 'task'));
+    if (!title) continue;
+    const sphere = sphereOf(r);
 
     const dedupe = `${sphere?.id ?? ''}|${key(title)}`;
     const status = normStatus(pick(r, 'status', 'state')) ?? (pick(r, 'done', 'completed') === true ? 'done' : 'todo');
@@ -224,7 +337,7 @@ export function planImport(st, data, { uid, now = new Date() }) {
     if (day && (status === 'done' || status === 'paused' || (limit > 0 && openOn(day) >= limit))) day = null;
     if (day) dayCount.set(day, openOn(day) + 1);
 
-    newTasks.push({
+    const t = {
       id: uid(),
       title,
       sphereId: sphere?.id ?? null,
@@ -234,12 +347,14 @@ export function planImport(st, data, { uid, now = new Date() }) {
       subtasks: normChecklist(pick(r, 'subtasks', 'checklist', 'steps', 'items'), uid),
       note: text(pick(r, 'note', 'notes', 'description', 'comment')),
       day,
-      dayOrder: day ? nextOrder(day) : 0,
+      dayOrder: 0,
       time: day ? normTime(pick(r, 'time', 'at')) : null,
       repeat: day ? normRepeat(pick(r, 'repeat', 'recurrence', 'recurring')) : null,
       createdAt: stamp,
       doneAt: status === 'done' ? stamp : null,
-    });
+    };
+    if (day) place(t);
+    newTasks.push(t);
   }
 
   // цели: по названию; у существующей заполняются пустые поля и добавляются новые шаги
@@ -248,15 +363,50 @@ export function planImport(st, data, { uid, now = new Date() }) {
   const changedGoals = new Map();
   let goalOrder = Math.max(-1, ...st.goals.map((g) => g.order)) + 1;
   let newSteps = 0;
+  const goneGoals = new Set();
+  const stepKeys = ['steps', 'monthSteps', 'month_steps', 'milestones', 'tasks'];
 
   for (const raw of Array.isArray(data.goals) ? data.goals : []) {
-    const title = text(typeof raw === 'string' ? raw : pick(raw, 'title', 'name', 'goal'));
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const id = text(pick(r, 'id'));
+    const cur = id ? st.goals.find((g) => g.id === id) : null;
+    if (cur) {
+      // правка по id: меняются только указанные поля
+      if (wantsDelete(r)) {
+        goneGoals.add(cur.id);
+        changedGoals.delete(cur.id);
+        continue;
+      }
+      const goal = changedGoals.get(cur.id) ?? { ...cur, steps: cur.steps.map((x) => ({ ...x })) };
+      const title = text(pick(r, 'title', 'name', 'goal'));
+      if (title && key(title) !== key(goal.title)) {
+        goals.delete(key(goal.title));
+        goal.title = title;
+        goals.set(key(title), goal);
+      }
+      if (has(r, 'target')) {
+        const target = normNumber(r.target);
+        goal.target = target > 0 ? target : null;
+      }
+      if (has(r, 'current', 'value', 'progress')) goal.current = Math.max(0, normNumber(pick(r, 'current', 'value', 'progress')) ?? 0);
+      if (has(r, 'unit', 'units')) goal.unit = text(pick(r, 'unit', 'units'));
+      if (has(r, 'step')) goal.step = normNumber(r.step) > 0 ? normNumber(r.step) : null;
+      if (has(r, 'deadline', 'due', 'by')) goal.deadline = normDate(pick(r, 'deadline', 'due', 'by'));
+      newSteps += mergeChecklist(goal.steps, pick(r, ...stepKeys), uid);
+      changedGoals.set(goal.id, goal);
+      continue;
+    }
+    if (id && wantsDelete(r)) {
+      notFound++;
+      continue;
+    }
+    const title = text(typeof raw === 'string' ? raw : pick(r, 'title', 'name', 'goal'));
     if (!title) continue;
-    const r = typeof raw === 'object' ? raw : {};
     const fields = {
       target: normNumber(pick(r, 'target', 'targetValue', 'target_value', 'of')),
       current: normNumber(pick(r, 'current', 'value', 'progress')),
       unit: text(pick(r, 'unit', 'units')),
+      step: normNumber(pick(r, 'step')),
       deadline: normDate(pick(r, 'deadline', 'due', 'by')),
     };
 
@@ -265,7 +415,7 @@ export function planImport(st, data, { uid, now = new Date() }) {
       goal = {
         id: uid(), title, order: goalOrder++, steps: [], createdAt: stamp,
         target: fields.target > 0 ? fields.target : null, current: Math.max(0, fields.current ?? 0),
-        unit: fields.unit, deadline: fields.deadline,
+        unit: fields.unit, step: fields.step > 0 ? fields.step : null, deadline: fields.deadline,
       };
       goals.set(key(title), goal);
       newGoals.push(goal);
@@ -273,12 +423,13 @@ export function planImport(st, data, { uid, now = new Date() }) {
       goal = changedGoals.get(goal.id) ?? { ...goal, steps: [...goal.steps] };
       if (!(goal.target > 0) && fields.target > 0) Object.assign(goal, { target: fields.target, current: Math.max(0, fields.current ?? goal.current ?? 0) });
       if (!goal.unit && fields.unit) goal.unit = fields.unit;
+      if (!(goal.step > 0) && fields.step > 0) goal.step = fields.step;
       if (!goal.deadline && fields.deadline) goal.deadline = fields.deadline;
       changedGoals.set(goal.id, goal);
       goals.set(key(title), goal);
     }
 
-    const steps = pick(r, 'steps', 'monthSteps', 'month_steps', 'milestones', 'tasks') ?? [];
+    const steps = pick(r, ...stepKeys) ?? [];
     for (const s of Array.isArray(steps) ? steps : []) {
       const stepTitle = text(typeof s === 'object' ? pick(s, 'title', 'name', 'text') : s);
       if (!stepTitle) continue;
@@ -292,16 +443,31 @@ export function planImport(st, data, { uid, now = new Date() }) {
     }
   }
 
+  const deleted = [
+    ...[...goneTasks].map((id) => st.tasks.find((t) => t.id === id).title),
+    ...[...goneGoals].map((id) => st.goals.find((g) => g.id === id).title),
+  ];
   return {
     spheres: newSpheres,
     tasks: newTasks,
     goals: [...newGoals, ...changedGoals.values()],
+    changes: {
+      spheres: [...changedSpheres.values()],
+      tasks: [...changedTasks.values()],
+      deleteTasks: [...goneTasks],
+      deleteGoals: [...goneGoals],
+    },
     summary: {
       spheres: newSpheres.length,
       tasks: newTasks.length,
       goals: newGoals.length,
       steps: newSteps,
       skipped,
+      changed: changedTasks.size + changedGoals.size + changedSpheres.size,
+      done: madeDone,
+      deleted,
+      notFound,
+      noRoom,
     },
   };
 }
@@ -467,16 +633,157 @@ export function parseCSV(src) {
  */
 export function readImportText(name, src, today) {
   const trimmed = String(src).trim();
-  if (/\.json$/i.test(name) || /^[[{]/.test(trimmed)) {
-    try {
-      const data = JSON.parse(trimmed);
-      return Array.isArray(data) ? { tasks: data } : data;
-    } catch {
-      if (/\.json$/i.test(name)) return null;
-    }
-  }
+  const json = extractJSON(trimmed);
+  if (json !== undefined) return Array.isArray(json) ? { tasks: json } : json;
+  if (/\.json$/i.test(name)) return null;
   if (/\.(csv|tsv)$/i.test(name)) return parseCSV(trimmed);
   return parseList(trimmed, today);
+}
+
+/**
+ * JSON из ответа ИИ: весь текст, блок ```json … ``` или объект посреди
+ * пояснений (если в нём есть tasks / goals / spheres). undefined — JSON нет.
+ * Markdown-список с [ ] и [x] за JSON не принимается.
+ */
+export function extractJSON(src) {
+  const s = String(src).trim();
+  const parse = (x) => {
+    try {
+      return JSON.parse(x);
+    } catch {
+      return undefined;
+    }
+  };
+  if (/^[[{]/.test(s)) {
+    const v = parse(s);
+    if (v !== undefined) return v;
+  }
+  const fence = s.match(/```[a-z]*[ \t]*\n?([\s\S]*?)```/i);
+  if (fence) {
+    const v = parse(fence[1].trim());
+    if (v !== undefined) return v;
+  }
+  if (/"(tasks|goals|spheres)"\s*:/.test(s)) {
+    const v = parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1));
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
+/* ── инструкция для ИИ ─────────────────────────────────────────────────── */
+
+const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) =>
+  v != null && v !== '' && v !== false && !(Array.isArray(v) && !v.length)));
+
+/**
+ * Данные для ИИ, чтобы он мог не только добавить, но и поменять: открытые
+ * задачи, сферы и цели с их id. Сделанные не нужны — их не трогают.
+ */
+export function aiData(st) {
+  const names = new Map(st.spheres.map((s) => [s.id, s.name]));
+  const list = (items) => items.map((x) => compact({ title: x.title, done: x.done || null }));
+  return {
+    spheres: st.spheres.map((s) => compact({ id: s.id, name: s.name, glyph: s.glyph, archived: s.archived || null })),
+    tasks: st.tasks.filter((t) => !isDone(t)).map((t) => compact({
+      id: t.id, title: t.title, sphere: names.get(t.sphereId) ?? 'Inbox', status: t.status, day: t.day, time: t.time,
+      repeat: t.repeat && t.repeat !== 'none' ? t.repeat : null, priority: t.priority, deadline: t.deadline,
+      note: t.note, subtasks: list(t.subtasks),
+    })),
+    goals: st.goals.map((g) => compact({
+      id: g.id, title: g.title, target: g.target, current: g.target > 0 ? g.current ?? 0 : null, unit: g.unit,
+      step: g.step, deadline: g.deadline, steps: list(g.steps),
+    })),
+  };
+}
+
+/** Пример из инструкции — настоящий: тест прогоняет его через импорт. */
+export function aiExample(today) {
+  return {
+    spheres: [{ name: 'Work', glyph: 'square' }, { name: 'Health', glyph: 'circle' }],
+    tasks: [
+      { title: 'Send the quarterly report', sphere: 'Work', day: today, time: '10:00', priority: 'high',
+        subtasks: ['Collect the numbers', 'Write the summary'] },
+      { title: 'Morning run', sphere: 'Health', day: today, time: '07:30', repeat: 'weekdays' },
+      { title: 'Renew passport', deadline: addDays(today, 30), note: 'Photo booth near the station' },
+    ],
+    goals: [
+      { title: 'Save for a car', target: 30000, current: 4000, unit: '€', step: 250,
+        deadline: `${Number(today.slice(0, 4)) + 1}-12-31` },
+      { title: 'Learn Dutch', steps: ['Finish the A1 course', { title: 'Buy a textbook', done: true }] },
+    ],
+  };
+}
+
+/**
+ * Инструкция для любого ИИ-чата (ChatGPT, Claude, Gemini…): формат импорта,
+ * правила и пример. С data — ещё и нынешние данные с id, чтобы ИИ мог
+ * отметить, перенести или удалить. Ответ ИИ вставляют в Settings → Paste AI answer.
+ */
+export function aiPrompt({ today, limit = 3, data = null }) {
+  const json = (v) => JSON.stringify(v, null, 1);
+  return [
+    '# Tracker — instructions for an AI assistant',
+    '',
+    'I use "Tracker", a personal task app on my phone. It imports one JSON object. Help me fill it or change it:',
+    'read my request at the end, ask me first if something important is unclear, then answer with a one-line',
+    'summary and exactly one ```json code block. I copy your whole answer into the app (Settings → Paste AI answer);',
+    'the app shows what will change, and I confirm.',
+    '',
+    `Today is ${fmtWeekday(today)} ${fmtLong(today)} (${today}). ${limit > 0
+      ? `A day holds at most ${limit} open tasks; planned tasks that don't fit stay without a date.`
+      : 'There is no limit of tasks per day.'}`,
+    '',
+    '## JSON format',
+    '{ "spheres": [ … ], "tasks": [ … ], "goals": [ … ] } — every key is optional.',
+    'Dates are "YYYY-MM-DD", times "HH:MM" (24-hour). Valid JSON only: double quotes, no comments, no trailing commas.',
+    '',
+    '### spheres — areas of life or work',
+    '- name (required); glyph (optional): circle, pill, square, bar, triangle, ring, half or diamond.',
+    '- A task may name a sphere that is not listed — it is created. No sphere → the task goes to Inbox.',
+    '',
+    '### tasks',
+    '- title (required) — short, starts with a verb',
+    '- sphere — sphere name',
+    '- day — the date to do it (puts it into that day)',
+    '- time — "HH:MM", only together with day; tasks of a day are sorted by time',
+    '- repeat — daily, weekdays, weekly or monthly; only together with day',
+    '- deadline — the date it must be done by (not the same as day)',
+    '- priority — high, medium or low',
+    '- status — todo, doing, paused or done',
+    '- note — details, links',
+    '- subtasks — ["Part", {"title": "Part", "done": true}]',
+    '',
+    '### goals',
+    '- title (required), deadline',
+    '- measured by a number: target, current (default 0), unit ("€", "km", "pages"),',
+    '  step — how much the app\'s − and + buttons change current',
+    '- or by steps: steps — a checklist ["…", {"title": "…", "done": true}]',
+    '',
+    '## Changing existing entries',
+    data
+      ? 'My current data is below. Refer to an entry by its "id"; only the fields you include change, the rest stays.'
+      : 'I have not shared my current data, so you can only add. To complete, move or delete something, ask me\nto copy the instructions "with my data" from the app.',
+    '- Complete: {"id": "…", "status": "done"} · Move: {"id": "…", "day": "YYYY-MM-DD", "time": "HH:MM"} · Unplan: {"id": "…", "day": null}',
+    '- Delete: {"id": "…", "delete": true} — only when I clearly ask to delete.',
+    '- Goal progress: {"id": "…", "current": 5200}. Tick a goal step: {"id": "…", "steps": [{"title": "exact step title", "done": true}]}',
+    '- Rename a sphere: {"id": "…", "name": "New name"}. Archive it: {"id": "…", "archived": true}',
+    '- Without an id an entry is added as new. A task with the same title in the same sphere is skipped',
+    '  as a duplicate — do not repeat existing tasks.',
+    '',
+    '## Example',
+    '```json',
+    json(aiExample(today)),
+    '```',
+    '',
+    '## Good practice',
+    '- Do not invent tasks, dates or numbers I did not mention — suggest them in the text instead.',
+    '- One task is one action: long details go to note, parts to subtasks.',
+    '- Do not show ids in the text of your answer.',
+    ...(data ? ['', '## My current data', '```json', json(data), '```'] : []),
+    '',
+    '## My request',
+    '',
+  ].join('\n');
 }
 
 /* ── файл календаря (.ics) ────────────────────────────────────────────── */

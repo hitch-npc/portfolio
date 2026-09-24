@@ -114,7 +114,7 @@ export function todayView() {
   // пустые места — в том же списке, после задач: перетаскивание их не трогает (у них нет data-id)
   const slots = sortable(h('ol', { class: 'tasks day-list', 'aria-label': 'Today' },
     open.map((t, i) => taskItem(t, { num: i + 1, accent: i === 0, drag: open.length > 1, inDay: true })),
-    emptySlots(open.length)), (ids) => store.reorderDay(ids));
+    emptySlots(open.length)), (ids) => store.reorderDay(ids), { hold: true });
 
   body.replaceChildren(...[
     slots,

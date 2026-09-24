@@ -74,7 +74,7 @@ export function planView() {
         h('button', {
           class: 'icon-btn', type: 'button', 'aria-label': `Remove “${t.title}” from tomorrow`,
           onclick: () => store.unplanTask(t.id),
-        }, icon('close'))))), emptySlots(open.length)), (ids) => store.reorderDay(ids));
+        }, icon('close'))))), emptySlots(open.length)), (ids) => store.reorderDay(ids), { hold: true });
 
   const groups = [
     group('Not done yet', null, g.carried, picked, spheres, true),

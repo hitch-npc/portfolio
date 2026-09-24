@@ -78,6 +78,31 @@ export function dayTasks(st, day) {
   };
 }
 
+/**
+ * Место задачи со временем в дне (dayOrder). Задачи дня идут от ранней
+ * к поздней: новая встаёт перед первой, у которой время позже; позже никого
+ * нет — сразу за последней задачей со временем, задачи без времени остаются
+ * ниже. Порядок, заданный перетаскиванием, не пересчитывается: по времени
+ * встаёт только новая задача или та, у которой время поменяли, — поэтому
+ * ручной порядок главнее. Без времени — в конец дня.
+ */
+export function timeSlot(st, task, day) {
+  const others = st.tasks
+    .filter((t) => t.day === day && t.id !== task.id && !isDone(t))
+    .sort(byDayOrder);
+  const orders = others.map((t) => t.dayOrder ?? 0);
+  const end = Math.max(-1, ...orders) + 1;
+  if (!task.time) return end;
+  let at = others.findIndex((t) => t.time && t.time > task.time);
+  if (at < 0) at = others.findLastIndex((t) => t.time) + 1;
+  const prev = orders[at - 1];
+  const next = orders[at];
+  if (prev == null && next == null) return 0;
+  if (prev == null) return next - 1;
+  if (next == null) return end;
+  return (prev + next) / 2;
+}
+
 export function isDayFull(st, day) {
   const limit = dayLimit(st);
   return limit > 0 && dayTasks(st, day).open.length >= limit;
@@ -159,6 +184,12 @@ export function searchTasks(st, query) {
  * Прогресс цели: если задано числовое значение (например, 10 откликов),
  * считается по нему; иначе — по шагам.
  */
+/** Шаг кнопок −/+ по величине цели: для десятков — 1, для тысяч — сотня. */
+export const autoStep = (target) => (target >= 5000 ? 100 : target >= 500 ? 10 : 1);
+
+/** Шаг цели: заданный руками или по величине цели. */
+export const goalStep = (goal) => (goal.step > 0 ? goal.step : autoStep(goal.target ?? 0));
+
 export function goalProgress(goal) {
   const steps = goal.steps ?? [];
   if (goal.target > 0) {
