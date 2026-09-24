@@ -33,14 +33,14 @@ export function header(title, sub, ...actions) {
 
 export const backLink = (href, label) => h('a', { class: 'back', href }, icon('back'), label);
 
-export function iconButton(name, label, onclick, cls = '') {
-  return h('button', { class: ['icon-btn', cls], type: 'button', 'aria-label': label, title: label, onclick }, icon(name));
+export function iconButton(name, label, onclick, cls = '', size = 24) {
+  return h('button', { class: ['icon-btn', cls], type: 'button', 'aria-label': label, title: label, onclick }, icon(name, size));
 }
 
 /** Кнопка-пилюля: иконка в кружке + подпись. */
 export function pillButton(name, label, onclick, cls = '') {
   return h('button', { class: ['pill', 'pill-action', name && 'has-chip', cls], type: 'button', onclick },
-    name && h('span', { class: 'chip' }, icon(name)), label);
+    name && h('span', { class: 'chip' }, icon(name, 20)), label);
 }
 
 /** Поле графика: точечная сетка и уголки-метки, как на чертеже. */
@@ -66,7 +66,7 @@ export function foldout(id, title, count, content) {
     h('button', {
       class: 'fold-head', type: 'button', 'aria-expanded': String(isOpen),
       onclick: () => { toggleBlock(id); rerender(); },
-    }, h('span', null, title), h('span', { class: 'count' }, count), icon('chevron')),
+    }, h('span', null, title), h('span', { class: 'count' }, count), icon('chevron', 20)),
     isOpen && content());
 }
 
@@ -101,7 +101,7 @@ function meta(t, { showSphere = true } = {}) {
 export function checkButton(done, label, onclick, cls = '') {
   return h('button', {
     class: ['check', done && 'is-on', cls], type: 'button', 'aria-pressed': String(done), 'aria-label': label, onclick,
-  }, icon('check'));
+  }, icon('check', cls.includes('check-sm') ? 16 : 20));
 }
 
 /** Галочка, которую только что поставили: у неё короткая анимация. */
@@ -223,7 +223,7 @@ function taskCard(t) {
           onclick: (e) => { try { e.target.showPicker?.(); } catch { /* уже открыт системой */ } },
           onchange: (e) => store.updateTask(t.id, { deadline: e.target.value || null }),
         })),
-      t.deadline && iconButton('close', 'Clear deadline', () => store.updateTask(t.id, { deadline: null }))),
+      t.deadline && iconButton('close', 'Clear deadline', () => store.updateTask(t.id, { deadline: null }), '', 20)),
     field('Subtasks',
       t.subtasks.length > 0 && h('ul', { class: 'subs' }, t.subtasks.map((s) =>
         h('li', { class: ['sub', s.done && 'is-done'] },
@@ -237,7 +237,7 @@ function taskCard(t) {
               v ? store.updateSubtask(t.id, s.id, { title: v }) : store.deleteSubtask(t.id, s.id);
             },
           }),
-          iconButton('close', 'Delete subtask', () => store.deleteSubtask(t.id, s.id))))),
+          iconButton('close', 'Delete subtask', () => store.deleteSubtask(t.id, s.id), '', 18)))),
       entry(`subadd-${t.id}`, 'Add subtask', (v) => store.addSubtask(t.id, v), { cls: 'entry-sm' })),
     note,
     h('div', { class: 'card-foot' },

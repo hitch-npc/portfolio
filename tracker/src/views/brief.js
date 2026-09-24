@@ -67,7 +67,7 @@ function tile(label, value, tail, content, { wide = false, late = false, href = 
   return h('section', { class: ['tile', wide && 'tile-wide'] },
     h('div', { class: 'tile-head' },
       h('span', { class: 'tile-label' }, label),
-      href && h('a', { class: 'tile-link', href, 'aria-label': `Open ${label}` }, icon('chevron'))),
+      href && h('a', { class: 'tile-link', href, 'aria-label': `Open ${label}` }, icon('chevron', 20))),
     v,
     content);
 }

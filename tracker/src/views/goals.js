@@ -74,7 +74,7 @@ function goalCard({ goal, steps, done, total }, month) {
             v ? store.updateStep(goal.id, s.id, { title: v }) : store.deleteStep(goal.id, s.id);
           },
         }),
-        iconButton('close', 'Delete step', () => store.deleteStep(goal.id, s.id))))),
+        iconButton('close', 'Delete step', () => store.deleteStep(goal.id, s.id), '', 18)))),
     entry(`step-add-${goal.id}`, `Add step for ${monthName(month)}`,
       (title) => store.addStep(goal.id, title, month), { cls: 'entry-sm' }));
 }
