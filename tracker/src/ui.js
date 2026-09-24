@@ -40,17 +40,17 @@ function svg(viewBox, markup, cls) {
   return el;
 }
 
-const S = 'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"';
+const S = 'fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"';
 const F = 'fill="currentColor"';
 const loop = 'repeatCount="indefinite"';
 const ease = 'calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"';
 
 /*
- * Иконки разделов — тонкая линия, кольца и оси; где линии встречаются,
+ * Иконки разделов — линия 1,2 px, кольца и оси; где линии встречаются,
  * стык «слипается» каплей (фильтр goo: лёгкое размытие + порог по альфе).
- * Движение — SMIL, без JS: глобус вращает меридианы, у Луны ходит фаза,
- * к центру мишени сходятся круги, в брифе прописываются строки,
- * шестерёнка крутится, у солнца по кругу бежит свет.
+ * Движение — SMIL, без JS: эллипс кувыркается вокруг кольца, кольца Луны
+ * расходятся и сходятся, к центру прицела сходятся круги, в брифе
+ * прописываются строки, колесо крутится, по лучам солнца бежит свет.
  *
  * Базовые атрибуты — поза покоя: без элементов анимации иконка неподвижна
  * и закончена (так рисуются неоткрытые вкладки и «Уменьшить движение»).
@@ -60,43 +60,38 @@ const GOO = `<defs><filter id="__ID__" x="-20%" y="-20%" width="140%" height="14
   <feGaussianBlur stdDeviation=".55"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -6.5"/></filter></defs>`;
 const G = `filter="url(#__ID__)" ${S}`;
 
-const meridian = (rx, begin) =>
-  `<ellipse cx="12" cy="12" rx="${rx}" ry="9"><animate attributeName="rx" dur="3.6s" begin="${begin}" ${loop} values="9;6.4;0;6.4;9"/></ellipse>`;
-
-const sunDots = Array.from({ length: 8 }, (_, i) => {
+// солнце: лучи начинаются прямо от кольца — стык слипается. По кругу бежит
+// не яркость (фильтр goo срезал бы полупрозрачное), а длина: луч вытягивается
+const sunRays = Array.from({ length: 8 }, (_, i) => {
   const a = (i / 8) * Math.PI * 2;
-  const x = (12 + 8.4 * Math.sin(a)).toFixed(2);
-  const y = (12 - 8.4 * Math.cos(a)).toFixed(2);
-  return `<circle cx="${x}" cy="${y}" r="1.3"><animate attributeName="opacity" dur="1.6s" begin="${(-i * 0.2).toFixed(1)}s" ${loop} values="1;.25;.25"/></circle>`;
+  const p = (r) => `${(12 + r * Math.sin(a)).toFixed(2)} ${(12 - r * Math.cos(a)).toFixed(2)}`;
+  const ray = (len) => `M${p(4)}L${p(len)}`;
+  return `<path d="${ray(8)}"><animate attributeName="d" dur="1.6s" begin="${(-i * 0.2).toFixed(1)}s" ${loop} values="${ray(10)};${ray(6.5)};${ray(6.5)}" keyTimes="0;.35;1"/></path>`;
 }).join('');
 
 const LIVE = {
-  // сегодня — солнце: точка и венец, по которому бежит свет
-  today: `<g ${F}><circle cx="12" cy="12" r="3.4"/>${sunDots}</g>`,
-  // план — Луна: терминатор проходит по диску, фазы сменяются; в покое — половина
-  plan: `${GOO}<g ${G}><circle cx="12" cy="12" r="8.5"/>
-    <g transform="translate(12 0)"><g transform="scale(0.001 1)"><path d="M0 3.5A8.5 8.5 0 0 1 0 20.5" vector-effect="non-scaling-stroke"/>
-      <animateTransform attributeName="transform" type="scale" dur="4s" begin="-1s" ${loop} values="1 1;-1 1;1 1" keyTimes="0;.5;1" ${ease}/></g></g></g>
-    <path d="M20 1.5v3M18.5 3h3" ${S} opacity=".9"><animate attributeName="opacity" dur="2s" ${loop} values="0;1;0"/></path>`,
-  // сферы — глобус: меридианы вращаются, полюса слипаются
-  spheres: `${GOO}<g ${G}><g transform="rotate(-18 12 12)">
-    <circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="2.6"/>
-    ${meridian(9, '0s')}${meridian(3.2, '-1.2s')}${meridian(3.2, '-2.4s')}</g></g>`,
-  // цели — прицел: кольцо с рисками, круги сходятся к центру
-  goals: `${GOO}<g ${G}><circle cx="12" cy="12" r="8"/>
-    <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5"/>
-    ${[0, -1.2].map((b) => `<circle cx="12" cy="12" r="8" opacity="0"><animate attributeName="r" dur="2.4s" begin="${b}s" ${loop} values="8;1.5"/><animate attributeName="opacity" dur="2.4s" begin="${b}s" ${loop} values="0;1;0"/></circle>`).join('')}
-    </g><circle cx="12" cy="12" r="1.5" ${F}/>`,
+  // сегодня — солнце: кольцо и лучи от него, по лучам бежит свет
+  today: `${GOO}<g ${G}><circle cx="12" cy="12" r="4"/>${sunRays}</g>`,
+  // план — Луна: два кольца, одно проходит по другому — сменяются фазы
+  plan: `${GOO}<g ${G}><circle cx="10" cy="12" r="7"/>
+    <circle cx="14" cy="12" r="7"><animate attributeName="cx" dur="5s" ${loop} values="14;18;14" keyTimes="0;.5;1" ${ease}/></circle></g>`,
+  // сферы — гироскоп: кольцо и эллипс, который кувыркается вокруг него
+  spheres: `${GOO}<g ${G}><circle cx="12" cy="12" r="7.5"/>
+    <g transform="rotate(-10 12 12)"><ellipse cx="12" cy="12" rx="0.4" ry="10.5"><animate attributeName="rx" dur="5s" ${loop} values="0.4;7;2;7.5;0.4" keyTimes="0;.3;.5;.75;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1;.45 0 .55 1"/></ellipse>
+      <animateTransform attributeName="transform" type="rotate" dur="5s" ${loop} values="-10 12 12;40 12 12;100 12 12;150 12 12;170 12 12" keyTimes="0;.3;.5;.75;1"/></g></g>`,
+  // цели — прицел: кольцо, оси насквозь, к центру сходятся круги
+  goals: `${GOO}<g ${G}><circle cx="12" cy="12" r="7"/><path d="M12 1.5v21M1.5 12h21"/>
+    ${[0, -1.2].map((b) => `<circle cx="12" cy="12" r="${b ? 3.9 : 7}"><animate attributeName="r" dur="2.4s" begin="${b}s" ${loop} values="7;0.6"/></circle>`).join('')}</g>`,
   // бриф — ось и строки, которые прописываются от оси
   brief: `${GOO}<g ${G}><path d="M6 3v18"/>
-    ${[[7, 12, '0;.25'], [12, 9, '.15;.4'], [17, 11, '.3;.55']].map(([y, w, k]) => {
+    ${[[7, 12, '0.001;.25'], [12, 8, '.15;.4'], [17, 10, '.3;.55']].map(([y, w, k]) => {
       const [k1, k2] = k.split(';');
-      return `<path d="M6 ${y}h${w}" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" dur="3.2s" ${loop} values="${w};${w};0;0;${w}" keyTimes="0;${k1 === '0' ? '0.001' : k1};${k2};.85;1"/></path>`;
+      return `<path d="M6 ${y}h${w}" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" dur="3.2s" ${loop} values="${w};${w};0;0;${w}" keyTimes="0;${k1};${k2};.85;1"/></path>`;
     }).join('')}</g>`,
-  // настройки — шестерёнка: кольцо, втулка и зубья-риски, медленно вращается
+  // настройки — колесо: кольцо, шесть спиц от втулки наружу; медленно вращается
   settings: `${GOO}<g ${G}><g>
-    <circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.2"/>
-    <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
+    <circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+    <path d="M12 2.5v6M12 15.5v6M3.77 7.25l5.2 3M15.03 13.75l5.2 3M3.77 16.75l5.2-3M15.03 10.25l5.2-3"/>
     <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" ${loop}/></g></g>`,
 };
 
