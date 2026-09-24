@@ -40,22 +40,85 @@ function svg(viewBox, markup, cls) {
   return el;
 }
 
-const S = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const S = 'fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"';
 const F = 'fill="currentColor"';
+const loop = 'repeatCount="indefinite"';
+const ease = 'calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"';
 
 /*
- * Иконки: сетка 24×24, только контур 2 px, прямые — на целых координатах,
- * чтобы края ложились в пиксель. Ничего лишнего: предмет и всё.
- * Солнце — сегодня, месяц — вечернее планирование, флаг — цели, лист — бриф.
+ * Иконки разделов — тонкая линия, кольца и оси; где линии встречаются,
+ * стык «слипается» каплей (фильтр goo: лёгкое размытие + порог по альфе).
+ * Движение — SMIL, без JS: глобус вращает меридианы, у Луны ходит фаза,
+ * к центру мишени сходятся круги, в брифе прописываются строки,
+ * шестерёнка крутится, у солнца по кругу бежит свет.
+ *
+ * Базовые атрибуты — поза покоя: без элементов анимации иконка неподвижна
+ * и закончена (так рисуются неоткрытые вкладки и «Уменьшить движение»).
+ * __ID__ — место для уникального id фильтра: иконок на странице несколько.
+ */
+const GOO = `<defs><filter id="__ID__" x="-20%" y="-20%" width="140%" height="140%">
+  <feGaussianBlur stdDeviation=".55"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -6.5"/></filter></defs>`;
+const G = `filter="url(#__ID__)" ${S}`;
+
+const meridian = (rx, begin) =>
+  `<ellipse cx="12" cy="12" rx="${rx}" ry="9"><animate attributeName="rx" dur="3.6s" begin="${begin}" ${loop} values="9;6.4;0;6.4;9"/></ellipse>`;
+
+const sunDots = Array.from({ length: 8 }, (_, i) => {
+  const a = (i / 8) * Math.PI * 2;
+  const x = (12 + 8.4 * Math.sin(a)).toFixed(2);
+  const y = (12 - 8.4 * Math.cos(a)).toFixed(2);
+  return `<circle cx="${x}" cy="${y}" r="1.3"><animate attributeName="opacity" dur="1.6s" begin="${(-i * 0.2).toFixed(1)}s" ${loop} values="1;.25;.25"/></circle>`;
+}).join('');
+
+const LIVE = {
+  // сегодня — солнце: точка и венец, по которому бежит свет
+  today: `<g ${F}><circle cx="12" cy="12" r="3.4"/>${sunDots}</g>`,
+  // план — Луна: терминатор проходит по диску, фазы сменяются; в покое — половина
+  plan: `${GOO}<g ${G}><circle cx="12" cy="12" r="8.5"/>
+    <g transform="translate(12 0)"><g transform="scale(0.001 1)"><path d="M0 3.5A8.5 8.5 0 0 1 0 20.5" vector-effect="non-scaling-stroke"/>
+      <animateTransform attributeName="transform" type="scale" dur="4s" begin="-1s" ${loop} values="1 1;-1 1;1 1" keyTimes="0;.5;1" ${ease}/></g></g></g>
+    <path d="M20 1.5v3M18.5 3h3" ${S} opacity=".9"><animate attributeName="opacity" dur="2s" ${loop} values="0;1;0"/></path>`,
+  // сферы — глобус: меридианы вращаются, полюса слипаются
+  spheres: `${GOO}<g ${G}><g transform="rotate(-18 12 12)">
+    <circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="9" ry="2.6"/>
+    ${meridian(9, '0s')}${meridian(3.2, '-1.2s')}${meridian(3.2, '-2.4s')}</g></g>`,
+  // цели — прицел: кольцо с рисками, круги сходятся к центру
+  goals: `${GOO}<g ${G}><circle cx="12" cy="12" r="8"/>
+    <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5"/>
+    ${[0, -1.2].map((b) => `<circle cx="12" cy="12" r="8" opacity="0"><animate attributeName="r" dur="2.4s" begin="${b}s" ${loop} values="8;1.5"/><animate attributeName="opacity" dur="2.4s" begin="${b}s" ${loop} values="0;1;0"/></circle>`).join('')}
+    </g><circle cx="12" cy="12" r="1.5" ${F}/>`,
+  // бриф — ось и строки, которые прописываются от оси
+  brief: `${GOO}<g ${G}><path d="M6 3v18"/>
+    ${[[7, 12, '0;.25'], [12, 9, '.15;.4'], [17, 11, '.3;.55']].map(([y, w, k]) => {
+      const [k1, k2] = k.split(';');
+      return `<path d="M6 ${y}h${w}" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" dur="3.2s" ${loop} values="${w};${w};0;0;${w}" keyTimes="0;${k1 === '0' ? '0.001' : k1};${k2};.85;1"/></path>`;
+    }).join('')}</g>`,
+  // настройки — шестерёнка: кольцо, втулка и зубья-риски, медленно вращается
+  settings: `${GOO}<g ${G}><g>
+    <circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.2"/>
+    <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" ${loop}/></g></g>`,
+};
+
+let gooId = 0;
+
+/**
+ * Иконка раздела. live — с движением; без него элементы анимации убраны,
+ * и остаётся поза покоя.
+ */
+export function sectionIcon(name, live = false) {
+  const el = svg('0 0 24 24', LIVE[name].replaceAll('__ID__', `goo-${++gooId}`), `icon icon-${name}`);
+  el.setAttribute('width', 24);
+  el.setAttribute('height', 24);
+  if (!live) el.querySelectorAll('animate, animateTransform, animateMotion').forEach((n) => n.remove());
+  return el;
+}
+
+/*
+ * Служебные иконки: сетка 24×24, та же тонкая линия, прямые — на целых
+ * координатах. Ничего лишнего: предмет и всё.
  */
 const ICONS = {
-  today: `<circle cx="12" cy="12" r="4" ${S}/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" ${S}/>`,
-  plan: `<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" ${S}/>`,
-  spheres: `<circle cx="7" cy="7" r="3" ${S}/><rect x="14" y="4" width="6" height="6" rx="1" ${S}/><path d="M7 14l4 6H3z" ${S}/><rect x="13" y="15" width="8" height="4" rx="2" ${S}/>`,
-  goals: `<path d="M5 21V4M5 4h12l-3 5 3 5H5" ${S}/>`,
-  brief: `<rect x="5" y="3" width="14" height="18" rx="2" ${S}/><path d="M9 8h6M9 12h6M9 16h3" ${S}/>`,
-  // шестерёнка: зубья — пунктир обводки, 8 штук, той же толщины на вид, что остальные линии
-  settings: `<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="2.8 3.876"/><circle cx="12" cy="12" r="6.5" ${S}/><circle cx="12" cy="12" r="2" ${S}/>`,
   plus: `<path d="M12 5v14M5 12h14" ${S}/>`,
   check: `<path d="M5 12l4 4 10-10" ${S}/>`,
   close: `<path d="M6 6l12 12M18 6L6 18" ${S}/>`,
@@ -73,6 +136,7 @@ const ICONS = {
  * вокруг рисунка, а не уменьшение, так что 2 px остаются 2 px.
  */
 export function icon(name, size = 24) {
+  if (LIVE[name] && size === 24) return sectionIcon(name);
   const o = (24 - size) / 2;
   const el = svg(`${o} ${o} ${size} ${size}`, ICONS[name], `icon icon-${name}`);
   el.setAttribute('width', size);
