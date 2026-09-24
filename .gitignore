@@ -9,3 +9,15 @@ dist/
 # Gambarino и Switzer (ITF FFL): на сайте можно, в публичном репозитории — нет.
 # Сборка скачивает их сама: npm run fetch:fontshare
 public/fonts/fontshare/
+# Трекер: личные данные — задачи, файл импорта, экспорт, бюджет — не
+# коммитятся никогда, ни в каком виде. Приложение хранит их в IndexedDB
+# на телефоне; файлы копий и импорта живут только у владельца.
+tracker-import*.json
+tracker-backup*.json
+tracker-export*.json
+*.tracker.json
+budget*.json
+wishlist*.json
+checkpoint*.json
+/personal/
+/private/
