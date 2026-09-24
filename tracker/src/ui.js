@@ -245,3 +245,100 @@ export function sortable(list, onDrop) {
   });
   return list;
 }
+
+/* ── движение ────────────────────────────────────────────────────────── */
+
+/** «Уменьшить движение» в системе — никаких анимаций из JS. */
+export const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Число досчитывает до значения за ~0,4 с. Только при входе на экран. */
+export function countUp(el, to) {
+  if (calm() || to <= 0 || to > 999) return;
+  const start = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - start) / 420);
+    el.firstChild.nodeValue = String(Math.round(to * (1 - (1 - k) ** 3)));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  el.firstChild.nodeValue = '0';
+  requestAnimationFrame(step);
+}
+
+/**
+ * FLIP: запомнить места элементов, изменить DOM, плавно довезти элементы
+ * со старых мест на новые. Для композиции дня: сделанная задача уезжает влево.
+ */
+export function flip(els, change) {
+  const before = new Map(els().map((el) => [el, el.getBoundingClientRect()]));
+  change();
+  if (calm()) return;
+  for (const el of els()) {
+    const a = before.get(el);
+    if (!a) continue;
+    const b = el.getBoundingClientRect();
+    const dx = a.left - b.left;
+    const dy = a.top + a.height / 2 - (b.top + b.height / 2);
+    const sy = b.height ? a.height / b.height : 1;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sy - 1) < 0.01) continue;
+    el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scaleY(${sy})` }, { transform: 'none' }],
+      { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' },
+    );
+  }
+}
+
+/**
+ * Порядок плиток в сетке. Плитка едет за пальцем, соседи переставляются
+ * в DOM, как только палец оказывается над ними. Тянуть — за data-drag.
+ */
+export function sortableGrid(grid, onDrop) {
+  grid.addEventListener('pointerdown', (e) => {
+    const handle = e.target.closest('[data-drag]');
+    const item = handle?.closest('[data-id]');
+    if (!item || item.parentElement !== grid || e.button > 0) return;
+    e.preventDefault();
+
+    const tiles = () => [...grid.children].filter((n) => n.dataset.id);
+    const startOrder = tiles().map((n) => n.dataset.id).join();
+    const r0 = item.getBoundingClientRect();
+    const grab = { x: e.clientX - r0.left, y: e.clientY - r0.top };
+
+    item.classList.add('is-dragging');
+
+    // попадание и сдвиг считаются по раскладке (offset*), а не по экрану:
+    // соседи в это время едут анимацией, и их экранные рамки врут
+    const move = (ev) => {
+      const g = grid.getBoundingClientRect();
+      const x = ev.clientX - g.left;
+      const y = ev.clientY - g.top;
+      const over = tiles().find((n) => n !== item
+        && x > n.offsetLeft && x < n.offsetLeft + n.offsetWidth
+        && y > n.offsetTop && y < n.offsetTop + n.offsetHeight);
+      if (over) {
+        const list = tiles();
+        const others = () => list.filter((n) => n !== item);
+        flip(others, () => grid.insertBefore(item, list.indexOf(over) > list.indexOf(item) ? over.nextSibling : over));
+      }
+      const tx = ev.clientX - grab.x - (g.left + item.offsetLeft);
+      const ty = ev.clientY - grab.y - (g.top + item.offsetTop);
+      item.style.transform = `translate(${tx}px, ${ty}px)`;
+    };
+
+    // слушаем окно, а не ручку: плитка переезжает в DOM, и захват указателя
+    // при этом отпускается — события ручке больше не пришли бы
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      item.style.transform = '';
+      item.classList.remove('is-dragging');
+      const ids = tiles().map((n) => n.dataset.id);
+      if (ids.join() !== startOrder) onDrop(ids);
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+  return grid;
+}

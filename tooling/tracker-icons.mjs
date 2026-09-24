@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
- * Трекер — иконки
- * ───────────────
+ * Трекер — иконки и зерно
+ * ───────────────────────
  * Рисует PNG-иконки приложения: iOS берёт для домашнего экрана только PNG
  * (apple-touch-icon), SVG ему не годится. Рисунок — четыре глифа сфер
  * (круг, пилюля, квадрат, полоса) чернилами на фоне приложения. Красного
  * в иконке нет: акцент значит «требует внимания сейчас», и только это.
+ *
+ * Ещё — плитка бумажного зерна (tracker/textures/grain.png): чёрные точки
+ * с едва заметной прозрачностью. Картинка, а не SVG-фильтр: политика
+ * безопасности страницы не пускает data:-адреса, а шум на лету дорог для телефона.
  *
  * Пакетов нет: пиксели считаются с суперсэмплингом 4×4, PNG собирается
  * через zlib из Node. Запускается руками, результат коммитится.
@@ -103,7 +107,23 @@ function png(size, rgba) {
   ]);
 }
 
+/* Зерно: детерминированный шум (одинаковый при каждом запуске — без лишних диффов) */
+function grain(size) {
+  const px = Buffer.alloc(size * size * 4);
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let i = 0; i < size * size; i++) {
+    const r = rand();
+    px[i * 4 + 3] = r > 0.5 ? Math.round((r - 0.5) * 2 * 14) : 0; // альфа 0…14 из 255
+  }
+  return px;
+}
+
 mkdirSync(OUT, { recursive: true });
+mkdirSync(join(ROOT, 'tracker', 'textures'), { recursive: true });
+writeFileSync(join(ROOT, 'tracker', 'textures', 'grain.png'), png(160, grain(160)));
+console.log('✓ tracker/textures/grain.png');
+
 const ICONS = [
   { file: 'icon-180.png', size: 180, inset: 0.06 }, // iOS, домашний экран
   { file: 'icon-192.png', size: 192, inset: 0.06 },

@@ -70,12 +70,24 @@ function buildNav() {
   document.getElementById('nav').replaceChildren(h('div', { class: 'tabs' }, navLinks));
 }
 
+let enterTimer;
+
+/** Вход на экран: одна перерисовка с анимациями появления, дальше — без них. */
+function enter() {
+  ui.entering = true;
+  main.classList.add('is-entering');
+  render();
+  ui.entering = false;
+  clearTimeout(enterTimer);
+  enterTimer = setTimeout(() => main.classList.remove('is-entering'), 900);
+}
+
 function onRoute() {
   ui.expanded = null;
   ui.confirm = null;
   closeSheet();
-  render();
   window.scrollTo(0, 0);
+  enter();
   if (route().name === 'today') focusInput();
 }
 
@@ -96,7 +108,7 @@ async function boot() {
     return;
   }
 
-  render();
+  enter();
   if (route().name === 'today') focusInput();
   window.addEventListener('hashchange', onRoute);
 

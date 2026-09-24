@@ -3,11 +3,11 @@
  * неделя дедлайнов, цели месяца. «Export for Claude» кладёт компактный
  * JSON в буфер обмена — дальше его вставляют в чат руками.
  */
-import { h, glyph, toast } from '../ui.js';
+import { h, glyph, icon, toast, countUp } from '../ui.js';
 import { dueLabel, fmtDay, fmtWeekday, monthName, parse } from '../dates.js';
 import { brief, exportForClaude } from '../logic.js';
 import * as store from '../store.js';
-import { ui, header, pillButton, panel, bigNumber } from './common.js';
+import { ui, header, pillButton, plot, stat } from './common.js';
 import { fraction, meter } from './goals.js';
 
 async function copy(text) {
@@ -34,27 +34,42 @@ function line(t, spheres, { num, late } = {}) {
     late && due && h('span', { class: 'line-due is-late' }, due.text));
 }
 
+/** Неделя: столбики-пилюли на точечном поле. Сегодня — сплошным, остальные дни — штриховкой. */
 function week(days) {
   const max = Math.max(1, ...days.map((d) => d.tasks.length));
-  const empty = days.every((d) => !d.tasks.length);
-  const chart = h('div', { class: ['week', empty && 'is-empty'], role: 'img', 'aria-label': 'Deadlines over the next 7 days' },
+  const chart = h('div', { class: 'week', role: 'img', 'aria-label': 'Deadlines over the next 7 days' },
     days.map((d, i) => {
-      const bar = h('div', { class: ['week-bar', i === 0 && 'is-now', !d.tasks.length && 'is-zero'] });
-      bar.style.height = d.tasks.length ? `${(d.tasks.length / max) * 100}%` : '';
+      const n = d.tasks.length;
+      const bar = h('div', { class: ['week-bar', i === 0 && 'is-now', !n && 'is-zero'] });
+      bar.style.setProperty('--h', String(n / max));
+      bar.style.setProperty('--i', String(i));
       return h('div', { class: 'week-col' },
-        h('span', { class: 'week-count' }, d.tasks.length || ''),
+        h('span', { class: 'week-count' }, n || ''),
         h('div', { class: 'week-track' }, bar),
         h('span', { class: 'week-day' }, fmtWeekday(d.date)),
         h('span', { class: 'week-date' }, String(parse(d.date).getDate())));
     }));
+  return plot(chart);
+}
+
+function weekList(days) {
   const withTasks = days.filter((d) => d.tasks.length);
-  return [
-    chart,
-    withTasks.length > 0 && h('dl', { class: 'week-list' }, withTasks.map((d) => [
-      h('dt', null, fmtDay(d.date)),
-      h('dd', null, d.tasks.map((t) => t.title).join(' · ')),
-    ])),
-  ];
+  return withTasks.length > 0 && h('dl', { class: 'week-list' }, withTasks.map((d) => [
+    h('dt', null, fmtDay(d.date)),
+    h('dd', null, d.tasks.map((t) => t.title).join(' · ')),
+  ]));
+}
+
+/** Плитка: подпись сверху, крупное число, под ним — немного текста. */
+function tile(label, value, tail, content, { wide = false, late = false, href = null } = {}) {
+  const v = h('p', { class: ['big', late && 'is-late'] }, String(value), tail && h('span', { class: 'muted' }, tail));
+  if (ui.entering) countUp(v, value);
+  return h('section', { class: ['tile', wide && 'tile-wide'] },
+    h('div', { class: 'tile-head' },
+      h('span', { class: 'tile-label' }, label),
+      href && h('a', { class: 'tile-link', href, 'aria-label': `Open ${label}` }, icon('chevron'))),
+    v,
+    content);
 }
 
 export function briefView() {
@@ -62,35 +77,39 @@ export function briefView() {
   const b = brief(st, ui.day);
   const spheres = new Map(st.spheres.map((s) => [s.id, s]));
   const deadlines = b.week.reduce((n, d) => n + d.tasks.length, 0);
+  const stepsDone = b.goals.reduce((n, g) => n + g.done, 0);
+  const stepsAll = b.goals.reduce((n, g) => n + g.total, 0);
 
   return h('section', { class: 'screen screen-brief' },
     header('Brief', fmtDay(b.today)),
-    pillButton('copy', 'Export for Claude', async () => {
-      toast((await copy(exportForClaude(st, ui.day))) ? 'Copied — paste it into Claude' : 'Could not copy');
-    }, 'is-on pill-wide'),
+    week(b.week),
+    stat('Deadlines, next 7 days', deadlines),
+    weekList(b.week),
 
-    h('div', { class: 'panels' },
-      panel('Tomorrow', fmtDay(b.tomorrow),
+    h('div', { class: 'bento' },
+      tile(`Tomorrow · ${fmtWeekday(b.tomorrow)}`, b.planned.length, '/3',
         b.planned.length
-          ? h('ol', { class: 'lines' }, b.planned.map((t, i) => line(t, spheres, { num: i + 1 })))
-          : h('p', { class: 'hint' }, 'Nothing planned yet. ', h('a', { href: '#/plan' }, 'Plan tomorrow'))),
+          ? h('ol', { class: 'lines lines-sm' }, b.planned.map((t, i) => line(t, spheres, { num: i + 1 })))
+          : h('p', { class: 'hint' }, 'Not planned yet'),
+        { href: '#/plan' }),
 
-      // просроченное — единственная панель, где число красное: это и есть «требует внимания»
-      b.overdue.length > 0 && panel('Overdue', null,
-        bigNumber(b.overdue.length, b.overdue.length === 1 ? ' task' : ' tasks', 'is-late'),
-        h('ul', { class: 'lines' }, b.overdue.map((t) => line(t, spheres, { late: true })))),
+      // просроченное — единственная плитка, где число красное: это и есть «требует внимания»
+      tile('Overdue', b.overdue.length, null,
+        b.overdue.length
+          ? h('ul', { class: 'lines lines-sm' }, b.overdue.map((t) => line(t, spheres)))
+          : h('p', { class: 'hint' }, 'All clear'),
+        { late: b.overdue.length > 0 }),
 
-      panel('Next 7 days', null,
-        bigNumber(deadlines, deadlines === 1 ? ' deadline' : ' deadlines'),
-        week(b.week)),
-
-      panel('Goals', monthName(b.month),
+      tile(`Goals · ${monthName(b.month)}`, stepsDone, `/${stepsAll} steps`,
         b.goals.length
-          ? h('div', { class: 'brief-goals' }, b.goals.map(({ goal, steps, done, total }) =>
+          ? h('div', { class: 'brief-goals' }, b.goals.map(({ goal, done, total }) =>
             h('article', { class: 'brief-goal' },
               h('div', { class: 'brief-goal-head' }, h('h3', null, goal.title), fraction(done, total)),
-              meter(done, total),
-              steps.length > 0 && h('ul', { class: 'brief-steps' }, steps.map((s) =>
-                h('li', { class: s.done ? 'is-done' : null }, s.title))))))
-          : h('p', { class: 'hint' }, 'No goals yet.'))));
+              meter(done, total))))
+          : h('p', { class: 'hint' }, 'No goals yet'),
+        { wide: true, href: '#/goals' })),
+
+    pillButton('copy', 'Export for Claude', async () => {
+      toast((await copy(exportForClaude(st, ui.day))) ? 'Copied — paste it into Claude' : 'Could not copy');
+    }, 'is-on pill-wide pill-export'));
 }
