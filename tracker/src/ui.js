@@ -257,6 +257,32 @@ let closing = 0; // таймер ухода вниз
 let closedNow = false; // закрыта в этом же обработчике — следующая шторка сменит содержимое на месте
 
 const SHEET_OUT = 280; // мс, как .sheet-layer.is-closing в стилях
+let returnKey = null; // data-key поля, где печатали до шторки
+
+/** Фокус в поле, каретка — в конец: Safari иначе ставит её в начало. */
+export function focusEnd(el) {
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  const n = el.value?.length;
+  if (n == null) return;
+  try {
+    el.setSelectionRange(n, n);
+  } catch {
+    /* у date и подобных полей каретки нет */
+  }
+}
+
+/**
+ * Шторка поверх клавиатуры не видна: клавиатура наезжает на низ экрана.
+ * Поэтому при открытии поле, где печатали, отпускает фокус (клавиатура
+ * прячется), а при закрытии получает его обратно.
+ */
+function hideKeyboard() {
+  const a = document.activeElement;
+  if (!a || sheetRoot.contains(a) || !a.matches('input, textarea, select, [contenteditable="true"]')) return;
+  returnKey = a.dataset.key ?? null;
+  a.blur();
+}
 
 /**
  * Шторка снизу. render() вызывается заново при каждой перерисовке приложения.
@@ -273,6 +299,8 @@ export function openSheet(render) {
     // меняется содержимое; открыли позже — прошлая уже ушла
     if (!closedNow) finishClose();
   }
+  // Дата → Календарь: закрытие уже вернуло фокус в поле — снова прячем
+  if (!panel || closedNow) hideKeyboard();
   const swap = Boolean(panel);
   sheetRender = render;
   renderSheet();
@@ -284,19 +312,26 @@ export function openSheet(render) {
   }
 }
 
-export function closeSheet() {
+/**
+ * Закрыть шторку. Поле, где печатали до неё, снова в фокусе — клавиатура
+ * возвращается. restore = false — при переходе на другой экран.
+ */
+export function closeSheet(restore = true) {
   if (!sheetRender) return;
   sheetRender = null;
+  const key = returnKey;
+  returnKey = null;
   if (calm()) {
     finishClose();
-    return;
+  } else {
+    sheetRoot.classList.add('is-closing');
+    closing = setTimeout(finishClose, SHEET_OUT);
+    closedNow = true;
+    queueMicrotask(() => {
+      closedNow = false;
+    });
   }
-  sheetRoot.classList.add('is-closing');
-  closing = setTimeout(finishClose, SHEET_OUT);
-  closedNow = true;
-  queueMicrotask(() => {
-    closedNow = false;
-  });
+  if (restore && key) focusEnd(document.querySelector(`[data-key="${CSS.escape(key)}"]`));
 }
 
 function finishClose() {
@@ -334,6 +369,20 @@ function drawSheet() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && sheetRender) closeSheet();
 });
+
+// Клавиатура iOS не сжимает страницу, а наезжает на неё. Слой шторки держится
+// видимой части экрана (--vv-top, --vv-h), и поле в шторке остаётся над клавиатурой
+const vv = window.visualViewport;
+if (vv) {
+  const fit = () => {
+    const st = document.documentElement.style;
+    st.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+    st.setProperty('--vv-h', `${Math.round(vv.height)}px`);
+  };
+  vv.addEventListener('resize', fit);
+  vv.addEventListener('scroll', fit);
+  fit();
+}
 
 /* ── нажатие ─────────────────────────────────────────────────────────── */
 

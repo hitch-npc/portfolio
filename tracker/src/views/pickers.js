@@ -2,7 +2,7 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet } from '../ui.js';
+import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -288,7 +288,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
         dateSheet(d, (v) => {
           Object.assign(d, v);
           refresh();
-          input.focus({ preventScroll: true });
+          focusEnd(input);
         }, { full: 'drop' });
       }, Boolean(d.day)),
       chip([icon('flag', 20), pri && h('span', null, pri)], 'Priority',
@@ -301,6 +301,6 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
 
   refresh();
   form.refresh = refresh;
-  form.focusInput = () => input.focus({ preventScroll: true });
+  form.focusInput = () => focusEnd(input);
   return form;
 }

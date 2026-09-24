@@ -111,7 +111,7 @@ function onRoute() {
   ui.confirm = null;
   ui.select = null;
   ui.query = '';
-  closeSheet();
+  closeSheet(false);
   window.scrollTo(0, 0);
   enter();
   if (route().name === 'today') focusInput();
