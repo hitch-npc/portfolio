@@ -101,8 +101,10 @@ const FULL = {
  * «Done» отдаёт его onDone, «Cancel» — ничего не меняет.
  * current — день, где задача уже стоит: он не считается переполненным.
  * full — что будет с полным днём: 'replace' | 'drop' | 'fit'.
+ * onReminder — есть у существующей задачи: строка Reminder применяет дату
+ * и открывает шторку Календаря (если день встал — полный день спросит замену).
  */
-export function dateSheet(value, onDone, { current = null, title = 'Date', full: whenFull = 'replace' } = {}) {
+export function dateSheet(value, onDone, { current = null, title = 'Date', full: whenFull = 'replace', onReminder = null } = {}) {
   const draft = { day: value.day ?? null, time: value.time ?? null, repeat: value.repeat ?? null };
   const set = (patch) => {
     Object.assign(draft, patch);
@@ -166,7 +168,18 @@ export function dateSheet(value, onDone, { current = null, title = 'Date', full:
                 // повтор без даты не бывает: без дня ставим на сегодня
                 set({ repeat: r, day: r && !draft.day ? today : draft.day });
               },
-            }, REPEATS.map(([v, text]) => h('option', { value: v, selected: (draft.repeat ?? 'none') === v }, text)))))),
+            }, REPEATS.map(([v, text]) => h('option', { value: v, selected: (draft.repeat ?? 'none') === v }, text))))),
+        onReminder && h('div', { class: ['row', !draft.day && 'is-off'] },
+          icon('bell'), h('span', { class: 'row-label' }, 'Reminder'),
+          h('button', {
+            class: 'pill', type: 'button', disabled: !draft.day,
+            onclick: () => {
+              closeSheet();
+              onDone({ ...draft });
+              // день мог не встать (полный — открыта шторка замены): тогда Календарь не открываем
+              if (value.id && store.getState().tasks.find((x) => x.id === value.id)?.day === draft.day) onReminder();
+            },
+          }, 'Calendar', icon('chevron', 20)))),
 
       full && h('p', { class: 'sheet-note' },
         `${dayLabel(draft.day, today)} is full — ${limit} of ${limit} planned. ${FULL[whenFull]}`),

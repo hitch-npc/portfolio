@@ -10,7 +10,7 @@ import {
   searchTasks, sphereCounts, sphereTasks,
 } from '../src/logic.js';
 import {
-  detect, makeBackup, packFiles, parseCSV, parseList, planImport, readBackup, readImportText,
+  detect, icsName, makeBackup, packFiles, parseCSV, parseList, planImport, readBackup, readImportText, toICS,
   normDate, normPriority, normRepeat, normStatus, normTime,
 } from '../src/io.js';
 
@@ -348,4 +348,36 @@ test('резервная копия: туда и обратно, вместе с
   assert.throws(() => readBackup({ ...copy, schema: 99 }));
   assert.equal(detect([1, 2]), null);
   assert.equal(detect({ foo: 1 }), null);
+});
+
+test('календарь: событие со временем, на весь день, повтор, оповещение, экранирование', () => {
+  const now = new Date('2026-09-24T05:16:00Z');
+  const timed = toICS(
+    { id: 't1', title: 'Call bank, re: card; now', day: '2026-09-25', time: '23:45', repeat: 'weekdays', note: 'line 1\nline 2', subtasks: [] },
+    { alert: '10', now, sphere: 'Personal' },
+  );
+  const lines = timed.split('\r\n');
+  assert.ok(timed.endsWith('\r\n') && !/[^\r]\n/.test(timed), 'строки через CRLF');
+  assert.ok(lines.includes('DTSTART:20260925T234500'));
+  assert.ok(lines.includes('DTEND:20260926T001500'), '30 минут через полночь — следующий день');
+  assert.ok(lines.includes('RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'));
+  assert.ok(lines.includes('TRIGGER:-PT10M'));
+  assert.ok(lines.includes('SUMMARY:Call bank\\, re: card\\; now'));
+  assert.ok(lines.includes('DESCRIPTION:Sphere: Personal\\n\\nline 1\\nline 2'));
+  assert.ok(lines.includes('UID:t1@tracker') && lines.includes('DTSTAMP:20260924T051600Z'));
+
+  const day = toICS({ id: 't2', title: 'Renew passport', day: '2026-12-31' }, { alert: 'morning', now }).split('\r\n');
+  assert.ok(day.includes('DTSTART;VALUE=DATE:20261231') && day.includes('DTEND;VALUE=DATE:20270101'));
+  assert.ok(day.includes('TRIGGER:PT9H'), 'весь день: оповещение в 9:00');
+  assert.ok(!day.some((l) => l.startsWith('RRULE')));
+  assert.ok(!toICS({ id: 't3', title: 'x', day: '2026-12-31' }, { alert: 'none', now }).includes('VALARM'));
+  assert.throws(() => toICS({ id: 't4', title: 'x', day: null }, { now }));
+
+  // длинная кириллица: строки не длиннее 75 байт, буквы и \n не разрезаны
+  const long = toICS({ id: 't5', title: 'Очень длинное название задачи, '.repeat(6), day: '2026-10-01' }, { now });
+  const raw = long.split('\r\n');
+  assert.ok(raw.every((l) => new TextEncoder().encode(l).length <= 75));
+  assert.equal(raw.map((l, i) => (i && l.startsWith(' ') ? l.slice(1) : `\n${l}`)).join('').includes('SUMMARY:Очень длинное'), true);
+  assert.ok(!raw.some((l) => l.endsWith('\\') && !l.endsWith('\\\\')), 'экранированная пара не разрезана');
+  assert.equal(icsName('a/b: c?'), 'a b c.ics');
 });

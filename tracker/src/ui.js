@@ -145,6 +145,7 @@ const ICONS = {
   share: `<path d="M12 15V4M8 8l4-4 4 4M7 11H5v9h14v-9h-2" ${S}/>`,
   updown: `<path d="M8 10l4-4 4 4M8 14l4 4 4-4" ${S}/>`,
   minus: `<path d="M5 12h14" ${S}/>`,
+  bell: `<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15z" ${S}/><path d="M10 21.5h4" ${S}/>`,
 };
 
 /**
