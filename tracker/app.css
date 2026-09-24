@@ -1926,6 +1926,23 @@ body:has(.select-bar) .toast {
   color: var(--ink-muted);
 }
 
+.sheet-strong {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.sheet-setting {
+  margin: 18px 0 16px;
+}
+
+.sheet-hint {
+  margin: 12px 4px 14px;
+}
+
+.row .pill:disabled {
+  opacity: 0.4;
+}
+
 .sheet-options {
   display: grid;
   gap: var(--gap);

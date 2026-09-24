@@ -478,3 +478,93 @@ export function readImportText(name, src, today) {
   if (/\.(csv|tsv)$/i.test(name)) return parseCSV(trimmed);
   return parseList(trimmed, today);
 }
+
+/* ── файл календаря (.ics) ────────────────────────────────────────────── */
+
+/** Когда напомнить: для задачи со временем — минуты до начала, для дня без времени — от полуночи. */
+export const ALERTS_TIMED = [
+  ['0', 'At time', 'PT0S'],
+  ['10', '10 min before', '-PT10M'],
+  ['60', '1 hour before', '-PT1H'],
+  ['1440', '1 day before', '-P1D'],
+  ['none', 'No alert', null],
+];
+export const ALERTS_DAY = [
+  ['morning', 'Morning, 9:00', 'PT9H'],
+  ['eve', 'Day before, 9:00', '-PT15H'],
+  ['none', 'No alert', null],
+];
+
+const RRULES = {
+  daily: 'FREQ=DAILY',
+  weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+  weekly: 'FREQ=WEEKLY',
+  monthly: 'FREQ=MONTHLY',
+};
+
+/** Запятая, точка с запятой, обратная косая и перенос строки в тексте iCalendar экранируются. */
+const icsText = (s) => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+/**
+ * Строки длиннее 75 байт переносятся с пробелом в начале продолжения.
+ * Не режутся пополам ни буква в UTF-8, ни экранированная пара вроде \n.
+ */
+function fold(line) {
+  const enc = new TextEncoder();
+  const out = [];
+  let cur = '';
+  let bytes = 0;
+  for (const ch of line.match(/\\.|[\s\S]/gu) ?? []) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > (out.length ? 74 : 75)) {
+      out.push(cur);
+      cur = '';
+      bytes = 0;
+    }
+    cur += ch;
+    bytes += n;
+  }
+  out.push(cur);
+  return out.join('\r\n ');
+}
+
+const stampUTC = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+/**
+ * Событие календаря для задачи с днём. Время — «плавающее» (без часового
+ * пояса): 10:30 значит 10:30 там, где телефон. Со временем — событие
+ * на 30 минут, без времени — на весь день. Повтор — RRULE, напоминание — VALARM.
+ * alert — значение из ALERTS_TIMED / ALERTS_DAY.
+ */
+export function toICS(t, { alert, now = new Date(), sphere = null } = {}) {
+  if (!t.day) throw new Error('Task has no date');
+  const d = t.day.replace(/-/g, '');
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tracker//Personal task tracker//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${t.id}@tracker`, `DTSTAMP:${stampUTC(now)}`, `SUMMARY:${icsText(t.title)}`,
+  ];
+  if (t.time) {
+    const [hh, mm] = t.time.split(':').map(Number);
+    const end = new Date(Date.UTC(2000, 0, 1, hh, mm + 30));
+    const endDay = end.getUTCDate() > 1 ? addDays(t.day, 1).replace(/-/g, '') : d;
+    const pad = (n) => String(n).padStart(2, '0');
+    lines.push(`DTSTART:${d}T${pad(hh)}${pad(mm)}00`, `DTEND:${endDay}T${pad(end.getUTCHours())}${pad(end.getUTCMinutes())}00`);
+  } else {
+    lines.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${addDays(t.day, 1).replace(/-/g, '')}`);
+  }
+  if (RRULES[t.repeat]) lines.push(`RRULE:${RRULES[t.repeat]}`);
+  const about = [
+    sphere && `Sphere: ${sphere}`,
+    t.note?.trim(),
+    t.subtasks?.length && t.subtasks.map((s) => `${s.done ? '✓' : '–'} ${s.title}`).join('\n'),
+  ].filter(Boolean).join('\n\n');
+  if (about) lines.push(`DESCRIPTION:${icsText(about)}`);
+  const trigger = [...ALERTS_TIMED, ...ALERTS_DAY].find(([v]) => v === alert)?.[2];
+  if (trigger) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText(t.title)}`, `TRIGGER:${trigger}`, 'END:VALARM');
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return `${lines.map(fold).join('\r\n')}\r\n`;
+}
+
+/** Имя файла из названия задачи: без символов, которые не любят файловые системы. */
+export const icsName = (title) =>
+  `${title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40).trim() || 'task'}.ics`;

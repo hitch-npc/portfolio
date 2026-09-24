@@ -7,6 +7,7 @@ import { addDays, dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { PRIORITIES, REPEATS, STATUSES, activeSpheres, dayLimit, dayTasks } from '../logic.js';
 import * as store from '../store.js';
 import { dateSheet, sphereSheet } from './pickers.js';
+import { calendarSheet } from './calendar.js';
 import { filesField } from './files.js';
 
 /** Состояние интерфейса, которого нет в данных. */
@@ -330,8 +331,12 @@ function taskCard(t) {
       pills([[today, 'Today'], [tomorrow, 'Tomorrow']], t.day, (v) => (v ? requestPlan(t, v) : store.unplanTask(t.id)), 'Date'),
       h('button', {
         class: ['pill', other && 'is-on'], type: 'button', 'aria-label': 'Pick a date, time or repeat',
-        onclick: () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), { current: t.day }),
+        onclick: () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), {
+          current: t.day, onReminder: () => calendarSheet(t.id),
+        }),
       }, icon('calendar', 20), extra || null)),
+    !done && t.day && field('Remind',
+      h('button', { class: 'pill', type: 'button', onclick: () => calendarSheet(t.id) }, icon('bell', 20), 'Add to Calendar')),
     field('Status', pills(STATUSES, t.status, (v) => v && store.setStatus(t.id, v), 'Status')),
     field('Sphere', h('div', { class: 'pills-scroll' },
       pills(spheres, t.sphereId ?? null, (v) => store.updateTask(t.id, { sphereId: v }), 'Sphere'))),

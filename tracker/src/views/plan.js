@@ -10,6 +10,7 @@ import { dayTasks, planGroups } from '../logic.js';
 import * as store from '../store.js';
 import { ui, header, requestPlan, emptySlots, iconButton } from './common.js';
 import { dateSheet } from './pickers.js';
+import { calendarSheet } from './calendar.js';
 
 function candidate(t, picked, spheres, showSphere, showDay) {
   const num = picked.get(t.id);
@@ -30,7 +31,9 @@ function candidate(t, picked, spheres, showSphere, showDay) {
           due && h('span', { class: due.late ? 'is-late' : null }, due.text),
         ])))),
     iconButton('calendar', `Pick a date for “${t.title}”`,
-      () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), { current: t.day }), 'pick-date', 20));
+      () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), {
+        current: t.day, onReminder: () => calendarSheet(t.id),
+      }), 'pick-date', 20));
 }
 
 /** Части подписи через точку; пустые пропускаются. */
