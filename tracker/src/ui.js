@@ -73,8 +73,8 @@ const LIVE = {
   // сегодня — солнце: кольцо и лучи от него, по лучам бежит свет
   today: `${GOO}<g ${G}><circle cx="12" cy="12" r="4"/>${sunRays}</g>`,
   // план — Луна: два кольца, одно проходит по другому — сменяются фазы
-  plan: `${GOO}<g ${G}><circle cx="10" cy="12" r="7"/>
-    <circle cx="14" cy="12" r="7"><animate attributeName="cx" dur="5s" ${loop} values="14;18;14" keyTimes="0;.5;1" ${ease}/></circle></g>`,
+  plan: `${GOO}<g ${G}><circle cx="9" cy="12" r="6.5"/>
+    <circle cx="13" cy="12" r="6.5"><animate attributeName="cx" dur="5s" ${loop} values="12.5;15.5;12.5" keyTimes="0;.5;1" ${ease}/></circle></g>`,
   // сферы — гироскоп: кольцо и эллипс, который кувыркается вокруг него
   spheres: `${GOO}<g ${G}><circle cx="12" cy="12" r="7.5"/>
     <g transform="rotate(-10 12 12)"><ellipse cx="12" cy="12" rx="0.4" ry="10.5"><animate attributeName="rx" dur="5s" ${loop} values="0.4;7;2;7.5;0.4" keyTimes="0;.3;.5;.75;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1;.45 0 .55 1"/></ellipse>
@@ -105,6 +105,8 @@ export function sectionIcon(name, live = false) {
   const el = svg('0 0 24 24', LIVE[name].replaceAll('__ID__', `goo-${++gooId}`), `icon icon-${name}`);
   el.setAttribute('width', 24);
   el.setAttribute('height', 24);
+  // в движении кольца и эллипс подходят к краю поля — ничего не срезаем
+  el.setAttribute('overflow', 'visible');
   if (!live) el.querySelectorAll('animate, animateTransform, animateMotion').forEach((n) => n.remove());
   return el;
 }
