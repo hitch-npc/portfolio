@@ -252,27 +252,79 @@ export function toast(message) {
 
 let sheetRender = null;
 let sheetRoot;
+let panel = null; // сама шторка: живёт, пока открыта, перерисовывается только содержимое
+let closing = 0; // таймер ухода вниз
+let closedNow = false; // закрыта в этом же обработчике — следующая шторка сменит содержимое на месте
 
-/** Шторка снизу. render() вызывается заново при каждой перерисовке приложения. */
+const SHEET_OUT = 280; // мс, как .sheet-layer.is-closing в стилях
+
+/**
+ * Шторка снизу. render() вызывается заново при каждой перерисовке приложения.
+ * Выезжает один раз при открытии: тапы внутри меняют содержимое, а не
+ * запускают появление заново; уходит вниз при закрытии.
+ */
 export function openSheet(render) {
+  sheetRoot ??= document.getElementById('sheet');
+  if (closing) {
+    clearTimeout(closing);
+    closing = 0;
+    sheetRoot.classList.remove('is-closing');
+    // закрыли и тут же открыли другую (дата → Календарь) — шторка остаётся,
+    // меняется содержимое; открыли позже — прошлая уже ушла
+    if (!closedNow) finishClose();
+  }
+  const swap = Boolean(panel);
   sheetRender = render;
   renderSheet();
+  if (swap) panel.scrollTop = 0;
+  if (swap && !calm()) {
+    panel.classList.remove('is-swapping');
+    void panel.offsetWidth; // перезапуск анимации содержимого
+    panel.classList.add('is-swapping');
+  }
 }
 
 export function closeSheet() {
+  if (!sheetRender) return;
   sheetRender = null;
-  renderSheet();
+  if (calm()) {
+    finishClose();
+    return;
+  }
+  sheetRoot.classList.add('is-closing');
+  closing = setTimeout(finishClose, SHEET_OUT);
+  closedNow = true;
+  queueMicrotask(() => {
+    closedNow = false;
+  });
 }
 
-export function renderSheet() {
+function finishClose() {
+  clearTimeout(closing);
+  closing = 0;
+  panel = null;
+  sheetRoot.classList.remove('is-closing');
+  sheetRoot.replaceChildren();
+  sheetRoot.hidden = true;
+}
+
+/** Перерисовать шторку (свой черновик у шторки даты, Календаря и т. п.). */
+export const renderSheet = () => settlePress(drawSheet);
+
+function drawSheet() {
   sheetRoot ??= document.getElementById('sheet');
   if (!sheetRender) {
-    sheetRoot.replaceChildren();
-    sheetRoot.hidden = true;
+    if (!closing && panel) finishClose();
+    return;
+  }
+  if (panel) {
+    panel.classList.remove('is-swapping'); // проявление — один раз, не на каждый тап
+    panel.replaceChildren();
+    append(panel, [sheetRender()]);
     return;
   }
   sheetRoot.hidden = false;
-  const panel = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }, sheetRender());
+  panel = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }, sheetRender());
   sheetRoot.replaceChildren(
     h('div', { class: 'sheet-scrim', onclick: closeSheet }),
     panel,
@@ -282,6 +334,212 @@ export function renderSheet() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && sheetRender) closeSheet();
 });
+
+/* ── нажатие ─────────────────────────────────────────────────────────── */
+
+// iOS включает :active (кнопка проседает под пальцем), только если страница слушает касания
+document.addEventListener('touchstart', () => {}, { passive: true });
+
+const PRESSABLE = '.pill, .chip, .icon-btn, .check, .pick, .replace, .glyph-pick, .compose-chip, .compose-send, .quick-pick, .bump, .switch';
+const RELEASE_MS = 500;
+let pressed = null; // { el, at, from, start }
+let settling = 0; // вложенный вызов (шторка внутри перерисовки экрана) — только рисует
+
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
+  pressed = el && { el, at: performance.now() };
+}, { capture: true, passive: true });
+document.addEventListener('pointercancel', () => {
+  pressed = null;
+}, { capture: true, passive: true });
+
+/** Место узла: номера детей от #main или #sheet — они не перерисовываются. */
+function pathOf(el) {
+  const path = [];
+  while (el.parentElement && el.id !== 'main' && el.id !== 'sheet') {
+    path.unshift(Array.prototype.indexOf.call(el.parentElement.children, el));
+    el = el.parentElement;
+  }
+  return el.id === 'main' || el.id === 'sheet' ? { root: el, path } : null;
+}
+
+/** Та же кнопка: вид, задача и надпись совпадают (номер в кружке может смениться). */
+const keyOf = (el) => [
+  el.tagName, el.classList[0], el.closest('[data-id]')?.dataset.id,
+  el.querySelector('.task-title')?.textContent ?? el.getAttribute('aria-label') ?? el.textContent,
+].join('|');
+
+/**
+ * Тап перерисовывает экран, и нажатая кнопка — уже новый узел: без этого она
+ * рывком вставала бы в полный размер и мгновенно меняла цвет. Здесь отпускание
+ * доигрывается на новой кнопке: мягкий возврат из нажатия, цвет перетекает,
+ * у переключателя едет бегунок.
+ */
+export function settlePress(render) {
+  if (settling) {
+    render();
+    return;
+  }
+  const p = pressed;
+  const live = p && p.el.isConnected && performance.now() - p.at < 1500 && !calm();
+  const where = live ? pathOf(p.el) : null;
+  if (where && !p.from) {
+    const cs = getComputedStyle(p.el);
+    const knob = p.el.querySelector('.switch-knob');
+    p.from = { key: keyOf(p.el), bg: cs.backgroundColor, color: cs.color, knob: knob && getComputedStyle(knob).transform };
+  }
+  settling += 1;
+  try {
+    render();
+  } finally {
+    settling -= 1;
+  }
+  if (!where || p.el.isConnected) return;
+  let n = where.root;
+  for (const i of where.path) n = n?.children[i];
+  if (!n || keyOf(n) !== p.from.key) {
+    // рядом появилось или пропало что-то (время перед переключателем) — ищем
+    // ту же кнопку по надписи, если она такая одна
+    const same = [...where.root.querySelectorAll(PRESSABLE)].filter((el) => keyOf(el) === p.from.key);
+    if (same.length !== 1) return;
+    [n] = same;
+  }
+  p.el = n; // вторая перерисовка в том же тапе найдёт уже эту кнопку
+  p.start ??= performance.now();
+  const t = performance.now() - p.start;
+  if (t >= RELEASE_MS) return;
+  const cs = getComputedStyle(n);
+  const play = (el, frames, ms, easing) => {
+    el.animate(frames, { duration: ms, easing }).currentTime = Math.min(t, ms);
+  };
+  play(n, [{ transform: 'scale(0.95)' }, { transform: 'none' }], RELEASE_MS, 'cubic-bezier(0.34, 1.3, 0.64, 1)');
+  if (p.from.bg !== cs.backgroundColor || p.from.color !== cs.color) {
+    play(n, [{ backgroundColor: p.from.bg, color: p.from.color }, { backgroundColor: cs.backgroundColor, color: cs.color }], 260, 'ease');
+  }
+  const knob = n.querySelector('.switch-knob');
+  if (knob && p.from.knob) {
+    play(knob, [{ transform: p.from.knob }, { transform: getComputedStyle(knob).transform }], 380, 'cubic-bezier(0.34, 1.3, 0.64, 1)');
+  }
+}
+
+/* ── смахивание ──────────────────────────────────────────────────────── */
+
+const SWIPE_W = 88; // на сколько уезжает строка — ширина кнопки и зазор
+let swiped = null; // открытая строка
+let blockClick = 0; // до этого момента тап не срабатывает: палец смахивал, а не нажимал
+
+document.addEventListener('click', (e) => {
+  if (performance.now() < blockClick) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
+// тап мимо открытой строки только закрывает её — как в Почте
+document.addEventListener('pointerdown', (e) => {
+  if (swiped && !swiped.contains(e.target)) {
+    shut();
+    blockClick = performance.now() + 450;
+  }
+}, true);
+
+function paint(row, x) {
+  row.querySelector('.swipe-body').style.transform = x ? `translateX(${x}px)` : '';
+  row.style.setProperty('--reveal', String(Math.min(1, Math.max(0, -x / SWIPE_W))));
+}
+
+function settle(row, open) {
+  row.classList.remove('is-dragging');
+  paint(row, open ? -SWIPE_W : 0);
+  if (open) swiped = row;
+  else if (swiped === row) swiped = null;
+}
+
+function shut() {
+  if (swiped?.isConnected) settle(swiped, false);
+  swiped = null;
+}
+
+/**
+ * Смахивание влево открывает кнопку под строкой ([data-swipe] с .swipe-body
+ * и .swipe-action внутри). Прокрутке не мешает: вертикальное движение
+ * отдаётся странице (touch-action: pan-y в стилях).
+ */
+export function swipeable(list) {
+  list.addEventListener('focusin', (e) => {
+    // с клавиатуры кнопку не смахнуть — фокус на ней открывает строку
+    if (e.target.matches('.swipe-action')) settle(e.target.closest('[data-swipe]'), true);
+  });
+  list.addEventListener('pointerdown', (e) => {
+    const row = e.target.closest('[data-swipe]');
+    if (!row || e.button > 0 || e.target.closest('.swipe-action')) return;
+    const base = swiped === row ? -SWIPE_W : 0;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let x = base;
+    let mode = null; // 'x' — смахивание, 'y' — прокрутка
+    let last = { x: x0, t: e.timeStamp };
+    let v = 0;
+    const move = (ev) => {
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      if (!mode) {
+        if (Math.hypot(dx, dy) < 8) return;
+        mode = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+        if (mode === 'y') {
+          stop();
+          return;
+        }
+        row.classList.add('is-dragging');
+      }
+      x = base + dx;
+      if (x > 0) x /= 5; // вправо открывать нечего — только упругость
+      if (x < -SWIPE_W) x = -SWIPE_W + (x + SWIPE_W) / 3;
+      v = (ev.clientX - last.x) / Math.max(1, ev.timeStamp - last.t);
+      last = { x: ev.clientX, t: ev.timeStamp };
+      paint(row, x);
+    };
+    const up = () => {
+      stop();
+      if (mode === 'x') {
+        blockClick = performance.now() + 400;
+        // бросок решает быстрее, чем положение
+        settle(row, v < -0.3 || (v <= 0.3 && x < -SWIPE_W / 2));
+      } else if (!mode && swiped === row) {
+        blockClick = performance.now() + 400; // тап по открытой строке закрывает её
+        settle(row, false);
+      }
+    };
+    const cancel = () => {
+      stop();
+      if (mode === 'x') settle(row, x < -SWIPE_W / 2);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  });
+  return list;
+}
+
+/** Строка уходит влево и схлопывается, потом done() удаляет её из данных. */
+export function removeRow(row, done) {
+  swiped = null;
+  if (calm()) {
+    done();
+    return;
+  }
+  row.style.height = `${row.offsetHeight}px`;
+  row.classList.add('is-removing');
+  requestAnimationFrame(() => {
+    row.style.height = '0px';
+  });
+  setTimeout(done, 280);
+}
 
 /* ── перетаскивание ──────────────────────────────────────────────────── */
 

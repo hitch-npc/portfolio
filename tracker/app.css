@@ -27,6 +27,13 @@
   --dots: radial-gradient(circle, var(--ink-muted) 0.75px, transparent 1.1px) 0 0 / 10px 10px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  /* нажатие: вниз быстро, обратно мягко и с лёгким перелётом — как у iOS */
+  --press: 0.95;
+  --press-in: 0.1s;
+  --release: 0.5s cubic-bezier(0.34, 1.3, 0.64, 1);
+  /* шторка: выезд с долгим торможением, уход — с разгоном */
+  --sheet-in: 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+  --sheet-out: 0.28s cubic-bezier(0.4, 0, 1, 1);
 
   --r-card: 22px;
   --r-sheet: 24px;
@@ -72,6 +79,14 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* двойной тап не увеличивает экран: быстрые тапы по −/+ и по списку — это
+   ввод, а не жест. Щипок для увеличения остаётся */
+*,
+*::before,
+*::after {
+  touch-action: manipulation;
+}
+
 /* бумажное зерно поверх всего экрана; касания проходят насквозь */
 body::after {
   content: '';
@@ -99,10 +114,17 @@ button {
   text-align: inherit;
 }
 
+a,
+.task-main,
+.fold-head {
+  transition: opacity 0.35s ease;
+}
+
 a:active,
 .task-main:active,
 .fold-head:active {
   opacity: 0.6;
+  transition-duration: var(--press-in);
 }
 
 .pill,
@@ -111,8 +133,12 @@ a:active,
 .check,
 .pick,
 .replace,
-.glyph-pick {
-  transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
+.glyph-pick,
+.compose-chip,
+.compose-send,
+.quick-pick,
+.bump {
+  transition: transform var(--release), background-color 0.25s ease, color 0.25s ease;
 }
 
 .pill:active,
@@ -121,8 +147,13 @@ a:active,
 .pick:active,
 .replace:active,
 .glyph-pick:active,
-.add .chip:active {
-  transform: scale(0.93);
+.add .chip:active,
+.compose-chip:active,
+.compose-send:active,
+.quick-pick:active,
+.bump:active {
+  transform: scale(var(--press));
+  transition: transform var(--press-in) var(--ease), background-color 0.25s ease, color 0.25s ease;
 }
 
 a {
@@ -1165,7 +1196,7 @@ textarea:focus-visible {
   position: relative;
   display: grid;
   place-items: center;
-  transition: transform 0.14s var(--ease);
+  transition: transform var(--release);
 }
 
 .tab.is-on .tab-icon {
@@ -1174,6 +1205,7 @@ textarea:focus-visible {
 
 .tab:active .tab-icon {
   transform: scale(0.88);
+  transition: transform var(--press-in) var(--ease);
 }
 
 .tab-dot {
@@ -1230,12 +1262,41 @@ textarea:focus-visible {
   padding: 22px var(--pad) calc(16px + var(--safe-bottom));
   background: var(--bg);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
-  animation: sheet-in 0.22s ease-out;
+  animation: sheet-in var(--sheet-in) both;
 }
 
+/* выезжает целиком снизу; внутри тапы меняют только содержимое */
 @keyframes sheet-in {
   from {
-    transform: translateY(24px);
+    transform: translateY(100%);
+  }
+}
+
+/* одна шторка сменила другую (Дата → Календарь): содержимое проявляется */
+.sheet.is-swapping > * {
+  animation: rise 0.36s var(--ease) both;
+}
+
+.sheet-layer.is-closing {
+  pointer-events: none;
+}
+
+.sheet-layer.is-closing .sheet {
+  animation: sheet-out var(--sheet-out) both;
+}
+
+.sheet-layer.is-closing .sheet-scrim {
+  animation: fade-out var(--sheet-out) both;
+}
+
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade-out {
+  to {
     opacity: 0;
   }
 }
@@ -1699,7 +1760,6 @@ body:has(.select-bar) .toast {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
 }
 
 .compose-chip .glyph {
@@ -1713,11 +1773,6 @@ body:has(.select-bar) .toast {
   color: var(--bg);
 }
 
-.compose-chip:active,
-.compose-send:active {
-  transform: scale(0.93);
-}
-
 .compose-send {
   display: grid;
   place-items: center;
@@ -1727,7 +1782,6 @@ body:has(.select-bar) .toast {
   border-radius: var(--r-pill);
   background: var(--bg-alt);
   color: var(--ink-muted);
-  transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
 }
 
 .compose-send.is-ready {
@@ -1771,8 +1825,13 @@ body:has(.select-bar) .toast {
   font-weight: 600;
 }
 
+.menu-item {
+  transition: background-color 0.3s ease;
+}
+
 .menu-item:active {
   background: var(--ink-muted);
+  transition-duration: var(--press-in);
 }
 
 .menu-check {
@@ -1829,11 +1888,6 @@ body:has(.select-bar) .toast {
   padding: 14px 4px 12px;
   background: var(--bg-card);
   border-radius: var(--r-card);
-  transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
-}
-
-.quick-pick:active {
-  transform: scale(0.95);
 }
 
 .quick-pick .icon {
@@ -2132,8 +2186,13 @@ body:has(.select-bar) .toast {
   white-space: nowrap;
 }
 
+.bar-btn {
+  transition: background-color 0.3s ease;
+}
+
 .bar-btn:active {
   background: var(--ink-muted);
+  transition-duration: var(--press-in);
 }
 
 .bar-btn:disabled {
@@ -2249,6 +2308,62 @@ body:has(.select-bar) .toast {
   color: var(--ink-muted);
 }
 
+/* смахивание влево: строка уезжает, под ней — чёрная «Delete».
+   Вертикаль остаётся странице, горизонталь — строке */
+[data-swipe] {
+  position: relative;
+  touch-action: pan-y;
+}
+
+.swipe-body {
+  position: relative;
+  transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.swipe-action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 82px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--r-card);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: var(--reveal, 0);
+  transform: scale(calc(0.6 + 0.4 * var(--reveal, 0)));
+  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.is-dragging .swipe-body,
+.is-dragging .swipe-action {
+  transition: none;
+}
+
+/* палец ведёт строку — кнопка под ним не проседает */
+.is-dragging .pick:active {
+  transform: none;
+}
+
+.pick-row.is-removing {
+  overflow: hidden;
+  margin-bottom: calc(-1 * var(--gap));
+  opacity: 0;
+  transition: height 0.28s var(--ease), margin 0.28s var(--ease), opacity 0.2s ease;
+}
+
+.is-removing .swipe-body {
+  transform: translateX(-40%);
+  transition: transform 0.28s var(--ease);
+}
+
 .goal-progress.is-value {
   flex-direction: column;
   align-items: stretch;
@@ -2292,11 +2407,6 @@ body:has(.select-bar) .toast {
   background: var(--bg);
   font-size: 17px;
   font-weight: 600;
-  transition: transform 0.14s var(--ease);
-}
-
-.bump:active {
-  transform: scale(0.94);
 }
 
 .bump:disabled {
@@ -2441,7 +2551,7 @@ body:has(.select-bar) .toast {
 }
 
 .sheet-scrim {
-  animation: fade 0.22s ease both;
+  animation: fade 0.4s ease both;
 }
 
 @keyframes rise {
