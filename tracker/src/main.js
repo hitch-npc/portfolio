@@ -4,7 +4,6 @@
  * каждого изменения. В полночь «сегодня» сдвигается само.
  */
 import { h, keepFocus, renderSheet, closeSheet, toast, sectionIcon, calm } from './ui.js';
-import { showPreloader } from './preloader.js';
 import { addDays, todayISO } from './dates.js';
 import { overdue } from './logic.js';
 import * as store from './store.js';
@@ -118,24 +117,17 @@ async function boot() {
     console.error(err);
     toast('Could not save — check storage space');
   });
-  const pre = showPreloader();
-  pre.progress(0.2);
   buildNav();
 
   try {
     await store.load();
   } catch (err) {
     console.error(err);
-    pre.done();
     main.replaceChildren(h('p', { class: 'hint' }, 'Storage is unavailable. In Safari, private browsing blocks it.'));
     return;
   }
-  pre.progress(0.65);
-  await document.fonts.ready;
-  pre.progress(0.9);
 
   enter();
-  pre.done();
   if (route().name === 'today') focusInput();
   window.addEventListener('hashchange', onRoute);
 

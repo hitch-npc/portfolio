@@ -5,7 +5,7 @@
  * Трекер живёт рядом с портфолио, в dist/tracker/, и сборщика ему не нужно:
  * модули и CSS браузер берёт как есть. Здесь три дела:
  *
- *   1. скопировать tracker/ в dist/tracker/ (тесты и README — нет);
+ *   1. скопировать tracker/ в dist/tracker/ (тесты, архив и README — нет);
  *   2. вписать в service worker версию и список файлов для офлайна.
  *      Версия — хэш содержимого: поменялся любой файл → новый кэш
  *      у всех установок, не поменялось ничего → кэш тот же;
@@ -25,7 +25,7 @@ import { dirname, join, relative, extname } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'tracker');
 const OUT = join(ROOT, 'dist', 'tracker');
-const SKIP = new Set(['test', 'README.md']);
+const SKIP = new Set(['test', 'archive', 'README.md']);
 // что может лежать в приложении; всё прочее — повод остановиться и посмотреть
 const ALLOWED = new Set(['.html', '.css', '.js', '.webmanifest', '.woff2', '.png', '.txt']);
 
