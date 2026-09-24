@@ -33,7 +33,7 @@
   --r-sm: 14px;
   --r-pill: 999px;
 
-  --font: 'Commissioner', -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font: 'Geist', -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   --pad: 16px;
   --gap: 6px;
   --nav-h: 80px;
@@ -1748,6 +1748,25 @@ textarea:focus-visible {
   from {
     opacity: 0;
   }
+}
+
+/* ── капс ────────────────────────────────────────────────────────────── */
+
+/* ключевые места набраны капсом — гротеск звучит громче. Названия задач,
+   заметки и подписи под задачами — текст пользователя, их регистр не трогаем */
+.title,
+.label,
+.stat-label,
+.tile-label,
+.tile-name,
+.tab-label,
+.week-day,
+.fold-head > span:first-child,
+.field-label,
+.pill-action,
+.back,
+.sheet-title {
+  text-transform: uppercase;
 }
 
 @media (prefers-reduced-motion: reduce) {

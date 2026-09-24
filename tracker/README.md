@@ -47,11 +47,11 @@ triangle ring half diamond`.
 
 ## Шрифт
 
-Commissioner (The Commissioner Project Authors, SIL OFL 1.1) — гротеск
-с кириллицей, по пропорциям ближе всего к Switzer. Файлы и лицензия —
-в `tracker/fonts`, кредит — в Settings. Switzer (Fontshare, ITF FFL)
-не подошёл: в нём нет кириллицы, а его лицензия не разрешает держать
-файлы в открытом репозитории.
+Geist (The Geist Project Authors / Vercel, SIL OFL 1.1) — гротеск
+с кириллицей. Файлы и лицензия — в `tracker/fonts`, кредит — в Settings.
+Межбуквенные — как в шрифте; заголовки, подписи, вкладки и кнопки — капсом.
+Switzer (Fontshare, ITF FFL) не подошёл: в нём нет кириллицы, а его
+лицензия не разрешает держать файлы в открытом репозитории.
 
 ## Устройство
 
@@ -72,7 +72,7 @@ Commissioner (The Commissioner Project Authors, SIL OFL 1.1) — гротеск
 ```
 npm run test:tracker    # правила без браузера (входит в npm run check)
 npm run build:tracker   # dist/tracker; в npm run build идёт последним
-npm run tracker:fonts   # один раз на смену шрифта: Commissioner → tracker/fonts
+npm run tracker:fonts   # один раз на смену шрифта: Geist → tracker/fonts
 npm run tracker:icons   # один раз на смену иконки: PNG → tracker/icons
 ```
 

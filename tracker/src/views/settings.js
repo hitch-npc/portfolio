@@ -124,5 +124,5 @@ export function settingsView() {
         picker)),
     h('p', { class: 'version' }, `Version ${VERSION}`),
     // кредит шрифта: лицензия OFL его не требует, но автору — спасибо
-    h('p', { class: 'credit' }, 'Typeface: Commissioner by The Commissioner Project Authors, SIL Open Font License 1.1.'));
+    h('p', { class: 'credit' }, 'Typeface: Geist by The Geist Project Authors (Vercel), SIL Open Font License 1.1.'));
 }

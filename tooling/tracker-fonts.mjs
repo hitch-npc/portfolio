@@ -2,12 +2,11 @@
 /**
  * Трекер — шрифт
  * ──────────────
- * Забирает Commissioner с Google Fonts в tracker/fonts. Запускается руками,
+ * Забирает Geist с Google Fonts в tracker/fonts. Запускается руками,
  * один раз на смену шрифта: приложение работает офлайн, и браузер к Google
  * не ходит ни за CSS, ни за файлами.
  *
- * Commissioner — самый близкий к Switzer по пропорциям из гротесков
- * с кириллицей (у Switzer её нет, а задачи пишутся по-русски). Лицензия
+ * Geist — гротеск с кириллицей (задачи пишутся по-русски). Лицензия
  * SIL OFL 1.1 разрешает держать файлы в публичном репозитории — она рядом.
  *
  * Подмножества — latin и cyrillic с их -ext: браузер скачивает файл, только
@@ -24,7 +23,7 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'tracker', 'fonts');
 
-const FAMILY = { css: 'Commissioner:wght@400..800', dir: 'commissioner', file: 'commissioner', name: 'Commissioner' };
+const FAMILY = { css: 'Geist:wght@400..800', dir: 'geist', file: 'geist', name: 'Geist' };
 const SUBSETS = new Set(['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext']);
 
 // без современного UA Google отдаёт ttf вместо woff2
