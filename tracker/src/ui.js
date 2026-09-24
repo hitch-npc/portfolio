@@ -185,6 +185,12 @@ const GLYPH_SVG = {
 
 export const glyph = (name) => svg('0 0 14 14', `<g fill="currentColor">${GLYPH_SVG[name] ?? GLYPH_SVG.circle}</g>`, 'glyph');
 
+/**
+ * Глиф сферы (без сферы — «Входящие»). В оформлении Colour — в кружке цвета
+ * сферы; в Minimal обёртка ничего не меняет (display: contents).
+ */
+export const sphereMark = (s) => h('span', { class: 'sc-mark', 'data-sc': s?.color }, glyph(s ? s.glyph : 'inbox'));
+
 /* ── перерисовка без потери фокуса ───────────────────────────────────── */
 
 /**

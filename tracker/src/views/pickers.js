@@ -2,7 +2,7 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
+import { h, icon, glyph, sphereMark, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -27,7 +27,7 @@ const keep = (e) => e.preventDefault();
 
 /**
  * Меню под якорем, внутри host (position: relative). items — [value, label, mark, on];
- * mark — глиф сферы или имя иконки. Повторный тап по якорю закрывает меню.
+ * mark — имя глифа, 'icon:имя' или готовый узел (sphereMark). Повторный тап по якорю закрывает меню.
  */
 export function menu(host, items, onPick, label) {
   const again = menuEl && menuEl.parentElement === host && menuEl.dataset.label === label;
@@ -41,7 +41,7 @@ export function menu(host, items, onPick, label) {
         onclick: () => { haptic(); closeMenu(); onPick(value); },
       },
         h('span', { class: 'menu-check' }, on && icon('check', 20)),
-        h('span', { class: 'menu-mark' }, mark && (mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
+        h('span', { class: 'menu-mark' }, mark && (mark instanceof Node ? mark : mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
         h('span', null, text))));
   host.append(menuEl);
   place(menuEl, host);
@@ -67,7 +67,7 @@ function place(el, host) {
 
 const sphereItems = (current) => [
   [null, 'Inbox', 'inbox', current == null],
-  ...activeSpheres(store.getState()).map((s) => [s.id, s.name, s.glyph, current === s.id]),
+  ...activeSpheres(store.getState()).map((s) => [s.id, s.name, sphereMark(s), current === s.id]),
 ];
 
 /* ── подпись даты ────────────────────────────────────────────────────── */
@@ -208,7 +208,7 @@ export function sphereSheet(onPick, title = 'Move to') {
     h('h2', { class: 'sheet-title' }, title),
     h('div', { class: 'sheet-options' }, sphereItems(undefined).map(([id, name, g]) =>
       h('button', { class: 'replace', type: 'button', onclick: () => { closeSheet(); onPick(id); } },
-        glyph(g), h('span', { class: 'replace-title' }, name)))),
+        g instanceof Node ? g : glyph(g), h('span', { class: 'replace-title' }, name)))),
     h('button', { class: 'pill pill-action pill-wide', type: 'button', onclick: closeSheet }, 'Cancel'),
   ]);
 }
@@ -299,9 +299,9 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     });
   }
 
-  function chip(content, label, onclick, on = false) {
+  function chip(content, label, onclick, on = false, color = null) {
     return h('button', {
-      class: ['compose-chip', on && 'is-on'], type: 'button', 'aria-label': label, 'data-menu-anchor': '',
+      class: ['compose-chip', on && 'is-on'], type: 'button', 'aria-label': label, 'data-menu-anchor': '', 'data-sc': color,
       onpointerdown: keep, onmousedown: keep, onclick,
     }, content);
   }
@@ -327,7 +327,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     }
     chips.replaceChildren(
       chip([glyph(sphere ? sphere.glyph : 'inbox'), h('span', null, sphere ? sphere.name : 'Inbox')], 'Sphere',
-        () => menu(form, sphereItems(d.sphereId), (v) => { d.sphereId = v; refresh(); }, 'Sphere')),
+        () => menu(form, sphereItems(d.sphereId), (v) => { d.sphereId = v; refresh(); }, 'Sphere'), false, sphere?.color),
       chip([icon('calendar', 20), h('span', null, when ?? 'No date')], 'Date', () => {
         dateSheet(d, (v) => {
           Object.assign(d, v);

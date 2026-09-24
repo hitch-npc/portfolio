@@ -46,8 +46,21 @@ function route() {
 function render() {
   ui.day = todayISO();
   ui.tomorrow = addDays(ui.day, 1);
+  const set = settingsOf(store.getState());
+  const root = document.documentElement;
   // «Уменьшить движение» из настроек приложения — поверх системной
-  document.documentElement.dataset.motion = settingsOf(store.getState()).motion;
+  root.dataset.motion = set.motion;
+  // оформление: Minimal или Colour, светлая или тёмная тема. Копия — в localStorage
+  // для look.js: он ставит тему до первой отрисовки, чтобы тёмная не мигала светлой
+  if (root.dataset.theme !== set.theme || root.dataset.palette !== set.palette) {
+    root.dataset.theme = set.theme;
+    root.dataset.palette = set.palette;
+    try {
+      localStorage.setItem('tracker-look', JSON.stringify({ theme: set.theme, palette: set.palette }));
+    } catch {
+      // приватный режим или запрет хранилища — тема всё равно придёт из базы
+    }
+  }
   const r = route();
   // появление экрана играет только при входе на него: тап в первую секунду
   // не должен проигрывать его заново на новых узлах
@@ -57,8 +70,10 @@ function render() {
     if (main.firstChild !== node) main.replaceChildren(node);
     renderSheet();
   }));
-  // у экрана свой фон (вечернее планирование — серое), строка состояния — в тон
-  if (document.body.dataset.screen !== r.name) {
+  // у экрана свой фон (вечернее планирование — серое), строка состояния — в тон; и в тон теме
+  const tone = `${r.name}|${set.theme}`;
+  if (document.body.dataset.tone !== tone) {
+    document.body.dataset.tone = tone;
     document.body.dataset.screen = r.name;
     const bg = getComputedStyle(document.body).getPropertyValue('--screen').trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);

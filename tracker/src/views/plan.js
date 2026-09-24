@@ -4,7 +4,7 @@
  * дни позже завтра, «Входящие», сферы. Тап по задаче ставит её на завтра,
  * повторный — снимает; смахивание влево открывает «Delete».
  */
-import { h, glyph, icon, sortable, swipeable, removeRow, toast } from '../ui.js';
+import { h, glyph, sphereMark, icon, sortable, swipeable, removeRow, toast } from '../ui.js';
 import { dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { dayTasks, planGroups } from '../logic.js';
 import * as store from '../store.js';
@@ -33,7 +33,7 @@ function candidate(t, picked, spheres, showSphere, showDay) {
       h('span', { class: 'task-title' }, t.title),
       h('span', { class: 'task-meta' },
         dotted([
-          showSphere && h('span', { class: 'meta-sphere' }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'),
+          showSphere && h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'),
           showDay && t.day && [dayLabel(t.day, ui.day), t.time].filter(Boolean).join(' '),
           t.status === 'doing' && 'In progress',
           due && h('span', { class: due.late ? 'is-late' : null }, due.text),
@@ -51,11 +51,11 @@ const dotted = (parts) => parts.filter(Boolean).map((p, i) => [i > 0 && h('span'
  * В группе сферы сфера не подписывается — она в заголовке; в «Not done yet»
  * и «Upcoming» — подписывается, а в «Upcoming» ещё и день.
  */
-function group(title, g, tasks, picked, spheres, showDay = false) {
+function group(title, mark, tasks, picked, spheres, showDay = false) {
   if (!tasks.length) return null;
-  const showSphere = g == null;
+  const showSphere = mark == null;
   return h('section', { class: 'plan-group' },
-    h('h2', { class: 'label' }, g && glyph(g), title, h('span', { class: 'count' }, tasks.length)),
+    h('h2', { class: 'label' }, mark, title, h('span', { class: 'count' }, tasks.length)),
     swipeable(h('ul', { class: 'picks' }, tasks.map((t) => candidate(t, picked, spheres, showSphere, showDay)))));
 }
 
@@ -79,8 +79,8 @@ export function planView() {
   const groups = [
     group('Not done yet', null, g.carried, picked, spheres, true),
     group('Upcoming', null, g.upcoming, picked, spheres, true),
-    group('Inbox', 'inbox', g.inbox, picked, spheres),
-    ...g.spheres.map((x) => group(x.sphere.name, x.sphere.glyph, x.tasks, picked, spheres)),
+    group('Inbox', glyph('inbox'), g.inbox, picked, spheres),
+    ...g.spheres.map((x) => group(x.sphere.name, sphereMark(x.sphere), x.tasks, picked, spheres)),
   ].filter(Boolean);
 
   return h('section', { class: 'screen screen-plan' },

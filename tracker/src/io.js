@@ -14,7 +14,7 @@
  * Разбор импорта терпимый: поля принимаются под разными именами
  * (title/name, deadline/due, …) и значениями (high/высокий/1, …).
  */
-import { GLYPHS, dayLimit, isDone, timeSlot } from './logic.js';
+import { COLORS, GLYPHS, dayLimit, isDone, nextColor, timeSlot } from './logic.js';
 import { addDays, fmtLong, fmtWeekday } from './dates.js';
 
 export const APP = 'tracker';
@@ -193,13 +193,14 @@ export function planImport(st, data, { uid, now = new Date() }) {
   const used = new Set(st.spheres.filter((s) => !s.archived).map((s) => s.glyph));
   let order = Math.max(-1, ...st.spheres.map((s) => s.order)) + 1;
 
-  function sphereFor(name, glyph) {
+  function sphereFor(name, glyph, color) {
     const k = key(name);
     if (!k || k === 'inbox' || k === 'входящие') return null;
     if (spheres.has(k)) return spheres.get(k);
     const g = GLYPHS.includes(glyph) ? glyph : GLYPHS.find((x) => !used.has(x)) ?? GLYPHS[order % GLYPHS.length];
     used.add(g);
-    const s = { id: uid(), name: text(name), glyph: g, order: order++, archived: false, createdAt: stamp };
+    const c = COLORS.includes(color) ? color : nextColor([...st.spheres, ...newSpheres]);
+    const s = { id: uid(), name: text(name), glyph: g, color: c, order: order++, archived: false, createdAt: stamp };
     spheres.set(k, s);
     newSpheres.push(s);
     return s;
@@ -221,13 +222,16 @@ export function planImport(st, data, { uid, now = new Date() }) {
       }
       const glyph = pick(raw, 'glyph', 'shape');
       if (GLYPHS.includes(glyph)) s.glyph = glyph;
+      const color = pick(raw, 'color', 'colour');
+      if (COLORS.includes(color)) s.color = color;
       if (typeof raw.archived === 'boolean') s.archived = raw.archived;
       changedSpheres.set(s.id, s);
       fileIds.set(s.id, s);
       continue;
     }
     const name = typeof raw === 'string' ? raw : pick(raw, 'name', 'title');
-    const s = sphereFor(name, typeof raw === 'object' ? pick(raw, 'glyph', 'shape') : undefined);
+    const obj = raw && typeof raw === 'object';
+    const s = sphereFor(name, obj ? pick(raw, 'glyph', 'shape') : undefined, obj ? pick(raw, 'color', 'colour') : undefined);
     const fileId = typeof raw === 'object' ? pick(raw, 'id', 'key', 'slug') : undefined;
     if (s && fileId != null) fileIds.set(String(fileId), s);
   }
@@ -683,7 +687,7 @@ export function aiData(st) {
   const names = new Map(st.spheres.map((s) => [s.id, s.name]));
   const list = (items) => items.map((x) => compact({ title: x.title, done: x.done || null }));
   return {
-    spheres: st.spheres.map((s) => compact({ id: s.id, name: s.name, glyph: s.glyph, archived: s.archived || null })),
+    spheres: st.spheres.map((s) => compact({ id: s.id, name: s.name, glyph: s.glyph, color: s.color, archived: s.archived || null })),
     tasks: st.tasks.filter((t) => !isDone(t)).map((t) => compact({
       id: t.id, title: t.title, sphere: names.get(t.sphereId) ?? 'Inbox', status: t.status, day: t.day, time: t.time,
       repeat: t.repeat && t.repeat !== 'none' ? t.repeat : null, priority: t.priority, deadline: t.deadline,
@@ -738,7 +742,8 @@ export function aiPrompt({ today, limit = 3, data = null }) {
     'Dates are "YYYY-MM-DD", times "HH:MM" (24-hour). Valid JSON only: double quotes, no comments, no trailing commas.',
     '',
     '### spheres — areas of life or work',
-    '- name (required); glyph (optional): circle, pill, square, bar, triangle, ring, half or diamond.',
+    '- name (required); glyph (optional): circle, pill, square, bar, triangle, ring, half or diamond;',
+    `  color (optional): ${COLORS.slice(0, -1).join(', ')} or ${COLORS.at(-1)}.`,
     '- A task may name a sphere that is not listed — it is created. No sphere → the task goes to Inbox.',
     '',
     '### tasks',

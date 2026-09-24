@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addDays, dayLabel, diffDays, dueLabel, fmtDay, fmtMonth, nextRepeat, nextWeek } from '../src/dates.js';
 import {
-  brief, carriedOver, dayTasks, goalProgress, isDayFull, isGoalDone, overdue, planGroups,
+  COLORS, brief, carriedOver, colorize, dayTasks, goalProgress, isDayFull, isGoalDone, nextColor, overdue, planGroups,
   searchTasks, sphereCounts, sphereTasks, timeSlot,
 } from '../src/logic.js';
 import {
@@ -487,4 +487,35 @@ test('ИИ: правки по id — меняется только указан�
   // удалить цель
   const gone = planImport(st, { goals: [{ id: 'g1', delete: true }] }, { uid });
   assert.deepEqual([gone.changes.deleteGoals, gone.summary.deleted], [['g1'], ['Car']]);
+});
+
+test('цвета сфер: новой — первый свободный, старым — по порядку, импорт и правка по id', () => {
+  const sp = (id, order, color, archived = false) => ({ id, name: id, glyph: 'circle', order, archived, ...(color ? { color } : {}) });
+
+  // первый свободный у активных; цвет архивной свободен; все заняты — по кругу
+  assert.equal(nextColor([]), 'olive');
+  assert.equal(nextColor([sp('a', 0, 'olive'), sp('b', 1, 'apricot')]), 'lavender');
+  assert.equal(nextColor([sp('a', 0, 'olive', true)]), 'olive');
+  const full = COLORS.map((c, i) => sp(`s${i}`, i, c));
+  assert.equal(nextColor(full), COLORS[full.length % COLORS.length]);
+
+  // сферы до цветов: цвет по порядку, заданный не трогается, записать — только поменянные
+  const old = [sp('b', 1), sp('a', 0), sp('c', 2, 'olive'), sp('z', 3, null, true)];
+  const changed = colorize(old);
+  assert.deepEqual(changed.map((s) => s.id), ['a', 'b', 'z']);
+  assert.deepEqual(Object.fromEntries(old.map((s) => [s.id, s.color])), { a: 'lavender', b: 'apricot', c: 'olive', z: 'mint' });
+  assert.deepEqual(colorize(old), [], 'второй раз — ничего');
+
+  // импорт: цвет из файла, иначе следующий свободный; чужое слово — как без цвета
+  const st = { spheres: [sp('w', 0, 'olive')], tasks: [], goals: [], settings: {} };
+  const plan = planImport(st, { spheres: [{ name: 'Health', color: 'mint' }, { name: 'Home' }, { name: 'Money', colour: 'red' }] }, { uid });
+  assert.deepEqual(plan.spheres.map((s) => [s.name, s.color]), [['Health', 'mint'], ['Home', 'lavender'], ['Money', 'apricot']]);
+  const edit = planImport(st, { spheres: [{ id: 'w', color: 'plum' }] }, { uid });
+  assert.equal(edit.changes.spheres[0].color, 'plum');
+  assert.equal(st.spheres[0].color, 'olive', 'сама сфера до подтверждения не меняется');
+  assert.equal(planImport(st, { spheres: [{ id: 'w', color: 'pink' }] }, { uid }).changes.spheres[0].color, 'olive');
+
+  // ИИ знает названия цветов и видит цвет сферы
+  assert.ok(aiPrompt({ today: TODAY }).includes('olive, lavender, apricot, mint, slate, lilac, plum or khaki'));
+  assert.equal(aiData(st).spheres[0].color, 'olive');
 });

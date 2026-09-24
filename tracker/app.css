@@ -18,6 +18,26 @@
   --ink-muted: #918E8B;
   --accent: #E52928;
   --scrim: rgb(0 0 0 / 0.32);
+  /* фон вечернего планирования и плашка вкладок: чёрная, под открытой — светлая пилюля */
+  --screen-plan: var(--bg-alt);
+  --nav-bg: var(--ink);
+  --nav-on: var(--bg);
+  --nav-on-ink: var(--ink);
+  /* всплывающее — меню, тост, панель выбора: как плашка вкладок */
+  --pop-bg: var(--nav-bg);
+  --pop-ink: var(--bg);
+
+  /* цвета сфер — оформление Colour (Settings → Style). Красного среди них нет:
+     он значит «срочно». Текст и знаки на цвете — тёмные в обеих темах */
+  --sph-olive: #8E8100;
+  --sph-lavender: #958AA9;
+  --sph-apricot: #ED9C55;
+  --sph-mint: #C7DDC7;
+  --sph-slate: #7A96AB;
+  --sph-lilac: #D0C7E4;
+  --sph-plum: #99728C;
+  --sph-khaki: #DFD6A1;
+  --on-sphere: #000000;
 
   /* штриховка неактивного: крупная — для графиков, тонкая — для пустых мест дня */
   --hatch: repeating-linear-gradient(-45deg, var(--ink-muted) 0 2px, transparent 2px 7px);
@@ -49,6 +69,27 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* тёмная тема (Settings → Theme): те же роли, тёплый почти чёрный фон.
+   Красный чуть светлее — на тёмном он иначе тонет. Плашка вкладок остаётся
+   тёмной, светлеет только пилюля под открытой вкладкой */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0E0E0D;
+  --bg-card: #1D1C1B;
+  --bg-alt: #2F2E2C;
+  --bg-olive: #33332A;
+  --bg-olive-card: #2A2A22;
+  --ink: #EEEBE6;
+  --ink-muted: #8D8A85;
+  --accent: #FF453A;
+  --scrim: rgb(0 0 0 / 0.6);
+  --screen-plan: #13130F;
+  --nav-bg: #262523;
+  --nav-on: var(--ink);
+  --nav-on-ink: var(--bg);
+  --pop-ink: var(--ink);
+}
+
 /* ── основа ─────────────────────────────────────────────────────────── */
 
 *,
@@ -64,7 +105,7 @@ html {
 
 /* у экрана свой фон: вечернее планирование — на сером, как второй экран референса */
 body[data-screen='plan'] {
-  --screen: var(--bg-alt);
+  --screen: var(--screen-plan);
 }
 
 body {
@@ -95,6 +136,12 @@ body::after {
   z-index: 60;
   pointer-events: none;
   background: url('textures/grain.png') 0 0 / 128px 128px;
+}
+
+/* на тёмном зерно — светлыми крупинками: та же плитка, вывернутая наизнанку */
+:root[data-theme='dark'] body::after {
+  filter: invert(1);
+  opacity: 0.7;
 }
 
 button,
@@ -253,6 +300,7 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  line-height: 36px;
 }
 
 .title-glyph .glyph {
@@ -309,6 +357,7 @@ textarea:focus-visible {
   margin: 0 0 10px 4px;
   font-size: 14px;
   font-weight: 600;
+  line-height: 18px;
 }
 
 .label .glyph {
@@ -580,6 +629,10 @@ textarea:focus-visible {
   margin-top: 4px;
   font-size: 14px;
   font-weight: 500;
+  /* строки, где значок стоит у подписи, — целой высоты: дробную (1.3 × 14)
+     браузер округляет по-разному в разных местах экрана, и подпись съезжает
+     на пиксель от значка. У Geist середина заглавных — ровно середина строки */
+  line-height: 18px;
   color: var(--ink-muted);
 }
 
@@ -1075,6 +1128,7 @@ textarea:focus-visible {
   gap: 10px;
   font-size: 17px;
   font-weight: 600;
+  line-height: 22px;
 }
 
 .line .glyph {
@@ -1237,7 +1291,7 @@ textarea:focus-visible {
   height: 70px;
   margin: 0 auto;
   padding: 6px;
-  background: var(--ink);
+  background: var(--nav-bg);
   border-radius: var(--r-pill);
   pointer-events: auto;
 }
@@ -1249,7 +1303,7 @@ textarea:focus-visible {
   left: 6px;
   width: calc((100% - 12px) / 5);
   border-radius: var(--r-pill);
-  background: var(--bg);
+  background: var(--nav-on);
   transform: translateX(calc(var(--at, 0) * 100%));
   transition: transform 0.5s var(--spring), opacity 0.2s ease;
 }
@@ -1273,7 +1327,7 @@ textarea:focus-visible {
 }
 
 .tab.is-on {
-  color: var(--ink);
+  color: var(--nav-on-ink);
 }
 
 .tab-icon {
@@ -1301,11 +1355,11 @@ textarea:focus-visible {
   border-radius: var(--r-pill);
   background: var(--accent);
   /* вырез вокруг точки — цветом плашки, не тенью */
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--nav-bg);
 }
 
 .tab.is-on .tab-dot {
-  outline-color: var(--bg);
+  outline-color: var(--nav-on);
 }
 
 .tab-label {
@@ -1511,6 +1565,7 @@ textarea:focus-visible {
   flex: 1;
   font-size: 17px;
   font-weight: 600;
+  line-height: 22px;
 }
 
 .toast {
@@ -1520,8 +1575,8 @@ textarea:focus-visible {
   z-index: 40;
   max-width: calc(100% - 32px);
   padding: 12px 18px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--pop-bg);
+  color: var(--pop-ink);
   border-radius: var(--r-pill);
   font-size: 15px;
   font-weight: 600;
@@ -1711,6 +1766,7 @@ body:has(.select-bar) .toast {
 .lines-sm .line {
   font-size: 14px;
   font-weight: 500;
+  line-height: 18px;
 }
 
 .lines-sm .line-title {
@@ -1900,6 +1956,7 @@ body:has(.select-bar) .toast {
   background: var(--bg);
   font-size: 14px;
   font-weight: 600;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -1939,7 +1996,7 @@ body:has(.select-bar) .toast {
 
 /* ── меню ───────────────────────────────────────────────────────────── */
 
-/* чёрное, как панель вкладок: на бежевых карточках оно видно без тени */
+/* как панель вкладок (чёрное; в тёмной теме — её серое): на карточках видно без тени */
 .menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -1950,8 +2007,8 @@ body:has(.select-bar) .toast {
   max-height: 52dvh;
   overflow: auto;
   padding: 6px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--pop-bg);
+  color: var(--pop-ink);
   border-radius: var(--r-card);
   animation: rise 0.18s var(--ease) both;
 }
@@ -1978,6 +2035,7 @@ body:has(.select-bar) .toast {
   padding: 0 14px 0 8px;
   border-radius: var(--r-sm);
   font-size: 17px;
+  line-height: 22px;
   font-weight: 600;
 }
 
@@ -2289,8 +2347,8 @@ body:has(.select-bar) .toast {
   z-index: 12;
   width: min(440px, calc(100% - 24px));
   padding: 10px 10px 8px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--pop-bg);
+  color: var(--pop-ink);
   border-radius: var(--r-card);
   transform: translateX(-50%);
   animation: rise 0.22s var(--ease) both;
@@ -2313,12 +2371,12 @@ body:has(.select-bar) .toast {
 .select-bar .pill {
   height: 32px;
   background: transparent;
-  color: var(--bg);
+  color: var(--pop-ink);
 }
 
 .select-bar .pill.is-on {
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--pop-ink);
+  color: var(--pop-bg);
 }
 
 /* действия — сеткой в две строки: все видны сразу */
@@ -2357,8 +2415,8 @@ body:has(.select-bar) .toast {
 
 /* второй тап «удалить» — светлая пилюля, не красная: красный только для срочного */
 .bar-btn.is-on {
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--pop-ink);
+  color: var(--pop-bg);
 }
 
 .head-pill {
@@ -3056,6 +3114,137 @@ body:has(.select-bar) .toast {
   from {
     opacity: 0;
   }
+}
+
+/* ── оформление Colour: у каждой сферы свой цвет ──────────────────────
+   Settings → Style. Цвет — ключ сферы (data-sc), сам цвет — токен темы.
+   Заливка — у плитки сферы и у метки на задаче; глиф сферы в меню, в
+   заголовках и в Overview — в кружке её цвета. В Minimal ничего этого нет */
+[data-sc='olive'] { --sc: var(--sph-olive); }
+[data-sc='lavender'] { --sc: var(--sph-lavender); }
+[data-sc='apricot'] { --sc: var(--sph-apricot); }
+[data-sc='mint'] { --sc: var(--sph-mint); }
+[data-sc='slate'] { --sc: var(--sph-slate); }
+[data-sc='lilac'] { --sc: var(--sph-lilac); }
+[data-sc='plum'] { --sc: var(--sph-plum); }
+[data-sc='khaki'] { --sc: var(--sph-khaki); }
+
+:root[data-palette='colour'] .sphere-tile[data-sc] {
+  background: var(--sc);
+  color: var(--on-sphere);
+}
+
+/* глиф на цветной плитке — в обведённом кружке, как пилюли референса */
+:root[data-palette='colour'] .sphere-tile[data-sc] .chip {
+  background: none;
+  color: var(--on-sphere);
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+:root[data-palette='colour'] .sphere-tile[data-sc] .tile-more,
+:root[data-palette='colour'] .sphere-tile[data-sc] .drag,
+:root[data-palette='colour'] .sphere-tile[data-sc] .tile-count.is-zero,
+:root[data-palette='colour'] .sphere-tile[data-sc].is-archived .tile-name {
+  color: var(--on-sphere);
+  opacity: 0.5;
+}
+
+:root[data-palette='colour'] .meta-sphere[data-sc] {
+  /* высота — сама строка: 23px, нечётная, как значок 11px, — оба встают на
+     целые пиксели; поля выровнены по чернилам: значок и текст — по 8.5px от края */
+  padding: 0 8px 0 7.5px;
+  border-radius: var(--r-pill);
+  background: var(--sc);
+  color: var(--on-sphere);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 23px;
+}
+
+:root[data-palette='colour'] .meta-sphere[data-sc] .glyph {
+  width: 11px;
+  height: 11px;
+}
+
+/* кружки в меню шире обычного значка: столбец под них, Inbox — по той же оси */
+:root[data-palette='colour'] .menu-mark {
+  width: 24px;
+}
+
+:root[data-palette='colour'] .compose-chip[data-sc] {
+  background: var(--sc);
+  color: var(--on-sphere);
+}
+
+/* кружок цвета под глифом; в Minimal обёртки как нет */
+.sc-mark {
+  display: contents;
+}
+
+:root[data-palette='colour'] .sc-mark[data-sc] {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: var(--sc);
+  color: var(--on-sphere);
+}
+
+:root[data-palette='colour'] .title-glyph .sc-mark[data-sc] {
+  width: 38px;
+  height: 38px;
+}
+
+:root[data-palette='colour'] .title-glyph .sc-mark[data-sc] .glyph {
+  width: 18px;
+  height: 18px;
+}
+
+:root[data-palette='colour'] .sheet-head .sc-mark[data-sc] {
+  width: 36px;
+  height: 36px;
+}
+
+:root[data-palette='colour'] .sheet-head .sc-mark[data-sc] .glyph {
+  width: 16px;
+  height: 16px;
+}
+
+:root[data-palette='colour'] .line .sc-mark[data-sc] {
+  align-self: center;
+  width: 20px;
+  height: 20px;
+}
+
+/* кружок не выше строки: иначе строка растёт от него, а текст остаётся у верха */
+:root[data-palette='colour'] .lines-sm .line .sc-mark[data-sc] {
+  width: 18px;
+  height: 18px;
+}
+
+/* цвет сферы в её шторке «⋯»: образцы, выбранный — с галочкой */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: -8px 0 18px;
+}
+
+.color-pick {
+  display: grid;
+  place-items: center;
+  height: 48px;
+  background: var(--sc);
+  color: var(--on-sphere);
+  border-radius: var(--r-card);
+  transition: transform var(--release);
+}
+
+.color-pick:active {
+  transform: scale(var(--press));
+  transition: transform var(--press-in) var(--ease);
 }
 
 /* ── капс ────────────────────────────────────────────────────────────── */

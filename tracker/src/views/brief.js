@@ -4,7 +4,7 @@
  * в буфер инструкцию с открытыми задачами и целями — её вставляют в любой
  * ИИ-чат и спрашивают; предложенные правки вставляются обратно в Settings → AI.
  */
-import { h, glyph, icon, toast, countUp, copyText } from '../ui.js';
+import { h, sphereMark, icon, toast, countUp, copyText } from '../ui.js';
 import { dueLabel, fmtDay, fmtWeekday, parse } from '../dates.js';
 import { brief, dayLimit, isGoalDone } from '../logic.js';
 import { aiData, aiPrompt } from '../io.js';
@@ -17,7 +17,7 @@ function line(t, spheres, { num, late } = {}) {
   const due = t.deadline ? dueLabel(t.deadline, ui.day) : null;
   return h('li', { class: 'line' },
     num != null && h('span', { class: 'line-num' }, String(num)),
-    glyph(sphere ? sphere.glyph : 'inbox'),
+    sphereMark(sphere),
     h('span', { class: 'line-title' }, t.title),
     late && due && h('span', { class: 'line-due is-late' }, due.text));
 }
