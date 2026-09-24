@@ -7,18 +7,22 @@
   "scripts": {
     "dev": "npm run build:tokens && npm run build:tts && npm run fetch:fontshare && vite",
     "build:tokens": "node tooling/build-tokens.mjs",
-    "build": "npm run build:tokens && npm run build:tts && npm run fetch:fontshare && vite build && node tooling/links.mjs",
+    "build": "npm run build:tokens && npm run build:tts && npm run fetch:fontshare && vite build && node tooling/links.mjs && npm run build:tracker",
     "lint:links": "node tooling/links.mjs",
     "preview": "vite preview",
     "lint": "node tooling/guardrail.mjs",
-    "check": "node tooling/build-tokens.mjs --check && node tooling/guardrail.mjs",
+    "check": "node tooling/build-tokens.mjs --check && node tooling/guardrail.mjs && npm run test:tracker",
     "build:sandbox": "npm run build && node tooling/build-sandbox.mjs",
     "build:tts": "node tooling/build-tts.mjs",
     "fetch:fonts": "node tooling/fetch-fonts.mjs",
     "fetch:fontshare": "node tooling/fetch-fontshare.mjs",
     "lab": "vite --open /gallery.html",
     "lab:field": "vite --open /field.html",
-    "posters": "node tooling/posters.mjs"
+    "posters": "node tooling/posters.mjs",
+    "build:tracker": "node tooling/build-tracker.mjs",
+    "test:tracker": "node --test 'tracker/test/*.test.mjs'",
+    "tracker:fonts": "node tooling/tracker-fonts.mjs",
+    "tracker:icons": "node tooling/tracker-icons.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0",
