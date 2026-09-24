@@ -2,9 +2,9 @@
  * «Планирование завтра» — вечерний режим. Сверху места на завтра,
  * ниже всё, из чего выбирать: не сделанное сегодня, поставленное на
  * дни позже завтра, «Входящие», сферы. Тап по задаче ставит её на завтра,
- * повторный — снимает.
+ * повторный — снимает; смахивание влево открывает «Delete».
  */
-import { h, glyph, icon, sortable } from '../ui.js';
+import { h, glyph, icon, sortable, swipeable, removeRow, toast } from '../ui.js';
 import { dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { dayTasks, planGroups } from '../logic.js';
 import * as store from '../store.js';
@@ -16,7 +16,15 @@ function candidate(t, picked, spheres, showSphere, showDay) {
   const num = picked.get(t.id);
   const sphere = spheres.get(t.sphereId);
   const due = t.deadline ? dueLabel(t.deadline, ui.day) : null;
-  return h('li', { class: 'pick-row' }, h('button', {
+  return h('li', { class: 'pick-row', 'data-id': t.id, 'data-swipe': '' },
+    h('button', {
+      class: 'swipe-action', type: 'button', 'aria-label': `Delete “${t.title}”`,
+      onclick: (e) => removeRow(e.currentTarget.closest('li'), () => {
+        store.deleteTask(t.id);
+        toast('Task deleted');
+      }),
+    }, icon('close', 20), h('span', null, 'Delete')),
+    h('div', { class: 'swipe-body' }, h('button', {
     class: ['pick', num && 'is-on'], type: 'button', 'aria-pressed': String(Boolean(num)),
     onclick: () => (num ? store.unplanTask(t.id) : requestPlan(t, ui.tomorrow)),
   },
@@ -33,7 +41,7 @@ function candidate(t, picked, spheres, showSphere, showDay) {
     iconButton('calendar', `Pick a date for “${t.title}”`,
       () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), {
         current: t.day, onReminder: () => calendarSheet(t.id),
-      }), 'pick-date', 20));
+      }), 'pick-date', 20)));
 }
 
 /** Части подписи через точку; пустые пропускаются. */
@@ -48,7 +56,7 @@ function group(title, g, tasks, picked, spheres, showDay = false) {
   const showSphere = g == null;
   return h('section', { class: 'plan-group' },
     h('h2', { class: 'label' }, g && glyph(g), title, h('span', { class: 'count' }, tasks.length)),
-    h('ul', { class: 'picks' }, tasks.map((t) => candidate(t, picked, spheres, showSphere, showDay))));
+    swipeable(h('ul', { class: 'picks' }, tasks.map((t) => candidate(t, picked, spheres, showSphere, showDay)))));
 }
 
 export function planView() {
@@ -78,6 +86,6 @@ export function planView() {
   return h('section', { class: 'screen screen-plan' },
     header('Tomorrow', fmtDay(g.target)),
     slots,
-    h('p', { class: 'hint hint-top' }, 'Tap a task to plan it for tomorrow, the calendar — for any other date.'),
+    h('p', { class: 'hint hint-top' }, 'Tap a task to plan it for tomorrow, the calendar — for any other date. Swipe left to delete.'),
     groups.length ? groups : h('p', { class: 'hint' }, 'No active tasks to plan. Add some on Today.'));
 }

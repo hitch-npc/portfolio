@@ -3,7 +3,7 @@
  * #/spheres[/id], #/goals, #/brief, #/settings) и перерисовывает его после
  * каждого изменения. В полночь «сегодня» сдвигается само.
  */
-import { h, keepFocus, renderSheet, closeSheet, toast, sectionIcon, calm } from './ui.js';
+import { h, keepFocus, renderSheet, closeSheet, toast, sectionIcon, calm, settlePress } from './ui.js';
 import { addDays, todayISO } from './dates.js';
 import { overdue, settingsOf } from './logic.js';
 import * as store from './store.js';
@@ -49,11 +49,14 @@ function render() {
   // «Уменьшить движение» из настроек приложения — поверх системной
   document.documentElement.dataset.motion = settingsOf(store.getState()).motion;
   const r = route();
-  keepFocus(() => {
+  // появление экрана играет только при входе на него: тап в первую секунду
+  // не должен проигрывать его заново на новых узлах
+  if (!ui.entering) main.classList.remove('is-entering');
+  settlePress(() => keepFocus(() => {
     const node = ROUTES[r.name](r.arg);
     if (main.firstChild !== node) main.replaceChildren(node);
     renderSheet();
-  });
+  }));
   // у экрана свой фон (вечернее планирование — серое), строка состояния — в тон
   if (document.body.dataset.screen !== r.name) {
     document.body.dataset.screen = r.name;
