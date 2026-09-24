@@ -115,9 +115,8 @@ export function settingsView() {
 
   return h('section', { class: 'screen screen-settings' },
     backLink('#/today', 'Today'),
-    header('Settings'),
+    header('Settings', 'Data & backup'),
     h('section', { class: 'block block-alt' },
-      h('h2', { class: 'block-title' }, 'Data'),
       h('p', { class: 'block-text' }, 'Everything lives on this device only. Nothing is sent anywhere. Export a backup now and then — it is also how you move to a new phone.'),
       h('div', { class: 'stack' },
         pillButton('download', 'Export backup', exportBackup, 'is-on pill-wide'),

@@ -31,10 +31,10 @@ function build() {
       store.createTask(title);
       toast('Added to Inbox');
     },
-  }, icon('plus'), input);
+  }, h('span', { class: 'chip' }, icon('plus')), input);
 
   const head = header('Today', '', h('a', { class: 'icon-btn', href: '#/settings', 'aria-label': 'Settings', title: 'Settings' }, icon('settings')));
-  sub = head.querySelector('.head-text').appendChild(h('p', { class: 'sub' }));
+  sub = head.querySelector('.title-sub');
   body = h('div', { class: 'today-body' });
   shell = h('section', { class: 'screen screen-today' }, head, form, body);
 }
@@ -61,7 +61,7 @@ export function todayView() {
     !open.length && !done.length && h('p', { class: 'hint' }, 'Nothing planned. Open any task and tap Today — or plan tomorrow tonight.'),
     done.length > 0 && h('ul', { class: 'tasks done-list', 'aria-label': 'Done today' }, done.map((t) => taskItem(t))),
     late.length > 0 && h('section', { class: 'block block-alt' },
-      h('h2', { class: 'block-title' }, 'Overdue', h('span', { class: 'count' }, late.length)),
+      h('h2', { class: 'label' }, 'Overdue', h('span', { class: 'count' }, late.length)),
       h('ul', { class: 'tasks tasks-compact' }, late.map((t) => taskItem(t)))),
   ].filter(Boolean));
   return shell;

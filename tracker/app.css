@@ -19,7 +19,10 @@
   --accent: #E52928;
   --scrim: rgb(0 0 0 / 0.32);
 
-  --hatch: repeating-linear-gradient(-45deg, var(--ink-muted) 0 1px, transparent 1px 6px);
+  /* штриховка неактивного: крупная — для графиков, тонкая — для пустых мест дня */
+  --hatch: repeating-linear-gradient(-45deg, var(--ink-muted) 0 2px, transparent 2px 7px);
+  --hatch-fine: repeating-linear-gradient(-45deg, var(--ink-muted) 0 1px, transparent 1px 6px);
+  --screen: var(--bg);
 
   --r-card: 22px;
   --r-sheet: 24px;
@@ -29,7 +32,7 @@
   --font: 'Inter Tight', -apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   --pad: 16px;
   --gap: 6px;
-  --nav-h: 76px;
+  --nav-h: 80px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -47,10 +50,15 @@ html {
   text-size-adjust: 100%;
 }
 
+/* у экрана свой фон: вечернее планирование — на сером, как второй экран референса */
+body[data-screen='plan'] {
+  --screen: var(--bg-alt);
+}
+
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--bg);
+  background: var(--screen);
   color: var(--ink);
   font-family: var(--font);
   font-size: 17px;
@@ -152,33 +160,40 @@ textarea:focus-visible {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin: 8px 0 20px;
+  margin: 10px 0 22px;
 }
 
+/* заголовок в две строки одного кегля: название и приглушённое пояснение */
 .title {
   margin: 0;
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.035em;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+
+.title-main,
+.title-sub {
+  display: block;
+}
+
+.title-sub {
+  color: var(--ink-muted);
+}
+
+.title-sub:empty {
+  display: none;
 }
 
 .title-glyph {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .title-glyph .glyph {
-  width: 26px;
-  height: 26px;
-}
-
-.sub {
-  margin: 6px 0 0;
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--ink-muted);
+  width: 24px;
+  height: 24px;
 }
 
 .head-actions {
@@ -210,6 +225,58 @@ textarea:focus-visible {
   text-decoration: none;
 }
 
+.chip {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--r-pill);
+  background: var(--bg-alt);
+  color: var(--ink);
+}
+
+.chip .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* мелкая подпись секции: название чернилами, число приглушённо */
+.label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.label .glyph {
+  width: 11px;
+  height: 11px;
+}
+
+/* крупные числа — обычным весом, хвост приглушённо и мельче */
+.big {
+  margin: 0 0 14px;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+.big .muted {
+  margin-left: 2px;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.big.is-late {
+  color: var(--accent);
+}
+
 .hint {
   margin: 14px 4px;
   font-size: 15px;
@@ -233,22 +300,17 @@ textarea:focus-visible {
   align-items: center;
   gap: 12px;
   height: 64px;
-  padding: 0 18px;
+  padding: 0 18px 0 14px;
   margin-bottom: 20px;
   background: var(--bg-card);
   border-radius: var(--r-card);
 }
 
-.add .icon {
-  width: 24px;
-  height: 24px;
-}
-
 .add-input {
   flex: 1;
   height: 100%;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 500;
 }
 
 .entry {
@@ -337,9 +399,9 @@ textarea:focus-visible {
   flex: none;
   margin-top: -3px;
   font-size: 34px;
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
@@ -443,7 +505,7 @@ textarea:focus-visible {
   height: 62px;
   padding: 0 14px;
   border-radius: var(--r-card);
-  background: var(--hatch);
+  background: var(--hatch-fine);
   color: var(--ink-muted);
 }
 
@@ -590,14 +652,19 @@ textarea:focus-visible {
 }
 
 .pill-action {
-  height: 44px;
-  padding: 0 18px;
+  height: 52px;
+  padding: 0 22px;
+  gap: 10px;
   font-size: 16px;
+  background: var(--bg-card);
 }
 
-.pill-action .icon {
-  width: 20px;
-  height: 20px;
+.pill-action.has-chip {
+  padding-left: 8px;
+}
+
+.pill-action.is-on .chip {
+  background: var(--bg);
 }
 
 .pill-wide {
@@ -688,20 +755,9 @@ textarea:focus-visible {
 }
 
 .block-alt {
-  padding: 16px;
+  padding: 14px 12px 12px;
   background: var(--bg-alt);
   border-radius: var(--r-card);
-}
-
-.block-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0 0 12px;
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .block-text {
@@ -757,21 +813,6 @@ textarea:focus-visible {
   margin-top: 26px;
 }
 
-.group-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 10px 4px;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.group-title .glyph {
-  width: 14px;
-  height: 14px;
-}
-
 .picks {
   list-style: none;
   margin: 0;
@@ -799,7 +840,7 @@ textarea:focus-visible {
   border-radius: var(--r-pill);
   background: var(--bg-alt);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .pick.is-on .pick-mark {
@@ -863,9 +904,17 @@ textarea:focus-visible {
   text-decoration: none;
 }
 
-.sphere-main .glyph {
-  width: 16px;
-  height: 16px;
+.sphere-main {
+  padding-left: 12px;
+}
+
+.sphere .chip {
+  background: var(--bg);
+}
+
+.sphere .chip .glyph {
+  width: 14px;
+  height: 14px;
 }
 
 .sphere-name {
@@ -880,9 +929,9 @@ textarea:focus-visible {
 }
 
 .sphere-count {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -927,7 +976,7 @@ textarea:focus-visible {
   flex: 1;
   margin: 4px 0 0;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
@@ -944,8 +993,8 @@ textarea:focus-visible {
 }
 
 .fraction {
-  font-size: 40px;
-  font-weight: 800;
+  font-size: 44px;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -957,12 +1006,15 @@ textarea:focus-visible {
 
 .meter {
   flex: 1;
-  height: 12px;
+  height: 16px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
   background: var(--hatch);
 }
 
 .meter-done {
   height: 100%;
+  border-radius: var(--r-pill);
   background: var(--ink);
 }
 
@@ -1003,8 +1055,40 @@ textarea:focus-visible {
 
 /* ── бриф ───────────────────────────────────────────────────────────── */
 
-.screen-brief > .pill-wide {
-  margin-bottom: 4px;
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.panel {
+  padding: 16px 18px 18px;
+  background: var(--bg-card);
+  border-radius: var(--r-card);
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.panel-aside {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.panel .hint {
+  margin: 0;
 }
 
 .lines {
@@ -1032,7 +1116,7 @@ textarea:focus-visible {
 .line-num {
   width: 18px;
   flex: none;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .line-title {
@@ -1049,38 +1133,33 @@ textarea:focus-visible {
 .week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .week-col {
   display: grid;
-  grid-template-rows: 20px 96px auto auto;
+  grid-template-rows: 20px 120px auto auto;
   justify-items: center;
   gap: 4px;
 }
 
 .week-count {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .week-track {
   display: flex;
   align-items: flex-end;
   width: 100%;
-  height: 96px;
+  height: 120px;
 }
 
-.week.is-empty .week-col {
-  grid-template-rows: 0 8px auto auto;
-}
-
-.week.is-empty .week-track {
-  height: 8px;
-}
-
+/* столбики — пилюли: сегодня сплошным, остальные дни штриховкой */
 .week-bar {
   width: 100%;
+  min-height: 28px;
+  border-radius: var(--r-pill);
   background: var(--hatch);
 }
 
@@ -1089,12 +1168,21 @@ textarea:focus-visible {
 }
 
 .week-bar.is-zero {
-  height: 2px;
+  min-height: 6px;
+  height: 6px;
   background: var(--ink-muted);
 }
 
 .week-bar.is-now.is-zero {
   background: var(--ink);
+}
+
+.week.is-empty .week-col {
+  grid-template-rows: 0 6px auto auto;
+}
+
+.week.is-empty .week-track {
+  height: 6px;
 }
 
 .week-day {
@@ -1105,7 +1193,7 @@ textarea:focus-visible {
 
 .week-date {
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -1145,7 +1233,7 @@ textarea:focus-visible {
 }
 
 .brief-goal-head .fraction {
-  font-size: 28px;
+  font-size: 30px;
 }
 
 .brief-steps {
@@ -1170,46 +1258,68 @@ textarea:focus-visible {
   right: 0;
   bottom: 0;
   z-index: 10;
-  padding: 8px 12px calc(8px + var(--safe-bottom));
-  background: var(--bg);
+  padding: 8px 12px calc(10px + var(--safe-bottom));
+  background: var(--screen);
 }
 
+/* одна плашка: иконки в кружках, подпись — только у открытого раздела */
 .tabs {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
   gap: 4px;
-  max-width: 440px;
+  max-width: 420px;
   margin: 0 auto;
+  padding: 6px;
+  background: var(--bg-card);
+  border-radius: var(--r-pill);
 }
 
 .tab {
-  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 56px;
-  min-width: 0;
+  gap: 8px;
+  height: 48px;
+  padding: 0 6px;
   border-radius: var(--r-pill);
-  background: var(--bg-card);
   text-decoration: none;
 }
 
-.tab .icon {
-  width: 20px;
-  height: 20px;
+.tab-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  background: var(--bg-alt);
+}
+
+.tab-icon .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .tab-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  display: none;
+  padding-right: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.tab.is-on {
+.tab.is-on .tab-icon {
   background: var(--ink);
   color: var(--bg);
+}
+
+.tab.is-on .tab-label {
+  display: block;
+}
+
+@media (max-width: 350px) {
+  .tab.is-on .tab-label {
+    display: none;
+  }
 }
 
 /* ── шторка и тост ──────────────────────────────────────────────────── */
@@ -1252,7 +1362,7 @@ textarea:focus-visible {
 .sheet-title {
   margin: 0 0 8px;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
 }
@@ -1287,7 +1397,7 @@ textarea:focus-visible {
   width: 100%;
   padding: 6px 0;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
@@ -1356,7 +1466,7 @@ textarea:focus-visible {
 .replace-num {
   width: 22px;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: -0.05em;
 }
