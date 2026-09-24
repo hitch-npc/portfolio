@@ -50,7 +50,7 @@ const ease = 'calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"';
  * стык «слипается» каплей (фильтр goo: лёгкое размытие + порог по альфе).
  * Движение — SMIL, без JS: эллипс кувыркается вокруг кольца, кольца Луны
  * расходятся и сходятся, к центру прицела сходятся круги, в брифе
- * прописываются строки, колесо крутится, по лучам солнца бежит свет.
+ * прописываются строки, шестерёнка крутится, по лучам солнца бежит свет.
  *
  * Базовые атрибуты — поза покоя: без элементов анимации иконка неподвижна
  * и закончена (так рисуются неоткрытые вкладки и «Уменьшить движение»).
@@ -67,6 +67,13 @@ const sunRays = Array.from({ length: 8 }, (_, i) => {
   const p = (r) => `${(12 + r * Math.sin(a)).toFixed(2)} ${(12 - r * Math.cos(a)).toFixed(2)}`;
   const ray = (len) => `M${p(4)}L${p(len)}`;
   return `<path d="${ray(8)}"><animate attributeName="d" dur="1.6s" begin="${(-i * 0.2).toFixed(1)}s" ${loop} values="${ray(10)};${ray(6.5)};${ray(6.5)}" keyTimes="0;.35;1"/></path>`;
+}).join('');
+
+// зубцы шестерёнки: короткие риски наружу от кольца, стык слипается
+const gearTeeth = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2;
+  const p = (r) => `${(12 + r * Math.sin(a)).toFixed(2)} ${(12 - r * Math.cos(a)).toFixed(2)}`;
+  return `M${p(6.8)}L${p(8.6)}`;
 }).join('');
 
 const LIVE = {
@@ -88,11 +95,11 @@ const LIVE = {
       const [k1, k2] = k.split(';');
       return `<path d="M6 ${y}h${w}" stroke-dasharray="${w}" stroke-dashoffset="0"><animate attributeName="stroke-dashoffset" dur="3.2s" ${loop} values="${w};${w};0;0;${w}" keyTimes="0;${k1};${k2};.85;1"/></path>`;
     }).join('')}</g>`,
-  // настройки — колесо: кольцо, шесть спиц от втулки наружу; медленно вращается
+  // настройки — шестерёнка: кольцо, двенадцать мелких зубцов по краю, втулка; медленно вращается
   settings: `${GOO}<g ${G}><g>
-    <circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
-    <path d="M12 2.5v6M12 15.5v6M3.77 7.25l5.2 3M15.03 13.75l5.2 3M3.77 16.75l5.2-3M15.03 10.25l5.2-3"/>
-    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="14s" ${loop}/></g></g>`,
+    <circle cx="12" cy="12" r="6.8"/><circle cx="12" cy="12" r="2.6"/>
+    <path d="${gearTeeth}"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="16s" ${loop}/></g></g>`,
 };
 
 let gooId = 0;
