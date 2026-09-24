@@ -3,7 +3,8 @@
  * #/spheres[/id], #/goals, #/brief, #/settings) и перерисовывает его после
  * каждого изменения. В полночь «сегодня» сдвигается само.
  */
-import { h, icon, keepFocus, renderSheet, closeSheet, toast } from './ui.js';
+import { h, keepFocus, renderSheet, closeSheet, toast, sectionIcon, calm } from './ui.js';
+import { showPreloader } from './preloader.js';
 import { addDays, todayISO } from './dates.js';
 import { overdue } from './logic.js';
 import * as store from './store.js';
@@ -67,6 +68,13 @@ function render() {
     const on = a.dataset.tab === r.name;
     a.classList.toggle('is-on', on);
     on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
+    // двигается только иконка открытой вкладки — и каждый раз с начала
+    const box = a.querySelector('.tab-icon');
+    const live = String(on && !calm());
+    if (box.dataset.live !== live) {
+      box.dataset.live = live;
+      box.querySelector('svg').replaceWith(sectionIcon(a.dataset.tab, live === 'true'));
+    }
   }
   // красная точка на «Today» — есть просроченное: ровно то, что значит акцент
   lateDot.hidden = !overdue(store.getState(), ui.day).length;
@@ -76,7 +84,7 @@ function buildNav() {
   lateDot = h('span', { class: 'tab-dot', hidden: true });
   navLinks = TABS.map(([id, label]) =>
     h('a', { class: 'tab', href: `#/${id}`, 'data-tab': id },
-      h('span', { class: 'tab-icon' }, icon(id), id === 'today' && lateDot),
+      h('span', { class: 'tab-icon', 'data-live': 'false' }, sectionIcon(id), id === 'today' && lateDot),
       h('span', { class: 'tab-label' }, label)));
   tabs = h('div', { class: 'tabs' }, h('span', { class: 'tab-indicator', 'aria-hidden': 'true' }), navLinks);
   document.getElementById('nav').replaceChildren(tabs);
@@ -110,17 +118,24 @@ async function boot() {
     console.error(err);
     toast('Could not save — check storage space');
   });
+  const pre = showPreloader();
+  pre.progress(0.2);
   buildNav();
 
   try {
     await store.load();
   } catch (err) {
     console.error(err);
+    pre.done();
     main.replaceChildren(h('p', { class: 'hint' }, 'Storage is unavailable. In Safari, private browsing blocks it.'));
     return;
   }
+  pre.progress(0.65);
+  await document.fonts.ready;
+  pre.progress(0.9);
 
   enter();
+  pre.done();
   if (route().name === 'today') focusInput();
   window.addEventListener('hashchange', onRoute);
 
