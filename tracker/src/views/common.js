@@ -93,7 +93,7 @@ function meta(t, { showSphere = true, inDay = false } = {}) {
   const parts = [];
   const sphere = sphereOf(t);
   if (showSphere) {
-    parts.push(h('span', { class: 'meta-sphere' }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'));
+    parts.push(h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'));
   }
   if (t.day && t.status !== 'done') {
     const when = [!inDay && dayLabel(t.day, ui.day), t.time].filter(Boolean).join(' ');

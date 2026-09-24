@@ -1,11 +1,11 @@
 /**
  * «Сферы» — папки для задач. Плитки: глиф, название, число активных задач.
  * Порядок — перетаскиванием за ручку; «⋯» открывает шторку: имя, глиф,
- * архив. Архив задачи не удаляет, только убирает сферу с глаз.
+ * цвет (в оформлении Colour), архив. Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
-import { h, glyph, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, toast } from '../ui.js';
-import { GLYPHS, activeSpheres, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
+import { h, glyph, sphereMark, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, toast } from '../ui.js';
+import { COLORS, GLYPHS, activeSpheres, settingsOf, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import {
   ui, rerender, header, backLink, iconButton, pillButton, foldout, taskItem, selecting, startSelect, selectBar,
@@ -19,7 +19,7 @@ import { composer } from './pickers.js';
  */
 function sphereTile(s, count, { drag = true } = {}) {
   const n = count ?? 0;
-  return h('li', { class: ['tile', 'sphere-tile', s.archived && 'is-archived'], 'data-id': s.id },
+  return h('li', { class: ['tile', 'sphere-tile', s.archived && 'is-archived'], 'data-id': s.id, 'data-sc': s.color },
     h('a', { class: 'tile-cover', href: `#/spheres/${s.id}`, 'aria-label': `${s.name}, ${n} open` }),
     h('span', { class: 'chip' }, glyph(s.glyph)),
     iconButton('more', `Edit ${s.name}`, () => editSphere(s.id), 'tile-more'),
@@ -42,7 +42,7 @@ export function editSphere(id) {
     if (!s) return [];
     return [
       h('div', { class: 'sheet-head' },
-        glyph(s.glyph),
+        sphereMark(s),
         h('input', {
           class: 'sheet-input', type: 'text', value: s.name, 'aria-label': 'Sphere name', 'data-key': `sphere-name-${s.id}`,
           onkeydown: (e) => { if (e.key === 'Enter') e.target.blur(); },
@@ -57,6 +57,13 @@ export function editSphere(id) {
           class: ['glyph-pick', s.glyph === g && 'is-on'], type: 'button', 'aria-label': g, 'aria-pressed': String(s.glyph === g),
           onclick: () => store.updateSphere(s.id, { glyph: g }),
         }, glyph(g)))),
+      // цвет — только в оформлении Colour: в Minimal его не видно
+      settingsOf(store.getState()).palette === 'colour' && h('div', { class: 'color-grid', role: 'group', 'aria-label': 'Colour' },
+        COLORS.map((c) => h('button', {
+          class: ['color-pick', s.color === c && 'is-on'], type: 'button', 'data-sc': c,
+          'aria-label': c, 'aria-pressed': String(s.color === c),
+          onclick: () => store.updateSphere(s.id, { color: c }),
+        }, s.color === c && icon('check', 20)))),
       h('div', { class: 'sheet-actions' },
         s.archived
           ? pillButton(null, 'Restore', () => { store.updateSphere(s.id, { archived: false }); closeSheet(); toast(`${s.name} restored`); })
@@ -136,7 +143,7 @@ export function sphereView(id) {
 
   return h('section', { class: ['screen', 'screen-sphere', sel && 'is-selecting'] },
     backLink('#/spheres', 'Spheres'),
-    header(h('span', { class: 'title-glyph' }, glyph(isInbox ? 'inbox' : s.glyph), name),
+    header(h('span', { class: 'title-glyph' }, sphereMark(s), name),
       s?.archived ? 'Archived' : `${open.filter((t) => t.status !== 'paused').length} active`,
       !sel && open.length > 0 && h('button', { class: 'pill head-pill', type: 'button', onclick: () => startSelect(scope) }, 'Select'),
       !isInbox && !sel && iconButton('more', `Edit ${name}`, () => editSphere(s.id))),

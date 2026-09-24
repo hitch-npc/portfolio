@@ -1,12 +1,13 @@
 /**
- * Настройки: день и ввод, экран при запуске, движение; ИИ — инструкция для
+ * Настройки: оформление (Minimal или Colour, светлая или тёмная тема), день
+ * и ввод, экран при запуске, движение; ИИ — инструкция для
  * любого чата (с данными или без) и вставка его ответа; данные — резервная
  * копия, импорт из файла (копия, JSON, CSV, текст, Markdown) и вставка
  * списка. Копия уходит через «Поделиться» (на iPhone — «Сохранить в Файлы»),
  * где его нет — скачиванием. Импорт показывает, что изменится, и ждёт
  * подтверждения.
  */
-import { h, icon, openSheet, closeSheet, toast, autosize, copyText } from '../ui.js';
+import { h, icon, openSheet, closeSheet, toast, autosize, copyText, calm } from '../ui.js';
 import {
   aiData, aiPrompt, backupName, detect, makeBackup, packFiles, planImport, readBackup, readImportText,
 } from '../io.js';
@@ -170,8 +171,14 @@ async function copyPrompt(withData) {
   toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
 }
 
-/** Строка настройки: подпись и пилюли вариантов, выбранный — чёрный. */
-function choice(label, key, options, hint) {
+/** Смена оформления — наплывом старого экрана в новый; без View Transitions и при Fewer — сразу. */
+function restyle(fn) {
+  if (document.startViewTransition && !calm()) document.startViewTransition(fn);
+  else fn();
+}
+
+/** Строка настройки: подпись и пилюли вариантов, выбранный — залит. smooth — сменить наплывом. */
+function choice(label, key, options, hint, smooth = false) {
   const current = settingsOf(store.getState())[key];
   return h('div', { class: 'setting' },
     h('span', { class: 'setting-label' }, label),
@@ -179,7 +186,11 @@ function choice(label, key, options, hint) {
       options.map(([value, text]) =>
         h('button', {
           class: ['pill', value === current && 'is-on'], type: 'button', 'aria-pressed': String(value === current),
-          onclick: () => store.setSetting(key, value),
+          onclick: () => {
+            const set = () => store.setSetting(key, value);
+            if (smooth) restyle(set);
+            else set();
+          },
         }, text)))),
     hint && h('p', { class: 'setting-hint' }, hint));
 }
@@ -200,6 +211,12 @@ export function settingsView() {
     header('Settings', null, h('a', {
       class: 'icon-btn corner-btn', href: '#/today', 'aria-label': 'Close settings', title: 'Close',
     }, icon('close'))),
+
+    h('h2', { class: 'label' }, 'Appearance'),
+    h('section', { class: 'block-alt settings' },
+      choice('Style', 'palette', [['minimal', 'Minimal'], ['colour', 'Colour']],
+        'Colour — every sphere gets its own colour: its tile and the tags on its tasks. Change it in the sphere’s ⋯ menu.', true),
+      choice('Theme', 'theme', [['light', 'Light'], ['dark', 'Dark']], null, true)),
 
     h('h2', { class: 'label' }, 'Planning'),
     h('section', { class: 'block-alt settings' },

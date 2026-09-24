@@ -4,8 +4,14 @@
  */
 import { addDays } from './dates.js';
 
-/** Настройки по умолчанию. dayLimit — сколько незавершённых задач помещается в день (0 — без лимита). */
-export const DEFAULT_SETTINGS = { dayLimit: 3, addTo: 'today', motion: 'system', start: 'today' };
+/**
+ * Настройки по умолчанию. dayLimit — сколько незавершённых задач помещается
+ * в день (0 — без лимита). Оформление: palette — minimal (как было, без
+ * цвета) или colour (у сфер свой цвет); у каждого — тема light или dark.
+ */
+export const DEFAULT_SETTINGS = {
+  dayLimit: 3, addTo: 'today', motion: 'system', start: 'today', theme: 'light', palette: 'minimal',
+};
 
 export const settingsOf = (st) => ({ ...DEFAULT_SETTINGS, ...st.settings });
 export const dayLimit = (st) => settingsOf(st).dayLimit;
@@ -21,8 +27,31 @@ export const PRIORITIES = [
   ['medium', 'Medium'],
   ['low', 'Low'],
 ];
-/** Сферы различаются глифом, не цветом: цвет в системе один, и он значит «срочно». */
+/** Сферы различаются глифом; в оформлении Colour — ещё и цветом (красного среди них нет: он значит «срочно»). */
 export const GLYPHS = ['circle', 'pill', 'square', 'bar', 'triangle', 'ring', 'half', 'diamond'];
+
+/** Цвета сфер — ключи, не hex: сами цвета у каждой темы свои (app.css, --sph-*). */
+export const COLORS = ['olive', 'lavender', 'apricot', 'mint', 'slate', 'lilac', 'plum', 'khaki'];
+
+/** Цвет новой сферы: первый, которого нет у активных; все заняты — по кругу. */
+export function nextColor(spheres) {
+  const used = new Set(spheres.filter((s) => !s.archived).map((s) => s.color));
+  return COLORS.find((c) => !used.has(c)) ?? COLORS[spheres.length % COLORS.length];
+}
+
+/**
+ * Сферам без цвета (созданным до цветов, из старой копии) — цвет по порядку.
+ * Меняет переданные сферы и возвращает те, что поменялись, — их записать.
+ */
+export function colorize(spheres) {
+  const changed = [];
+  for (const s of [...spheres].sort((a, b) => a.archived - b.archived || a.order - b.order)) {
+    if (COLORS.includes(s.color)) continue;
+    s.color = nextColor(spheres.filter((x) => COLORS.includes(x.color)));
+    changed.push(s);
+  }
+  return changed;
+}
 
 export const DEFAULT_SPHERES = [
   ['TTS', 'circle'],

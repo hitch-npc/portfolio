@@ -6,7 +6,9 @@
  * onError показывает это пользователю.
  */
 import * as db from './db.js';
-import { DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, dayTasks, isDayFull, isDone, timeSlot } from './logic.js';
+import {
+  DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, COLORS, colorize, dayTasks, isDayFull, isDone, nextColor, timeSlot,
+} from './logic.js';
 import { addDays, diffDays, nextRepeat, todayISO } from './dates.js';
 
 /** files — вложения задач: { id, taskId, name, type, size, createdAt, blob }. */
@@ -33,13 +35,20 @@ export async function load() {
   // первый запуск: стартовые сферы
   if (!meta.some((m) => m.key === 'seeded')) {
     state.spheres = DEFAULT_SPHERES.map(([name, glyph], order) => ({
-      id: uid(), name, glyph, order, archived: false, createdAt: stamp(),
+      id: uid(), name, glyph, color: COLORS[order % COLORS.length], order, archived: false, createdAt: stamp(),
     }));
     await db.batch([
       ...state.spheres.map((value) => ({ store: 'spheres', value })),
       { store: 'meta', value: { key: 'seeded', value: true } },
     ]);
   }
+  colorSpheres();
+}
+
+/** Сферы из времени до цветов получают цвет по порядку — один раз, дальше он свой. */
+function colorSpheres() {
+  const changed = colorize(state.spheres);
+  if (changed.length) persist(db.batch(changed.map((value) => ({ store: 'spheres', value }))));
 }
 
 /* ── настройки ───────────────────────────────────────────────────────── */
@@ -303,6 +312,7 @@ export function createSphere(name) {
     id: uid(),
     name,
     glyph: GLYPHS.find((g) => !used.has(g)) ?? GLYPHS[state.spheres.length % GLYPHS.length],
+    color: nextColor(state.spheres),
     order: Math.max(-1, ...state.spheres.map((x) => x.order)) + 1,
     archived: false,
     createdAt: stamp(),
@@ -448,6 +458,7 @@ export async function applyImport(plan) {
 export async function restore(data) {
   await db.replaceAll(data);
   Object.assign(state, { spheres: data.spheres, tasks: data.tasks, goals: data.goals, files: data.files });
+  colorSpheres();
   if (data.settings) {
     state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
     persist(db.put('meta', { key: 'settings', value: state.settings }));
