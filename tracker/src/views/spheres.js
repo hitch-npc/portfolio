@@ -4,19 +4,33 @@
  * архив. Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих».
  */
-import { h, glyph, icon, entry, sortable, openSheet, closeSheet, toast } from '../ui.js';
+import { h, glyph, icon, entry, sortableGrid, openSheet, closeSheet, toast } from '../ui.js';
 import { GLYPHS, activeSpheres, archivedSpheres, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import { header, backLink, iconButton, pillButton, foldout, taskItem } from './common.js';
 
-function sphereRow(s, count, { drag = true } = {}) {
-  return h('li', { class: 'sphere', 'data-id': s.id },
-    h('a', { class: 'sphere-main', href: `#/spheres/${s.id}` },
-      h('span', { class: 'chip' }, glyph(s.glyph)),
-      h('span', { class: 'sphere-name' }, s.name),
-      h('span', { class: ['sphere-count', !count && 'is-zero'] }, count ?? 0)),
-    iconButton('more', `Edit ${s.name}`, () => editSphere(s.id)),
+/**
+ * Плитка сферы: глиф в кружке, «⋯» и ручка перетаскивания по углам, внизу —
+ * название и крупное число открытых задач. Ссылка лежит под всей плиткой,
+ * кнопки — поверх неё (кнопка внутри ссылки была бы невалидной разметкой).
+ */
+function sphereTile(s, count, { drag = true } = {}) {
+  const n = count ?? 0;
+  return h('li', { class: ['tile', 'sphere-tile', s.archived && 'is-archived'], 'data-id': s.id },
+    h('a', { class: 'tile-cover', href: `#/spheres/${s.id}`, 'aria-label': `${s.name}, ${n} open` }),
+    h('span', { class: 'chip' }, glyph(s.glyph)),
+    iconButton('more', `Edit ${s.name}`, () => editSphere(s.id), 'tile-more'),
+    h('span', { class: 'tile-name' }, s.name),
+    h('span', { class: ['tile-count', !n && 'is-zero'] }, n),
     drag && h('span', { class: 'drag', 'data-drag': '', 'aria-label': `Drag ${s.name} to reorder` }, icon('drag')));
+}
+
+function inboxTile(n) {
+  return h('li', { class: 'tile sphere-tile tile-inbox' },
+    h('a', { class: 'tile-cover', href: '#/spheres/inbox', 'aria-label': `Inbox, ${n} open` }),
+    h('span', { class: 'chip' }, glyph('inbox')),
+    h('span', { class: 'tile-name' }, 'Inbox'),
+    h('span', { class: ['tile-count', !n && 'is-zero'] }, n));
 }
 
 export function editSphere(id) {
@@ -59,24 +73,21 @@ export function spheresView() {
   const active = activeSpheres(st);
   const archived = archivedSpheres(st);
 
-  const inbox = h('ul', { class: 'spheres' },
-    h('li', { class: 'sphere' },
-      h('a', { class: 'sphere-main', href: '#/spheres/inbox' },
-        h('span', { class: 'chip' }, glyph('inbox')),
-        h('span', { class: 'sphere-name' }, 'Inbox'),
-        h('span', { class: ['sphere-count', !counts.get(null) && 'is-zero'] }, counts.get(null) ?? 0))));
+  // открытые во «Входящих» и активных сферах; архив не считается — его задачи скрыты
+  const open = [null, ...active.map((s) => s.id)].reduce((n, id) => n + (counts.get(id) ?? 0), 0);
 
-  const list = sortable(h('ul', { class: 'spheres' }, active.map((s) => sphereRow(s, counts.get(s.id)))),
-    (ids) => store.reorderSpheres(ids));
+  // «Входящие» — первая плитка, но без data-id: её не перетащить и перед ней не встать
+  const grid = sortableGrid(h('ul', { class: 'tiles' },
+    inboxTile(counts.get(null) ?? 0),
+    active.map((s) => sphereTile(s, counts.get(s.id)))),
+  (ids) => store.reorderSpheres(ids));
 
-  const open = [...counts.values()].reduce((a, b) => a + b, 0);
   return h('section', { class: 'screen screen-spheres' },
     header('Spheres', `${open} open`),
-    inbox,
-    list,
-    entry('sphere-new', 'New sphere', (name) => store.createSphere(name)),
+    grid,
+    entry('sphere-new', 'New sphere', (name) => store.createSphere(name), { cls: 'entry-card' }),
     archived.length > 0 && foldout('archived', 'Archived', archived.length, () =>
-      h('ul', { class: 'spheres spheres-archived' }, archived.map((s) => sphereRow(s, counts.get(s.id), { drag: false })))));
+      h('ul', { class: 'tiles' }, archived.map((s) => sphereTile(s, counts.get(s.id), { drag: false })))));
 }
 
 /** Одна сфера (или «Входящие»): добавить сюда, активные сверху, готовые свёрнуты. */

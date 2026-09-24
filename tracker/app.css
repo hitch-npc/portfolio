@@ -23,6 +23,10 @@
   --hatch: repeating-linear-gradient(-45deg, var(--ink-muted) 0 2px, transparent 2px 7px);
   --hatch-fine: repeating-linear-gradient(-45deg, var(--ink-muted) 0 1px, transparent 1px 6px);
   --screen: var(--bg);
+  /* точечное поле под графиками — как у чертежа */
+  --dots: radial-gradient(circle, var(--ink-muted) 0.75px, transparent 1.1px) 0 0 / 10px 10px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
 
   --r-card: 22px;
   --r-sheet: 24px;
@@ -68,6 +72,16 @@ body {
   font-feature-settings: 'tnum' 0, 'ss01' 0;
 }
 
+/* бумажное зерно поверх всего экрана; касания проходят насквозь */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: url('textures/grain.png') 0 0 / 160px 160px;
+}
+
 button,
 input,
 textarea {
@@ -85,9 +99,32 @@ button {
   text-align: inherit;
 }
 
-button:active,
-a:active {
+a:active,
+.task-main:active,
+.fold-head:active {
   opacity: 0.6;
+}
+
+.pill,
+.chip,
+.icon-btn,
+.check,
+.pick,
+.replace,
+.glyph-pick,
+.tab-icon {
+  transition: transform 0.14s var(--ease), background-color 0.25s ease, color 0.25s ease;
+}
+
+.pill:active,
+.icon-btn:active,
+.check:active,
+.pick:active,
+.replace:active,
+.glyph-pick:active,
+.add .chip:active,
+.tab:active .tab-icon {
+  transform: scale(0.93);
 }
 
 a {
@@ -258,25 +295,6 @@ textarea:focus-visible {
 }
 
 /* крупные числа — обычным весом, хвост приглушённо и мельче */
-.big {
-  margin: 0 0 14px;
-  font-size: 44px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.035em;
-  font-variant-numeric: tabular-nums;
-}
-
-.big .muted {
-  margin-left: 2px;
-  font-size: 17px;
-  letter-spacing: 0;
-}
-
-.big.is-late {
-  color: var(--accent);
-}
-
 .hint {
   margin: 14px 4px;
   font-size: 15px;
@@ -299,11 +317,11 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 64px;
-  padding: 0 18px 0 14px;
-  margin-bottom: 20px;
+  height: 60px;
+  padding: 0 20px 0 12px;
+  margin-bottom: 16px;
   background: var(--bg-card);
-  border-radius: var(--r-card);
+  border-radius: var(--r-pill);
 }
 
 .add-input {
@@ -390,7 +408,7 @@ textarea:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px 16px 14px 14px;
+  padding: 14px 14px 14px 16px;
   min-height: 62px;
 }
 
@@ -596,7 +614,6 @@ textarea:focus-visible {
 
 /* колонка сетки не шире экрана, что бы ни лежало внутри */
 .tasks,
-.spheres,
 .picks,
 .replace-list,
 .goal-list,
@@ -862,97 +879,6 @@ textarea:focus-visible {
   margin: -8px -10px -8px 0;
 }
 
-/* ── сферы ──────────────────────────────────────────────────────────── */
-
-.spheres {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--gap);
-}
-
-.spheres + .spheres {
-  margin-top: var(--gap);
-}
-
-.sphere {
-  display: flex;
-  align-items: center;
-  min-height: 64px;
-  padding-right: 4px;
-  background: var(--bg-card);
-  border-radius: var(--r-card);
-  transition: transform 0.16s ease;
-}
-
-.sphere.is-dragging {
-  position: relative;
-  z-index: 2;
-  background: var(--bg-olive-card);
-  transition: none;
-}
-
-.sphere-main {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 1;
-  min-width: 0;
-  height: 64px;
-  padding: 0 8px 0 18px;
-  text-decoration: none;
-}
-
-.sphere-main {
-  padding-left: 12px;
-}
-
-.sphere .chip {
-  background: var(--bg);
-}
-
-.sphere .chip .glyph {
-  width: 14px;
-  height: 14px;
-}
-
-.sphere-name {
-  flex: 1;
-  min-width: 0;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sphere-count {
-  font-size: 30px;
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  font-variant-numeric: tabular-nums;
-}
-
-.sphere-count.is-zero {
-  color: var(--ink-muted);
-}
-
-.drag {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 44px;
-  color: var(--ink-muted);
-  touch-action: none;
-  cursor: grab;
-}
-
-.spheres-archived .sphere-name {
-  color: var(--ink-muted);
-}
-
 /* ── цели ───────────────────────────────────────────────────────────── */
 
 .goal-list {
@@ -1055,42 +981,6 @@ textarea:focus-visible {
 
 /* ── бриф ───────────────────────────────────────────────────────────── */
 
-.panels {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.panel {
-  padding: 16px 18px 18px;
-  background: var(--bg-card);
-  border-radius: var(--r-card);
-}
-
-.panel-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.panel-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.panel-aside {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink-muted);
-}
-
-.panel .hint {
-  margin: 0;
-}
-
 .lines {
   list-style: none;
   margin: 0;
@@ -1158,6 +1048,7 @@ textarea:focus-visible {
 /* столбики — пилюли: сегодня сплошным, остальные дни штриховкой */
 .week-bar {
   width: 100%;
+  height: calc(var(--h) * 100%);
   min-height: 28px;
   border-radius: var(--r-pill);
   background: var(--hatch);
@@ -1175,14 +1066,6 @@ textarea:focus-visible {
 
 .week-bar.is-now.is-zero {
   background: var(--ink);
-}
-
-.week.is-empty .week-col {
-  grid-template-rows: 0 6px auto auto;
-}
-
-.week.is-empty .week-track {
-  height: 6px;
 }
 
 .week-day {
@@ -1278,7 +1161,7 @@ textarea:focus-visible {
 .tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
   height: 48px;
   padding: 0 6px;
   border-radius: var(--r-pill);
@@ -1300,11 +1183,13 @@ textarea:focus-visible {
 }
 
 .tab-label {
-  display: none;
-  padding-right: 10px;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
+  transition: max-width 0.34s var(--ease), opacity 0.2s ease, margin 0.34s var(--ease);
 }
 
 .tab.is-on .tab-icon {
@@ -1313,12 +1198,16 @@ textarea:focus-visible {
 }
 
 .tab.is-on .tab-label {
-  display: block;
+  max-width: 96px;
+  margin: 0 10px 0 8px;
+  opacity: 1;
 }
 
 @media (max-width: 350px) {
   .tab.is-on .tab-label {
-    display: none;
+    max-width: 0;
+    margin: 0;
+    opacity: 0;
   }
 }
 
@@ -1501,6 +1390,387 @@ textarea:focus-visible {
 .toast.is-on {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* ── поле графика и композиция дня ─────────────────────────────────── */
+
+.plot {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 16px;
+  background: var(--dots);
+}
+
+/* уголки-метки, как на чертеже */
+.mark {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 0 solid var(--ink);
+}
+
+.mark-tl { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+.mark-tr { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; }
+.mark-bl { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.mark-br { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+.day-chart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 172px;
+}
+
+.shape {
+  flex: 1 1 0;
+  max-width: 62px;
+  height: calc(var(--h) * 100%);
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  transition: height 0.5s var(--ease), max-width 0.5s var(--ease);
+}
+
+.shape.is-first {
+  background: var(--accent);
+}
+
+.shape.is-done {
+  background: var(--hatch);
+}
+
+.shape.is-empty {
+  flex: 0 1 40px;
+  height: auto;
+  aspect-ratio: 1;
+  background: var(--hatch-fine);
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 4px 18px;
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.stat-value {
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── плитки ─────────────────────────────────────────────────────────── */
+
+.tiles,
+.bento {
+  position: relative; /* плитки меряют себя от сетки — для перетаскивания */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bento {
+  margin: 4px 0 12px;
+}
+
+.tile {
+  position: relative;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  background: var(--bg-card);
+  border-radius: var(--r-card);
+}
+
+.tile-wide {
+  grid-column: 1 / -1;
+}
+
+.tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 10px;
+}
+
+.tile-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tile-link {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  color: var(--ink-muted);
+}
+
+.tile-link .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.big {
+  margin: 0 0 12px;
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.big .muted {
+  margin-left: 2px;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.big.is-late {
+  color: var(--accent);
+}
+
+.tile .hint {
+  margin: 0;
+}
+
+.lines-sm {
+  gap: 6px;
+}
+
+.lines-sm .line {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.lines-sm .line-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pill-export {
+  margin-top: 4px;
+}
+
+/* плитка сферы: глиф и «⋯» сверху, название и число снизу; ссылка — под всей плиткой */
+.sphere-tile {
+  display: flex;
+  flex-direction: column;
+  min-height: 152px;
+}
+
+.tile-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.sphere-tile > .chip,
+.sphere-tile > .tile-name,
+.sphere-tile > .tile-count {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.sphere-tile .chip {
+  background: var(--bg);
+}
+
+.sphere-tile .chip .glyph {
+  width: 14px;
+  height: 14px;
+}
+
+.sphere-tile .tile-more,
+.sphere-tile .drag {
+  position: absolute;
+  z-index: 2;
+}
+
+.sphere-tile .tile-more {
+  top: 6px;
+  right: 6px;
+}
+
+.sphere-tile .drag {
+  right: 6px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+}
+
+.tile-name {
+  margin-top: auto;
+  padding-top: 14px;
+  padding-right: 32px;
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-count {
+  font-size: 48px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-count.is-zero {
+  color: var(--ink-muted);
+}
+
+.sphere-tile.is-dragging {
+  z-index: 5;
+  background: var(--bg-olive-card);
+  transition: none;
+}
+
+.sphere-tile.is-archived .tile-name {
+  color: var(--ink-muted);
+}
+
+.drag {
+  display: grid;
+  place-items: center;
+  color: var(--ink-muted);
+  touch-action: none;
+  cursor: grab;
+}
+
+.fold .tiles {
+  margin-bottom: 8px;
+}
+
+/* ── движение ───────────────────────────────────────────────────────── */
+
+/* вход на экран: всё мягко поднимается, графики вырастают по очереди */
+.is-entering .screen {
+  animation: rise 0.34s var(--ease) both;
+}
+
+.is-entering .shape {
+  animation: grow 0.6s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 80ms);
+}
+
+.is-entering .week-bar {
+  transform-origin: 50% 100%;
+  animation: grow-up 0.6s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 80ms);
+}
+
+.is-entering .meter-done {
+  transform-origin: 0 50%;
+  animation: fill 0.7s var(--ease) 0.2s both;
+}
+
+.is-entering .tile,
+.is-entering .task,
+.is-entering .pick {
+  animation: rise 0.42s var(--ease) both;
+}
+
+.is-entering .tiles > :nth-child(2),
+.is-entering .tasks > :nth-child(2),
+.is-entering .picks > :nth-child(2) { animation-delay: 40ms; }
+.is-entering .tiles > :nth-child(3),
+.is-entering .tasks > :nth-child(3),
+.is-entering .picks > :nth-child(3) { animation-delay: 80ms; }
+.is-entering .tiles > :nth-child(4),
+.is-entering .tasks > :nth-child(4),
+.is-entering .picks > :nth-child(4) { animation-delay: 120ms; }
+.is-entering .tiles > :nth-child(n + 5),
+.is-entering .tasks > :nth-child(n + 5),
+.is-entering .picks > :nth-child(n + 5) { animation-delay: 160ms; }
+
+/* галочка: впрыгивает и прорисовывается; название зачёркивается слева направо */
+.check.is-pop {
+  animation: pop 0.4s var(--spring);
+}
+
+.check.is-pop .icon path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: draw 0.3s var(--ease) 0.08s forwards;
+}
+
+.task.is-pop .task-title {
+  text-decoration: none;
+  background: linear-gradient(var(--ink-muted), var(--ink-muted)) 0 55% / 0 1.5px no-repeat;
+  animation: strike 0.36s var(--ease) 0.1s forwards;
+}
+
+.sheet-scrim {
+  animation: fade 0.22s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.7); }
+  100% { transform: none; }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes strike {
+  to {
+    background-size: 100% 1.5px;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

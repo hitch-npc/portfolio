@@ -2,7 +2,7 @@
  * Общее для экранов: шапка, строка задачи с раскрывающейся карточкой,
  * шторка «день полон — заменить одну из трёх».
  */
-import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast } from '../ui.js';
+import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast, countUp } from '../ui.js';
 import { addDays, dueLabel, fmtDay } from '../dates.js';
 import { DAY_LIMIT, PRIORITIES, STATUSES, activeSpheres, dayTasks } from '../logic.js';
 import * as store from '../store.js';
@@ -14,6 +14,8 @@ export const ui = {
   expanded: null, // id раскрытой задачи
   open: new Set(), // раскрытые свёрнутые блоки: 'done:<sphere>', 'archived'
   confirm: null, // id, ждущий второго тапа «удалить»
+  popped: null, // id задачи, которую только что отметили: анимация галочки
+  entering: false, // экран только что открыт: анимации входа
 };
 
 /** Перерисовка без изменения данных (раскрыть карточку, свернуть блок). Ставит app.js. */
@@ -41,18 +43,17 @@ export function pillButton(name, label, onclick, cls = '') {
     name && h('span', { class: 'chip' }, icon(name)), label);
 }
 
-/** Карточка-панель: мелкая подпись сверху, справа — пояснение. */
-export function panel(label, aside, ...content) {
-  return h('section', { class: 'panel' },
-    h('div', { class: 'panel-head' },
-      h('span', { class: 'panel-label' }, label),
-      aside != null && aside !== false && h('span', { class: 'panel-aside' }, aside)),
-    content);
-}
+/** Поле графика: точечная сетка и уголки-метки, как на чертеже. */
+export const plot = (...content) =>
+  h('div', { class: 'plot' }, content,
+    ['tl', 'tr', 'bl', 'br'].map((c) => h('span', { class: `mark mark-${c}`, 'aria-hidden': 'true' })));
 
-/** Крупное число; хвост (единицы, «/всего») — приглушённо. */
-export const bigNumber = (value, tail, cls = '') =>
-  h('p', { class: ['big', cls] }, String(value), tail && h('span', { class: 'muted' }, tail));
+/** Строка «подпись — большое число» на одной базовой линии. */
+export function stat(label, value, tail, cls = '') {
+  const v = h('span', { class: ['stat-value', cls] }, String(value), tail && h('span', { class: 'muted' }, tail));
+  if (ui.entering && typeof value === 'number') countUp(v, value);
+  return h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label), v);
+}
 
 export function toggleBlock(id) {
   ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id);
@@ -78,6 +79,7 @@ export const emptySlots = (taken) =>
 
 const sphereOf = (t) => store.getState().spheres.find((s) => s.id === t.sphereId);
 
+/** Подпись под названием — коротко: сфера, срок, «High», подзадачи. Остальное — в карточке. */
 function meta(t, { showSphere = true } = {}) {
   const parts = [];
   const sphere = sphereOf(t);
@@ -90,9 +92,8 @@ function meta(t, { showSphere = true } = {}) {
     const due = dueLabel(t.deadline, ui.day);
     parts.push(h('span', { class: due.late ? 'is-late' : null }, due.text));
   }
-  if (t.priority) parts.push(PRIORITIES.find(([v]) => v === t.priority)[1]);
+  if (t.priority === 'high') parts.push('High');
   if (t.subtasks.length) parts.push(`${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`);
-  if (t.note) parts.push('Note');
   if (!parts.length) return null;
   return h('span', { class: 'task-meta' }, parts.map((p, i) => [i > 0 && h('span', { class: 'dot' }, '·'), p]));
 }
@@ -103,15 +104,22 @@ export function checkButton(done, label, onclick, cls = '') {
   }, icon('check'));
 }
 
+/** Галочка, которую только что поставили: у неё короткая анимация. */
+function toggle(t) {
+  ui.popped = t.status === 'done' ? null : t.id;
+  store.toggleDone(t.id);
+  setTimeout(() => { if (ui.popped === t.id) ui.popped = null; }, 600);
+}
+
 /**
- * Строка задачи. num — номер в дне (1–3); accent — задача №1 сегодня;
- * drag — номер служит ручкой перетаскивания.
+ * Строка задачи: номер (в дне), название с подписью, галочка справа — под большой палец.
+ * num — номер в дне (1–3); accent — задача №1 сегодня; drag — номер служит ручкой.
  */
 export function taskItem(t, opts = {}) {
   const expanded = ui.expanded === t.id;
   const done = t.status === 'done';
   return h('li', {
-    class: ['task', done && 'is-done', t.status === 'paused' && 'is-paused', expanded && 'is-open', opts.cls],
+    class: ['task', done && 'is-done', t.status === 'paused' && 'is-paused', expanded && 'is-open', ui.popped === t.id && 'is-pop', opts.cls],
     'data-id': t.id,
   },
     h('div', { class: 'task-row' },
@@ -120,20 +128,22 @@ export function taskItem(t, opts = {}) {
         'data-drag': opts.drag ? '' : null,
         'aria-label': opts.drag ? `Position ${opts.num}, drag to reorder` : null,
       }, String(opts.num)),
-      checkButton(done, done ? 'Mark as not done' : 'Mark as done', () => store.toggleDone(t.id)),
       // раскрытая: название правится прямо в строке, второй раз его не повторяем
       expanded
         ? [titleEditor(t), iconButton('close', 'Collapse', collapse, 'task-close')]
-        : h('button', {
-          class: 'task-main', type: 'button', 'aria-expanded': 'false',
-          onclick: () => {
-            ui.expanded = t.id;
-            ui.confirm = null;
-            rerender();
+        : [
+          h('button', {
+            class: 'task-main', type: 'button', 'aria-expanded': 'false',
+            onclick: () => {
+              ui.expanded = t.id;
+              ui.confirm = null;
+              rerender();
+            },
           },
-        },
-          h('span', { class: 'task-title' }, t.title),
-          meta(t, opts))),
+            h('span', { class: 'task-title' }, t.title),
+            meta(t, opts)),
+          checkButton(done, done ? 'Mark as not done' : 'Mark as done', () => toggle(t), ui.popped === t.id ? 'is-pop' : ''),
+        ]),
     expanded && taskCard(t));
 }
 
