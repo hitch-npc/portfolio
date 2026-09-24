@@ -6,9 +6,11 @@
  * onError показывает это пользователю.
  */
 import * as db from './db.js';
-import { DAY_LIMIT, DEFAULT_SPHERES, GLYPHS, dayTasks, isDone } from './logic.js';
+import { DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, dayTasks, isDayFull, isDone } from './logic.js';
+import { addDays, diffDays, nextRepeat, todayISO } from './dates.js';
 
-const state = { spheres: [], tasks: [], goals: [] };
+/** files — вложения задач: { id, taskId, name, type, size, createdAt, blob }. */
+const state = { spheres: [], tasks: [], goals: [], files: [], settings: { ...DEFAULT_SETTINGS } };
 const listeners = new Set();
 let onError = () => {};
 
@@ -24,8 +26,9 @@ export const uid = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export async function load() {
-  const [spheres, tasks, goals, meta] = await Promise.all(['spheres', 'tasks', 'goals', 'meta'].map(db.getAll));
-  Object.assign(state, { spheres, tasks, goals });
+  const [spheres, tasks, goals, meta, files] = await Promise.all(['spheres', 'tasks', 'goals', 'meta', 'files'].map(db.getAll));
+  const saved = meta.find((m) => m.key === 'settings')?.value;
+  Object.assign(state, { spheres, tasks, goals, files, settings: { ...DEFAULT_SETTINGS, ...saved } });
 
   // первый запуск: стартовые сферы
   if (!meta.some((m) => m.key === 'seeded')) {
@@ -39,16 +42,28 @@ export async function load() {
   }
 }
 
+/* ── настройки ───────────────────────────────────────────────────────── */
+
+export function setSetting(key, value) {
+  state.settings = { ...state.settings, [key]: value };
+  emit();
+  persist(db.put('meta', { key: 'settings', value: state.settings }));
+}
+
 /* ── задачи ──────────────────────────────────────────────────────────── */
 
 const findTask = (id) => state.tasks.find((t) => t.id === id);
 
+/** Место в конце дня: порядок следующий за последней задачей этого дня. */
+const endOf = (day) => Math.max(-1, ...state.tasks.filter((t) => t.day === day).map((t) => t.dayOrder ?? 0)) + 1;
+
 export function createTask(title, patch = {}) {
   const t = {
     id: uid(), title, sphereId: null, priority: null, deadline: null, status: 'todo',
-    subtasks: [], note: '', day: null, dayOrder: 0, createdAt: stamp(), doneAt: null,
+    subtasks: [], note: '', day: null, dayOrder: 0, time: null, repeat: null, createdAt: stamp(), doneAt: null,
     ...patch,
   };
+  if (t.day) t.dayOrder = endOf(t.day);
   state.tasks.push(t);
   emit();
   persist(db.put('tasks', t));
@@ -64,24 +79,71 @@ export function updateTask(id, patch, { silent = false } = {}) {
   persist(db.put('tasks', t));
 }
 
-export function deleteTask(id) {
-  state.tasks = state.tasks.filter((t) => t.id !== id);
+/** Удаляет задачи вместе с их вложениями. */
+export function deleteTasks(ids) {
+  const gone = new Set(ids);
+  const files = state.files.filter((f) => gone.has(f.taskId));
+  state.tasks = state.tasks.filter((t) => !gone.has(t.id));
+  state.files = state.files.filter((f) => !gone.has(f.taskId));
   emit();
-  persist(db.remove('tasks', id));
+  persist(db.batch([
+    ...ids.map((id) => ({ store: 'tasks', id, remove: true })),
+    ...files.map((f) => ({ store: 'files', id: f.id, remove: true })),
+  ]));
 }
+
+export const deleteTask = (id) => deleteTasks([id]);
 
 /* статус до «готово» — чтобы снятая галочка вернула «в работе», а не «к выполнению» */
 const statusBefore = new Map();
 
+/**
+ * Следующий раз повторяющейся задачи: тот же текст, сфера, приоритет и
+ * подзадачи (неотмеченные), день — по правилу повтора, но не раньше завтра.
+ * Лимит дня тут не проверяется: повтор назначили заранее, его не отменяют.
+ */
+function spawnNext(t) {
+  const today = todayISO();
+  let day = nextRepeat(t.day ?? today, t.repeat);
+  while (day <= today) day = nextRepeat(day, t.repeat);
+  const shift = diffDays(t.day ?? today, day);
+  return {
+    id: uid(), title: t.title, sphereId: t.sphereId, priority: t.priority,
+    deadline: t.deadline ? addDays(t.deadline, shift) : null,
+    status: 'todo', subtasks: t.subtasks.map((x) => ({ ...x, id: uid(), done: false })), note: t.note,
+    day, dayOrder: endOf(day), time: t.time ?? null, repeat: t.repeat, createdAt: stamp(), doneAt: null,
+  };
+}
+
+/** Отмечает или снимает отметку. Для повторяющейся возвращает созданную следующую задачу. */
 export function toggleDone(id) {
   const t = findTask(id);
-  if (!t) return;
+  if (!t) return null;
+  const ops = [];
+  let next = null;
   if (isDone(t)) {
-    updateTask(id, { status: statusBefore.get(id) ?? 'todo', doneAt: null });
+    // снятая отметка забирает и следующий повтор, если его ещё не трогали
+    const n = t.nextId && findTask(t.nextId);
+    if (n && !isDone(n)) {
+      state.tasks = state.tasks.filter((x) => x !== n);
+      ops.push({ store: 'tasks', id: n.id, remove: true });
+    }
+    Object.assign(t, { status: statusBefore.get(id) ?? 'todo', doneAt: null, nextId: null });
   } else {
     statusBefore.set(id, t.status);
-    updateTask(id, { status: 'done', doneAt: stamp() });
+    Object.assign(t, { status: 'done', doneAt: stamp() });
+    if (t.repeat && t.repeat !== 'none') {
+      next = spawnNext(t);
+      t.nextId = next.id;
+      state.tasks.push(next);
+      ops.push({ store: 'tasks', value: next });
+    }
   }
+  t.updatedAt = stamp();
+  ops.push({ store: 'tasks', value: t });
+  emit();
+  persist(db.batch(ops));
+  return next;
 }
 
 export function setStatus(id, status) {
@@ -91,26 +153,32 @@ export function setStatus(id, status) {
 }
 
 /**
- * Ставит задачу в день. День полон — ничего не делает и возвращает false:
- * экран предлагает заменить одну из трёх (replaceId). Задача на паузе,
- * поставленная в день, снимается с паузы — иначе её там не будет видно.
+ * Ставит задачу в день (extra — время и повтор из шторки даты). День полон —
+ * ничего не делает и возвращает false: экран предлагает заменить одну
+ * из задач дня (replaceId). Задача на паузе, поставленная в день, снимается
+ * с паузы — иначе её там не будет видно. Тот же день — только extra.
  */
-export function planTask(id, day, replaceId = null) {
+export function planTask(id, day, replaceId = null, extra = {}) {
   const t = findTask(id);
   if (!t) return false;
-  const { open } = dayTasks(state, day);
-  const ops = [];
-  let order;
-  if (replaceId) {
-    const old = findTask(replaceId);
-    order = old.dayOrder;
-    Object.assign(old, { day: null, dayOrder: 0 });
-    ops.push({ store: 'tasks', value: old });
-  } else {
-    if (open.length >= DAY_LIMIT) return false;
-    order = Math.max(-1, ...open.map((x) => x.dayOrder ?? 0)) + 1;
+  if (!day) {
+    updateTask(id, { day: null, dayOrder: 0, time: null, repeat: null });
+    return true;
   }
-  Object.assign(t, { day, dayOrder: order, updatedAt: stamp() });
+  const ops = [];
+  let order = t.dayOrder;
+  if (t.day !== day || isDone(t)) {
+    if (replaceId) {
+      const old = findTask(replaceId);
+      order = old.dayOrder;
+      Object.assign(old, { day: null, dayOrder: 0 });
+      ops.push({ store: 'tasks', value: old });
+    } else {
+      if (!isDone(t) && isDayFull(state, day)) return false;
+      order = endOf(day);
+    }
+  }
+  Object.assign(t, extra, { day, dayOrder: order, updatedAt: stamp() });
   if (t.status === 'paused') t.status = 'todo';
   ops.push({ store: 'tasks', value: t });
   emit();
@@ -118,7 +186,48 @@ export function planTask(id, day, replaceId = null) {
   return true;
 }
 
-export const unplanTask = (id) => updateTask(id, { day: null, dayOrder: 0 });
+export const unplanTask = (id) => planTask(id, null);
+
+/**
+ * Несколько задач в один день — сколько поместится, по порядку.
+ * day = null снимает дату. Возвращает число поставленных.
+ */
+export function planMany(ids, day) {
+  const ops = [];
+  let placed = 0;
+  for (const id of ids) {
+    const t = findTask(id);
+    if (!t) continue;
+    if (!day) Object.assign(t, { day: null, dayOrder: 0, time: null, repeat: null });
+    else if (t.day === day) { placed++; continue; }
+    else if (isDone(t) || !isDayFull(state, day)) Object.assign(t, { day, dayOrder: endOf(day), status: t.status === 'paused' ? 'todo' : t.status });
+    else continue;
+    placed++;
+    t.updatedAt = stamp();
+    ops.push({ store: 'tasks', value: t });
+  }
+  emit();
+  if (ops.length) persist(db.batch(ops));
+  return placed;
+}
+
+/** Одно и то же изменение нескольким задачам (сфера, приоритет). */
+export function updateMany(ids, patch) {
+  const ops = ids.map(findTask).filter(Boolean).map((t) => {
+    Object.assign(t, patch, { updatedAt: stamp() });
+    return { store: 'tasks', value: t };
+  });
+  emit();
+  persist(db.batch(ops));
+}
+
+/** Отметить несколько сделанными (повторяющиеся ставят следующий раз). */
+export function completeMany(ids) {
+  for (const id of ids) {
+    const t = findTask(id);
+    if (t && !isDone(t)) toggleDone(id);
+  }
+}
 
 /** Новый порядок дня: ids — незавершённые задачи дня в нужном порядке. */
 export function reorderDay(ids) {
@@ -144,6 +253,34 @@ export function updateSubtask(taskId, subId, patch) {
 export function deleteSubtask(taskId, subId) {
   const t = findTask(taskId);
   if (t) updateTask(taskId, { subtasks: t.subtasks.filter((s) => s.id !== subId) });
+}
+
+/* ── вложения ────────────────────────────────────────────────────────── */
+
+export const filesOf = (taskId) => state.files.filter((f) => f.taskId === taskId);
+
+/**
+ * Файлы копируются в базу целиком (Blob из прочитанных байтов): ссылка на
+ * файл из системного выбора в Safari может пропасть после закрытия выбора.
+ */
+export async function addFiles(taskId, list) {
+  const records = [];
+  for (const file of list) {
+    const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'application/octet-stream' });
+    records.push({
+      id: uid(), taskId, name: file.name || 'file', type: blob.type, size: blob.size, createdAt: stamp(), blob,
+    });
+  }
+  await db.batch(records.map((value) => ({ store: 'files', value })));
+  state.files.push(...records);
+  emit();
+  return records;
+}
+
+export function deleteFile(id) {
+  state.files = state.files.filter((f) => f.id !== id);
+  emit();
+  persist(db.remove('files', id));
 }
 
 /* ── сферы ───────────────────────────────────────────────────────────── */
@@ -191,9 +328,13 @@ function saveGoal(g) {
   persist(db.put('goals', g));
 }
 
+/**
+ * Цель: название, необязательные число (target, current, unit) и срок,
+ * шаги — простой чек-лист.
+ */
 export function createGoal(title) {
   const g = {
-    id: uid(), title, steps: [], createdAt: stamp(),
+    id: uid(), title, steps: [], target: null, current: 0, unit: '', deadline: null, createdAt: stamp(),
     order: Math.max(-1, ...state.goals.map((x) => x.order)) + 1,
   };
   state.goals.push(g);
@@ -214,10 +355,18 @@ export function deleteGoal(id) {
   persist(db.remove('goals', id));
 }
 
-export function addStep(goalId, title, month) {
+/** Текущее значение цели ± шаг, не ниже нуля. */
+export function bumpGoal(id, delta) {
+  const g = findGoal(id);
+  if (!g) return;
+  g.current = Math.max(0, Math.round(((g.current ?? 0) + delta) * 100) / 100);
+  saveGoal(g);
+}
+
+export function addStep(goalId, title) {
   const g = findGoal(goalId);
   if (!g) return;
-  g.steps = [...g.steps, { id: uid(), title, month, done: false }];
+  g.steps = [...g.steps, { id: uid(), title, done: false }];
   saveGoal(g);
 }
 
@@ -257,6 +406,10 @@ export async function applyImport(plan) {
 /** Полная замена из резервной копии: сначала база, потом память — копия встаёт целиком или никак. */
 export async function restore(data) {
   await db.replaceAll(data);
-  Object.assign(state, { spheres: data.spheres, tasks: data.tasks, goals: data.goals });
+  Object.assign(state, { spheres: data.spheres, tasks: data.tasks, goals: data.goals, files: data.files });
+  if (data.settings) {
+    state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+    persist(db.put('meta', { key: 'settings', value: state.settings }));
+  }
   emit();
 }

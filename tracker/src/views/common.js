@@ -1,11 +1,13 @@
 /**
  * Общее для экранов: шапка, строка задачи с раскрывающейся карточкой,
- * шторка «день полон — заменить одну из трёх».
+ * шторка «день полон — заменить одну из задач», выбор нескольких задач.
  */
 import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast, countUp } from '../ui.js';
-import { addDays, dueLabel, fmtDay } from '../dates.js';
-import { DAY_LIMIT, PRIORITIES, STATUSES, activeSpheres, dayTasks } from '../logic.js';
+import { addDays, dayLabel, dueLabel, fmtDay } from '../dates.js';
+import { PRIORITIES, REPEATS, STATUSES, activeSpheres, dayLimit, dayTasks } from '../logic.js';
 import * as store from '../store.js';
+import { dateSheet, sphereSheet } from './pickers.js';
+import { filesField } from './files.js';
 
 /** Состояние интерфейса, которого нет в данных. */
 export const ui = {
@@ -16,6 +18,8 @@ export const ui = {
   confirm: null, // id, ждущий второго тапа «удалить»
   popped: null, // id задачи, которую только что отметили: анимация галочки
   entering: false, // экран только что открыт: анимации входа
+  select: null, // выбор нескольких задач: { scope, ids: Set } или null
+  query: '', // поиск на экране сфер
 };
 
 /** Перерисовка без изменения данных (раскрыть карточку, свернуть блок). Ставит app.js. */
@@ -70,21 +74,29 @@ export function foldout(id, title, count, content) {
     isOpen && content());
 }
 
-/** Незанятые места дня — заштрихованы, с номером: лимит в три виден сразу. */
+/** Незанятые места дня — заштрихованы, с номером: лимит дня виден сразу. Без лимита мест нет. */
 export const emptySlots = (taken) =>
-  Array.from({ length: Math.max(0, DAY_LIMIT - taken) }, (_, i) =>
+  Array.from({ length: Math.max(0, dayLimit(store.getState()) - taken) }, (_, i) =>
     h('li', { class: 'slot-empty', 'aria-hidden': 'true' }, h('span', { class: 'task-num' }, String(taken + i + 1))));
 
 /* ── строка задачи ───────────────────────────────────────────────────── */
 
 const sphereOf = (t) => store.getState().spheres.find((s) => s.id === t.sphereId);
 
-/** Подпись под названием — коротко: сфера, срок, «High», подзадачи. Остальное — в карточке. */
-function meta(t, { showSphere = true } = {}) {
+/**
+ * Подпись под названием — коротко: сфера, день и время, срок, «High»,
+ * подзадачи, вложения. Остальное — в карточке. inDay — строка в списке
+ * своего дня: день не подписываем, время — да.
+ */
+function meta(t, { showSphere = true, inDay = false } = {}) {
   const parts = [];
   const sphere = sphereOf(t);
   if (showSphere) {
     parts.push(h('span', { class: 'meta-sphere' }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'));
+  }
+  if (t.day && t.status !== 'done') {
+    const when = [!inDay && dayLabel(t.day, ui.day), t.time].filter(Boolean).join(' ');
+    if (when || t.repeat) parts.push(h('span', { class: 'meta-when' }, when, t.repeat && icon('repeat')));
   }
   if (t.status === 'doing') parts.push('In progress');
   if (t.status === 'paused') parts.push('Paused');
@@ -94,6 +106,8 @@ function meta(t, { showSphere = true } = {}) {
   }
   if (t.priority === 'high') parts.push('High');
   if (t.subtasks.length) parts.push(`${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`);
+  const files = store.filesOf(t.id).length;
+  if (files) parts.push(h('span', { class: 'meta-when' }, icon('clip'), String(files)));
   if (!parts.length) return null;
   return h('span', { class: 'task-meta' }, parts.map((p, i) => [i > 0 && h('span', { class: 'dot' }, '·'), p]));
 }
@@ -104,11 +118,115 @@ export function checkButton(done, label, onclick, cls = '') {
   }, icon('check', cls.includes('check-sm') ? 16 : 20));
 }
 
-/** Галочка, которую только что поставили: у неё короткая анимация. */
+/** Галочка, которую только что поставили: у неё короткая анимация. Повтор — подсказка, когда следующий. */
 function toggle(t) {
   ui.popped = t.status === 'done' ? null : t.id;
-  store.toggleDone(t.id);
+  const next = store.toggleDone(t.id);
+  if (next) toast(`Repeats — next ${dayLabel(next.day, ui.day)}`);
   setTimeout(() => { if (ui.popped === t.id) ui.popped = null; }, 600);
+}
+
+/* ── выбор нескольких задач ──────────────────────────────────────────── */
+
+export const selecting = (scope) => ui.select?.scope === scope;
+
+export function startSelect(scope) {
+  ui.select = { scope, ids: new Set() };
+  ui.expanded = null;
+  rerender();
+}
+
+export function endSelect() {
+  ui.select = null;
+  ui.confirm = null;
+  rerender();
+}
+
+function toggleSelected(id) {
+  const ids = ui.select.ids;
+  ids.has(id) ? ids.delete(id) : ids.add(id);
+  ui.confirm = null;
+  rerender();
+}
+
+/** Строка в режиме выбора: кружок слева, тап по строке — выбрать. */
+function selectItem(t, opts) {
+  const on = ui.select.ids.has(t.id);
+  return h('li', { class: ['task', 'is-selectable', on && 'is-selected', t.status === 'done' && 'is-done'], 'data-id': t.id },
+    h('button', {
+      class: 'task-row', type: 'button', 'aria-pressed': String(on), onclick: () => toggleSelected(t.id),
+    },
+      h('span', { class: ['select-mark', on && 'is-on'], 'aria-hidden': 'true' }, on && icon('check', 20)),
+      h('span', { class: 'task-main' }, h('span', { class: 'task-title' }, t.title), meta(t, opts))));
+}
+
+/**
+ * Панель над вкладками: что сделать с выбранными. all — id всех задач
+ * списка (для «Select all»).
+ */
+export function selectBar(all) {
+  const ids = [...ui.select.ids];
+  const n = ids.length;
+  const done = (msg) => {
+    toast(msg);
+    endSelect();
+  };
+  const plan = (day) => {
+    const placed = store.planMany(ids, day);
+    const where = dayLabel(day, ui.day);
+    done(placed === n ? `${n} → ${where}` : `${placed} of ${n} fit — ${where} is full`);
+  };
+  const act = (name, label, onclick, cls = '') =>
+    h('button', { class: ['bar-btn', cls], type: 'button', disabled: !n, onclick }, icon(name, 20), h('span', null, label));
+  const deleting = ui.confirm === 'bulk-delete';
+
+  return h('div', { class: 'select-bar', role: 'toolbar', 'aria-label': 'Selected tasks' },
+    h('div', { class: 'select-bar-head' },
+      h('span', { class: 'select-count' }, n ? `${n} selected` : 'Select tasks'),
+      h('button', {
+        class: 'pill', type: 'button',
+        onclick: () => {
+          ui.select.ids = new Set(n === all.length ? [] : all);
+          rerender();
+        },
+      }, n === all.length && n ? 'None' : 'All'),
+      h('button', { class: 'pill is-on', type: 'button', onclick: endSelect }, 'Done')),
+    h('div', { class: 'select-actions' },
+      act('check', 'Complete', () => { store.completeMany(ids); done(`${n} done`); }),
+      act('calendar', 'Today', () => plan(ui.day)),
+      act('calendar', 'Tomorrow', () => plan(addDays(ui.day, 1))),
+      act('calendar', 'Date', () => dateSheet({}, (v) => {
+        if (!v.day) {
+          store.planMany(ids, null);
+          done(`${n} without a date`);
+          return;
+        }
+        plan(v.day);
+        store.updateMany(ids.filter((id) => store.getState().tasks.find((t) => t.id === id)?.day === v.day), { time: v.time, repeat: v.repeat });
+      }, { title: `${n} tasks`, full: 'fit' })),
+      act('flag', 'Priority', () => openSheet(() => [
+        h('h2', { class: 'sheet-title' }, 'Priority'),
+        h('div', { class: 'sheet-options' }, [...PRIORITIES, [null, 'None']].map(([v, text]) =>
+          h('button', {
+            class: 'replace', type: 'button',
+            onclick: () => { closeSheet(); store.updateMany(ids, { priority: v }); done(`Priority: ${text}`); },
+          }, h('span', { class: 'replace-title' }, text)))),
+        h('button', { class: 'pill pill-action pill-wide', type: 'button', onclick: closeSheet }, 'Cancel'),
+      ])),
+      act('next', 'Move', () => sphereSheet((sphereId) => {
+        store.updateMany(ids, { sphereId });
+        const s = store.getState().spheres.find((x) => x.id === sphereId);
+        done(`${n} → ${s ? s.name : 'Inbox'}`);
+      }, `Move ${n}`)),
+      act('close', deleting ? 'Sure?' : 'Delete', () => {
+        if (!deleting) {
+          ui.confirm = 'bulk-delete';
+          rerender();
+          return;
+        }
+        store.deleteTasks(ids);
+        done(`${n} deleted`);
+      }, deleting ? 'is-on' : '')));
 }
 
 /**
@@ -116,6 +234,7 @@ function toggle(t) {
  * num — номер в дне (1–3); accent — задача №1 сегодня; drag — номер служит ручкой.
  */
 export function taskItem(t, opts = {}) {
+  if (ui.select) return selectItem(t, opts);
   const expanded = ui.expanded === t.id;
   const done = t.status === 'done';
   return h('li', {
@@ -194,7 +313,9 @@ function taskCard(t) {
   const today = ui.day;
   const tomorrow = addDays(today, 1);
   const done = t.status === 'done';
-  const planned = t.day === today ? 'today' : t.day === tomorrow ? 'tomorrow' : null;
+  const other = t.day && t.day !== today && t.day !== tomorrow;
+  const extra = [other && dayLabel(t.day, today), t.time, t.repeat && REPEATS.find(([v]) => v === t.repeat)?.[1]]
+    .filter(Boolean).join(' · ');
 
   const note = autosize(h('textarea', {
     class: 'edit-note', rows: 2, placeholder: 'Note', 'aria-label': 'Note', 'data-key': `note-${t.id}`, value: t.note,
@@ -205,17 +326,19 @@ function taskCard(t) {
   const spheres = [[null, 'Inbox', 'inbox'], ...activeSpheres(store.getState()).map((s) => [s.id, s.name, s.glyph])];
 
   return h('div', { class: 'card-edit' },
-    !done && field('Plan', pills([['today', 'Today'], ['tomorrow', 'Tomorrow']], planned, (v) => {
-      if (!v) store.unplanTask(t.id);
-      else requestPlan(t, v === 'today' ? today : tomorrow);
-    }, 'Plan')),
+    !done && field('Date',
+      pills([[today, 'Today'], [tomorrow, 'Tomorrow']], t.day, (v) => (v ? requestPlan(t, v) : store.unplanTask(t.id)), 'Date'),
+      h('button', {
+        class: ['pill', other && 'is-on'], type: 'button', 'aria-label': 'Pick a date, time or repeat',
+        onclick: () => dateSheet(t, (v) => requestPlan(t, v.day, { time: v.time, repeat: v.repeat }), { current: t.day }),
+      }, icon('calendar', 20), extra || null)),
     field('Status', pills(STATUSES, t.status, (v) => v && store.setStatus(t.id, v), 'Status')),
     field('Sphere', h('div', { class: 'pills-scroll' },
       pills(spheres, t.sphereId ?? null, (v) => store.updateTask(t.id, { sphereId: v }), 'Sphere'))),
     field('Priority', pills(PRIORITIES, t.priority, (v) => store.updateTask(t.id, { priority: v }), 'Priority')),
     // поле даты прозрачное поверх пилюли: тап открывает системный выбор даты,
     // а видна дата в формате приложения, а не браузера
-    field('Due',
+    field('Deadline',
       h('label', { class: 'date-wrap' },
         h('span', { class: 'pill' }, t.deadline ? fmtDay(t.deadline) : 'Set date'),
         h('input', {
@@ -239,6 +362,7 @@ function taskCard(t) {
           }),
           iconButton('close', 'Delete subtask', () => store.deleteSubtask(t.id, s.id), '', 18)))),
       entry(`subadd-${t.id}`, 'Add subtask', (v) => store.addSubtask(t.id, v), { cls: 'entry-sm' })),
+    field('Files', filesField(t)),
     note,
     h('div', { class: 'card-foot' },
       h('button', {
@@ -261,24 +385,26 @@ function taskCard(t) {
 /* ── день полон ──────────────────────────────────────────────────────── */
 
 /**
- * Ставит задачу в день; если там уже три незавершённые — шторка
- * «заменить одну из трёх». Заменённая возвращается в общий список.
+ * Ставит задачу в день (extra — время и повтор); если день полон — шторка
+ * «заменить одну из задач дня». Заменённая возвращается в общий список.
+ * day = null снимает дату.
  */
-export function requestPlan(t, day) {
-  if (store.planTask(t.id, day)) return;
-  const label = day === ui.day ? 'Today' : 'Tomorrow';
+export function requestPlan(t, day, extra = {}) {
+  if (store.planTask(t.id, day, null, extra)) return;
+  const label = dayLabel(day, ui.day);
+  const limit = dayLimit(store.getState());
   openSheet(() => {
     const { open } = dayTasks(store.getState(), day);
     return [
       h('h2', { class: 'sheet-title' }, `${label} is full`),
-      h('p', { class: 'sheet-text' }, `Three is the limit. Replace one with “${t.title}”?`),
+      h('p', { class: 'sheet-text' }, `${limit} a day is the limit (Settings). Replace one with “${t.title}”?`),
       h('ol', { class: 'replace-list' }, open.map((x, i) =>
         h('li', null, h('button', {
           class: 'replace', type: 'button',
           onclick: () => {
-            store.planTask(t.id, day, x.id);
+            store.planTask(t.id, day, x.id, extra);
             closeSheet();
-            toast(`Planned for ${label.toLowerCase()}, ${fmtDay(day)}`);
+            toast(`Planned for ${fmtDay(day)}`);
           },
         }, h('span', { class: 'replace-num' }, String(i + 1)), h('span', { class: 'replace-title' }, x.title))))),
       h('button', { class: 'pill pill-action pill-wide', type: 'button', onclick: closeSheet }, 'Cancel'),

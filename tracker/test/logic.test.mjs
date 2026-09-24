@@ -4,9 +4,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, diffDays, dueLabel, fmtDay, fmtMonth } from '../src/dates.js';
-import { brief, dayTasks, exportForClaude, isDayFull, overdue, planGroups, sphereCounts, sphereTasks } from '../src/logic.js';
-import { detect, makeBackup, planImport, readBackup, normDate, normPriority, normStatus } from '../src/io.js';
+import { addDays, dayLabel, diffDays, dueLabel, fmtDay, fmtMonth, nextRepeat, nextWeek } from '../src/dates.js';
+import {
+  brief, carriedOver, dayTasks, exportForClaude, goalProgress, isDayFull, isGoalDone, overdue, planGroups,
+  searchTasks, sphereCounts, sphereTasks,
+} from '../src/logic.js';
+import {
+  detect, makeBackup, packFiles, parseCSV, parseList, planImport, readBackup, readImportText,
+  normDate, normPriority, normRepeat, normStatus, normTime,
+} from '../src/io.js';
 
 const TODAY = '2026-09-24';
 let n = 0;
@@ -38,6 +44,23 @@ test('даты: сдвиг через границу месяца и разни�
   assert.equal(fmtMonth('2026-09'), 'September 2026');
 });
 
+test('даты: подписи дня, следующая неделя, повторы', () => {
+  assert.equal(dayLabel(TODAY, TODAY), 'Today');
+  assert.equal(dayLabel('2026-09-25', TODAY), 'Tomorrow');
+  assert.equal(dayLabel('2026-09-23', TODAY), 'Yesterday');
+  assert.equal(dayLabel('2026-09-28', TODAY), 'Mon');
+  assert.equal(dayLabel('2026-10-05', TODAY), 'Mon 5 Oct');
+  assert.equal(dayLabel('2027-01-05', TODAY), '5 Jan 2027');
+  assert.equal(nextWeek(TODAY), '2026-09-28'); // четверг → понедельник
+  assert.equal(nextWeek('2026-09-28'), '2026-10-05'); // понедельник → через неделю
+  assert.equal(nextRepeat(TODAY, 'daily'), '2026-09-25');
+  assert.equal(nextRepeat('2026-09-25', 'weekdays'), '2026-09-28'); // пятница → понедельник
+  assert.equal(nextRepeat(TODAY, 'weekly'), '2026-10-01');
+  assert.equal(nextRepeat('2026-01-31', 'monthly'), '2026-02-28');
+  assert.equal(nextRepeat('2026-12-15', 'monthly'), '2027-01-15');
+  assert.equal(nextRepeat(TODAY, 'none'), null);
+});
+
 test('день: пауза и архивная сфера скрыты, готовые отдельно, порядок по dayOrder', () => {
   const st = world();
   st.tasks.push(
@@ -54,6 +77,21 @@ test('день: пауза и архивная сфера скрыты, гото
   assert.equal(isDayFull(st, TODAY), false);
   st.tasks.push(task('third', { day: TODAY, dayOrder: 2 }));
   assert.equal(isDayFull(st, TODAY), true);
+  // лимит — настройка: 5 или без лимита
+  assert.equal(isDayFull({ ...st, settings: { dayLimit: 5 } }, TODAY), false);
+  assert.equal(isDayFull({ ...st, settings: { dayLimit: 0 } }, TODAY), false);
+});
+
+test('не сделанное в прошлые дни: только активное и не архивное', () => {
+  const st = world();
+  const y = addDays(TODAY, -1);
+  st.tasks.push(
+    task('yesterday', { day: y }),
+    task('yesterday done', { day: y, status: 'done' }),
+    task('yesterday archived', { day: y, sphereId: 'so' }),
+    task('today', { day: TODAY }),
+  );
+  assert.deepEqual(carriedOver(st, TODAY).map((t) => t.title), ['yesterday']);
 });
 
 test('просроченные: без паузы, готовых и архива; уже стоящие в дне — только в брифе', () => {
@@ -81,10 +119,13 @@ test('планирование: несделанное первым, потом 
     task('paused', { status: 'paused' }),
     task('archived', { sphereId: 'so' }),
     task('picked', { day: addDays(TODAY, 1), sphereId: 'sa' }),
+    task('later', { day: addDays(TODAY, 5), sphereId: 'sb' }),
+    task('soon', { day: addDays(TODAY, 2) }),
   );
   const g = planGroups(st, TODAY);
   assert.equal(g.target, '2026-09-25');
   assert.deepEqual(g.carried.map((t) => t.title), ['carried']);
+  assert.deepEqual(g.upcoming.map((t) => t.title), ['soon', 'later'], 'по датам, отдельно от сфер');
   assert.deepEqual(g.inbox.map((t) => t.title), ['inbox']);
   assert.deepEqual(g.spheres.map((x) => [x.sphere.name, x.tasks.map((t) => t.title).sort()]), [
     ['Alpha', ['alpha', 'picked']],
@@ -117,23 +158,27 @@ test('бриф и экспорт для Claude: неделя от сегодня
   );
   st.goals.push({
     id: 'g1', title: 'Goal', order: 0, steps: [
-      { id: 's1', title: 'now', month: '2026-09', done: true },
-      { id: 's2', title: 'now 2', month: '2026-09', done: false },
+      { id: 's1', title: 'now', done: true },
+      { id: 's2', title: 'now 2', done: false },
       { id: 's3', title: 'next', month: '2026-10', done: false },
     ],
-  });
+  }, { id: 'g2', title: 'Apply', order: 1, steps: [], target: 10, current: 4, unit: 'jobs', deadline: '2026-12-31' });
+  st.files = [{ id: 'f1', taskId: st.tasks[0].id, name: 'brief.pdf' }];
   const b = brief(st, TODAY);
   assert.equal(b.week.length, 7);
   assert.equal(b.week[0].date, TODAY);
   assert.deepEqual(b.week[2].tasks.map((t) => t.title), ['friday']);
   assert.equal(b.goals[0].done, 1);
-  assert.equal(b.goals[0].total, 2);
+  assert.equal(b.goals[0].total, 3, 'шаги целиком, без деления по месяцам');
+  assert.equal(b.goals[1].kind, 'value');
 
   const out = exportForClaude(st, TODAY);
   assert.ok(!out.includes('\n'));
   const data = JSON.parse(out);
   assert.deepEqual(data.brief.tomorrow, ['tomorrow']);
-  assert.equal(data.goals[0].progress, '1/2');
+  assert.equal(data.goals[0].progress, '1/3');
+  assert.deepEqual([data.goals[1].progress, data.goals[1].unit, data.goals[1].deadline], ['4/10', 'jobs', '2026-12-31']);
+  assert.deepEqual(data.tasks.find((t) => t.title === 'tomorrow').files, ['brief.pdf']);
   assert.equal(data.tasks.find((t) => t.title === 'tomorrow').sphere, 'Alpha');
   assert.equal(data.tasks.find((t) => t.title === 'far').priority, undefined);
 });
@@ -146,12 +191,84 @@ test('импорт: нормализация значений', () => {
   assert.equal(normDate('2026-10-03T09:00:00Z'), '2026-10-03');
   assert.equal(normDate('3.10.2026'), '2026-10-03');
   assert.equal(normDate('soon'), null);
+  assert.equal(normRepeat('Every week'), 'weekly');
+  assert.equal(normTime('9:05'), '09:05');
+  assert.equal(normTime('25:00'), null);
+});
+
+test('цели: прогресс по числу или по шагам', () => {
+  const steps = [{ title: 'a', done: true }, { title: 'b', done: false }];
+  assert.deepEqual(
+    (({ kind, done, total }) => ({ kind, done, total }))(goalProgress({ steps })),
+    { kind: 'steps', done: 1, total: 2 },
+  );
+  const value = goalProgress({ steps, target: 10, current: 12 });
+  assert.deepEqual([value.kind, value.done, value.total, value.current], ['value', 10, 10, 12]);
+  assert.equal(isGoalDone({ steps, target: 10, current: 12 }), true);
+  assert.equal(isGoalDone({ steps }), false);
+  assert.equal(isGoalDone({ steps: [] }), false, 'пустая цель не достигнута');
+});
+
+test('поиск: название, заметка, подзадачи; незавершённые сверху', () => {
+  const st = world();
+  st.tasks.push(
+    task('Call the bank', { status: 'done' }),
+    task('Taxes', { note: 'ask the BANK about form' }),
+    task('Trip', { subtasks: [{ id: 'x', title: 'bank card', done: false }] }),
+    task('Other'),
+  );
+  assert.deepEqual(searchTasks(st, ' bank ').map((t) => t.title), ['Taxes', 'Trip', 'Call the bank']);
+  assert.deepEqual(searchTasks(st, '  '), []);
+});
+
+test('импорт списка: заголовки — сферы, отступ — подзадачи, метки дня, срока и приоритета', () => {
+  const { tasks } = parseList([
+    '# Work',
+    '- [ ] Send report @today !',
+    '  - attach numbers',
+    '- [x] Old thing due:3.10.2026',
+    'Home:',
+    'Buy lamp @tomorrow',
+    '1. Read book !low',
+    'Mail a@b.com',
+    '---',
+  ].join('\n'), TODAY);
+  assert.deepEqual(tasks.map((t) => [t.title, t.sphere, t.status]), [
+    ['Send report', 'Work', 'todo'],
+    ['Old thing', 'Work', 'done'],
+    ['Buy lamp', 'Home', 'todo'],
+    ['Read book', 'Home', 'todo'],
+    ['Mail a@b.com', 'Home', 'todo'],
+  ]);
+  assert.deepEqual([tasks[0].day, tasks[0].priority], [TODAY, 'high']);
+  assert.deepEqual(tasks[0].subtasks, [{ title: 'attach numbers', done: false }]);
+  assert.equal(tasks[1].deadline, '2026-10-03');
+  assert.equal(tasks[2].day, '2026-09-25');
+  assert.equal(tasks[3].priority, 'low');
+
+  // дальше — общим путём импорта
+  const plan = planImport(world(), { tasks }, { uid });
+  assert.deepEqual(plan.spheres.map((s) => s.name), ['Work', 'Home']);
+  assert.equal(plan.tasks[0].day, TODAY);
+});
+
+test('импорт CSV: разделитель по шапке, кавычки, столбцы по названию', () => {
+  const { tasks } = parseCSV('\uFEFFName;Project;Due;Subtasks\n"Write, ""final"" report";Work;01.10.2026;a; b\nPlain;;;\n');
+  assert.equal(tasks.length, 2);
+  assert.deepEqual(tasks[0], { title: 'Write, "final" report', sphere: 'Work', deadline: '01.10.2026', subtasks: ['a'] });
+  assert.deepEqual(parseCSV('title,priority\nX,high\n').tasks, [{ title: 'X', priority: 'high' }]);
+  assert.deepEqual(parseCSV('just a task\nanother\n').tasks.map((t) => t.title), ['just a task', 'another']);
+
+  assert.deepEqual(readImportText('list.md', '- one\n- two', TODAY).tasks.map((t) => t.title), ['one', 'two']);
+  assert.deepEqual(readImportText('x.json', '[{"title":"a"}]', TODAY), { tasks: [{ title: 'a' }] });
+  assert.equal(readImportText('x.json', '{broken', TODAY), null);
+  assert.equal(readImportText('t.csv', 'title\nq', TODAY).tasks[0].title, 'q');
 });
 
 test('импорт: сферы по названию, повторы пропускаются, цели дополняются', () => {
   const st = world();
   st.tasks.push(task('Existing', { sphereId: 'sa' }), task('Closed', { status: 'done' }));
-  st.goals.push({ id: 'g1', title: 'Run', order: 0, steps: [{ id: 'x', title: 'Week 1', month: '2026-09', done: false }] });
+  st.goals.push({ id: 'g1', title: 'Run', order: 0, steps: [{ id: 'x', title: 'Week 1', month: '2026-09', done: false }], target: null });
 
   const file = {
     spheres: [{ id: 'f-alpha', name: 'alpha' }, { name: 'Gamma' }],
@@ -165,8 +282,8 @@ test('импорт: сферы по названию, повторы пропу�
       '',
     ],
     goals: [
-      { title: 'run', steps: ['Week 1', 'Week 2'] },
-      { name: 'Read', month: '2026-10', steps: [{ title: 'Book' }] },
+      { title: 'run', steps: ['Week 1', 'Week 2'], target: 100, unit: 'km' },
+      { name: 'Read', steps: [{ title: 'Book' }], target: '12', current: 3, deadline: '2026-12-31' },
     ],
   };
   assert.equal(detect(file), 'import');
@@ -187,28 +304,46 @@ test('импорт: сферы по названию, повторы пропу�
 
   const run = plan.goals.find((g) => g.id === 'g1');
   assert.deepEqual(run.steps.map((s) => s.title), ['Week 1', 'Week 2']);
+  assert.deepEqual([run.target, run.unit], [100, 'km'], 'у существующей цели заполняются пустые поля');
   assert.equal(st.goals[0].steps.length, 1, 'исходная цель не меняется до подтверждения');
   const read = plan.goals.find((g) => g.title === 'Read');
-  assert.equal(read.steps[0].month, '2026-10');
+  assert.deepEqual([read.target, read.current, read.deadline, read.steps[0].title], [12, 3, '2026-12-31', 'Book']);
   assert.equal(plan.summary.steps, 2);
 });
 
-test('импорт: день из файла не переполняет лимит в три', () => {
+test('импорт: день из файла не переполняет лимит дня', () => {
   const st = world();
   st.tasks.push(task('a', { day: TODAY }), task('b', { day: TODAY, dayOrder: 1 }));
-  const plan = planImport(st, { tasks: [{ title: 'c', day: TODAY }, { title: 'd', day: TODAY }] }, { uid, today: TODAY });
+  const file = { tasks: [{ title: 'c', day: TODAY, time: '9:30', repeat: 'daily' }, { title: 'd', day: TODAY }] };
+  const plan = planImport(st, file, { uid });
   assert.deepEqual(plan.tasks.map((t) => t.day), [TODAY, null]);
   assert.equal(plan.tasks[0].dayOrder, 2);
+  assert.deepEqual([plan.tasks[0].time, plan.tasks[0].repeat], ['09:30', 'daily']);
+  // без лимита — встают обе
+  assert.deepEqual(planImport({ ...st, settings: { dayLimit: 0 } }, file, { uid }).tasks.map((t) => t.day), [TODAY, TODAY]);
 });
 
-test('резервная копия: туда и обратно, чужие файлы не принимаются', () => {
+test('резервная копия: туда и обратно, вместе с вложениями; чужие файлы не принимаются', async () => {
   const st = world();
   st.tasks.push(task('x'));
-  const copy = JSON.parse(JSON.stringify(makeBackup(st, new Date('2026-09-24T20:00:00Z'))));
+  st.settings = { dayLimit: 5 };
+  const bytes = new Uint8Array(70000).map((_, i) => i % 251);
+  const files = await packFiles([
+    { id: 'f1', taskId: st.tasks[0].id, name: 'scan.pdf', type: 'application/pdf', size: bytes.length, blob: new Blob([bytes]) },
+    { id: 'f2', taskId: 'gone', name: 'orphan.txt', type: 'text/plain', size: 1, blob: new Blob(['x']) },
+  ]);
+  const copy = JSON.parse(JSON.stringify(makeBackup(st, new Date('2026-09-24T20:00:00Z'), files)));
   assert.equal(detect(copy), 'backup');
   const back = readBackup(copy);
   assert.deepEqual(back.tasks.map((t) => t.title), ['x']);
   assert.equal(back.spheres.length, 3);
+  assert.deepEqual(back.settings, { dayLimit: 5 });
+  assert.deepEqual(back.files.map((f) => f.name), ['scan.pdf'], 'вложение без задачи отброшено');
+  assert.deepEqual(new Uint8Array(await back.files[0].blob.arrayBuffer()), bytes);
+  assert.equal(back.files[0].blob.type, 'application/pdf');
+  // копия прошлой версии (без files и settings) читается
+  const v1 = readBackup({ app: 'tracker', schema: 1, spheres: [], tasks: [], goals: [] });
+  assert.deepEqual([v1.files, v1.settings], [[], null]);
   assert.throws(() => readBackup({ tasks: [] }));
   assert.throws(() => readBackup({ ...copy, schema: 99 }));
   assert.equal(detect([1, 2]), null);

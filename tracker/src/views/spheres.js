@@ -1,13 +1,16 @@
 /**
- * «Сферы» — папки для задач. Список: глиф, название, число активных задач.
+ * «Сферы» — папки для задач. Плитки: глиф, название, число активных задач.
  * Порядок — перетаскиванием за ручку; «⋯» открывает шторку: имя, глиф,
  * архив. Архив задачи не удаляет, только убирает сферу с глаз.
- * Задачи без сферы живут во «Входящих».
+ * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
 import { h, glyph, icon, entry, sortableGrid, openSheet, closeSheet, toast } from '../ui.js';
-import { GLYPHS, activeSpheres, archivedSpheres, sphereCounts, sphereTasks } from '../logic.js';
+import { GLYPHS, activeSpheres, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
-import { header, backLink, iconButton, pillButton, foldout, taskItem } from './common.js';
+import {
+  ui, rerender, header, backLink, iconButton, pillButton, foldout, taskItem, selecting, startSelect, selectBar,
+} from './common.js';
+import { composer } from './pickers.js';
 
 /**
  * Плитка сферы: глиф в кружке, «⋯» и ручка перетаскивания по углам, внизу —
@@ -67,6 +70,26 @@ export function editSphere(id) {
   });
 }
 
+/** Поиск по всем задачам: названия, заметки, подзадачи. */
+function searchField() {
+  return h('label', { class: 'search' },
+    icon('search', 20),
+    h('input', {
+      class: 'search-input', type: 'search', placeholder: 'Search tasks', 'aria-label': 'Search tasks',
+      autocomplete: 'off', enterkeyhint: 'search', 'data-key': 'search', value: ui.query,
+      oninput: (e) => { ui.query = e.target.value; rerender(); },
+      onkeydown: (e) => { if (e.key === 'Escape') { ui.query = ''; rerender(); } },
+    }),
+    ui.query && iconButton('close', 'Clear search', () => { ui.query = ''; rerender(); }, 'search-clear', 20));
+}
+
+function results(st) {
+  const found = searchTasks(st, ui.query);
+  return found.length
+    ? h('ul', { class: 'tasks' }, found.map((t) => taskItem(t)))
+    : h('p', { class: 'hint' }, 'Nothing found.');
+}
+
 export function spheresView() {
   const st = store.getState();
   const counts = sphereCounts(st);
@@ -76,16 +99,24 @@ export function spheresView() {
   // открытые во «Входящих» и активных сферах; архив не считается — его задачи скрыты
   const open = [null, ...active.map((s) => s.id)].reduce((n, id) => n + (counts.get(id) ?? 0), 0);
 
-  // «Входящие» — первая плитка, но без data-id: её не перетащить и перед ней не встать
+  if (ui.query.trim()) {
+    return h('section', { class: 'screen screen-spheres' },
+      header('Spheres', `${open} open`), searchField(), results(st));
+  }
+
+  // «Входящие» — первая плитка, но без data-id: её не перетащить и перед ней не встать.
+  // «Новая сфера» — последняя плитка во всю ширину: та же сетка, тот же зазор
   const grid = sortableGrid(h('ul', { class: 'tiles' },
     inboxTile(counts.get(null) ?? 0),
-    active.map((s) => sphereTile(s, counts.get(s.id)))),
+    active.map((s) => sphereTile(s, counts.get(s.id))),
+    h('li', { class: 'tile tile-wide tile-new' },
+      entry('sphere-new', 'New sphere', (name) => store.createSphere(name)))),
   (ids) => store.reorderSpheres(ids));
 
   return h('section', { class: 'screen screen-spheres' },
     header('Spheres', `${open} open`),
+    searchField(),
     grid,
-    entry('sphere-new', 'New sphere', (name) => store.createSphere(name), { cls: 'entry-card' }),
     archived.length > 0 && foldout('archived', 'Archived', archived.length, () =>
       h('ul', { class: 'tiles' }, archived.map((s) => sphereTile(s, counts.get(s.id), { drag: false })))));
 }
@@ -99,17 +130,22 @@ export function sphereView(id) {
 
   const { open, done } = sphereTasks(st, isInbox ? null : s.id);
   const name = isInbox ? 'Inbox' : s.name;
+  const scope = `sphere:${id}`;
+  const sel = selecting(scope);
+  if (ui.select && !sel) ui.select = null; // выбор остался с другого экрана
 
-  return h('section', { class: 'screen screen-sphere' },
+  return h('section', { class: ['screen', 'screen-sphere', sel && 'is-selecting'] },
     backLink('#/spheres', 'Spheres'),
     header(h('span', { class: 'title-glyph' }, glyph(isInbox ? 'inbox' : s.glyph), name),
       s?.archived ? 'Archived' : `${open.filter((t) => t.status !== 'paused').length} active`,
-      !isInbox && iconButton('more', `Edit ${name}`, () => editSphere(s.id))),
-    entry(`add-${id}`, `Add to ${name}`, (title) => store.createTask(title, { sphereId: isInbox ? null : s.id }), { cls: 'entry-card' }),
+      !sel && open.length > 0 && h('button', { class: 'pill head-pill', type: 'button', onclick: () => startSelect(scope) }, 'Select'),
+      !isInbox && !sel && iconButton('more', `Edit ${name}`, () => editSphere(s.id))),
+    !sel && composer(`add-${id}`, { sphereId: isInbox ? null : s.id, placeholder: `Add to ${name}` }),
     open.length
       ? h('ul', { class: 'tasks' }, open.map((t) => taskItem(t, { showSphere: false })))
       : h('p', { class: 'hint' }, 'No open tasks here.'),
     done.length > 0 && foldout(`done:${id}`, 'Done', done.length, () =>
-      h('ul', { class: 'tasks' }, done.map((t) => taskItem(t, { showSphere: false })))));
+      h('ul', { class: 'tasks' }, done.map((t) => taskItem(t, { showSphere: false })))),
+    sel && selectBar(open.map((t) => t.id)));
 }
 

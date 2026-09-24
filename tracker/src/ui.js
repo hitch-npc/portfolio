@@ -133,6 +133,18 @@ const ICONS = {
   copy: `<rect x="8" y="8" width="12" height="12" rx="2" ${S}/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" ${S}/>`,
   download: `<path d="M12 4v11M7 10l5 5 5-5M5 20h14" ${S}/>`,
   upload: `<path d="M12 15V4M7 9l5-5 5 5M5 20h14" ${S}/>`,
+  send: `<path d="M12 19V5M6 11l6-6 6 6" ${S}/>`,
+  calendar: `<rect x="4" y="5" width="16" height="15" rx="3" ${S}/><path d="M4 10h16M8 3v4M16 3v4" ${S}/><g ${F}><circle cx="8.5" cy="14" r="1"/><circle cx="12" cy="14" r="1"/><circle cx="15.5" cy="14" r="1"/><circle cx="8.5" cy="17" r="1"/><circle cx="12" cy="17" r="1"/></g>`,
+  clock: `<circle cx="12" cy="12" r="8" ${S}/><path d="M12 7v5l3 2" ${S}/>`,
+  repeat: `<path d="M5 11V9a3 3 0 0 1 3-3h11M16 3l3 3-3 3M19 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3" ${S}/>`,
+  flag: `<path d="M6 21V4M6 5h11l-2.5 4L17 13H6" ${S}/>`,
+  next: `<rect x="4" y="4" width="16" height="16" rx="3" ${S}/><path d="M8 12h8M13 9l3 3-3 3" ${S}/>`,
+  clip: `<path d="M16.5 11.5l-5.8 5.8a3.5 3.5 0 0 1-5-5l6.9-6.9a2.3 2.3 0 0 1 3.3 3.3l-6.6 6.6a1.1 1.1 0 0 1-1.6-1.6l5.6-5.6" ${S}/>`,
+  file: `<path d="M7 3h7l4 4v14H7z" ${S}/><path d="M14 3v4h4" ${S}/>`,
+  search: `<circle cx="11" cy="11" r="6" ${S}/><path d="M15.5 15.5L20 20" ${S}/>`,
+  share: `<path d="M12 15V4M8 8l4-4 4 4M7 11H5v9h14v-9h-2" ${S}/>`,
+  updown: `<path d="M8 10l4-4 4 4M8 14l4 4 4-4" ${S}/>`,
+  minus: `<path d="M5 12h14" ${S}/>`,
 };
 
 /**
@@ -330,8 +342,9 @@ export function sortable(list, onDrop) {
 
 /* ── движение ────────────────────────────────────────────────────────── */
 
-/** «Уменьшить движение» в системе — никаких анимаций из JS. */
-export const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** «Уменьшить движение» в системе или в настройках — никаких анимаций из JS. */
+export const calm = () =>
+  document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Число досчитывает до значения за ~0,4 с. Только при входе на экран. */
 export function countUp(el, to) {

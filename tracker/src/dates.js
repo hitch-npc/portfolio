@@ -35,6 +35,42 @@ export const fmtShort = (s) => `${parse(s).getDate()} ${MONTHS[parse(s).getMonth
 export const fmtDay = (s) => `${fmtWeekday(s)} ${fmtShort(s)}`; // Thu 24 Sep
 export const fmtMonth = (ym) => `${MONTHS_LONG[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`; // September 2026
 export const monthName = (ym) => MONTHS_LONG[Number(ym.slice(5, 7)) - 1]; // September
+export const fmtLong = (s) => `${fmtShort(s)} ${s.slice(0, 4)}`; // 24 Sep 2026
+
+/** Ближайший понедельник после `s` (с понедельника — через неделю). */
+export function nextWeek(s) {
+  const wd = parse(s).getDay();
+  return addDays(s, (8 - wd) % 7 || 7);
+}
+
+/** Подпись запланированного дня: Today, Tomorrow, день недели в пределах недели, иначе дата. */
+export function dayLabel(day, today) {
+  const d = diffDays(today, day);
+  if (d === 0) return 'Today';
+  if (d === 1) return 'Tomorrow';
+  if (d === -1) return 'Yesterday';
+  if (d > 1 && d < 7) return fmtWeekday(day);
+  return day.slice(0, 4) === today.slice(0, 4) ? fmtDay(day) : fmtLong(day);
+}
+
+/**
+ * Следующий день повторяющейся задачи. Месяц вперёд с 31-го — последний день
+ * следующего месяца, а не перескок через него.
+ */
+export function nextRepeat(day, repeat) {
+  if (repeat === 'daily') return addDays(day, 1);
+  if (repeat === 'weekly') return addDays(day, 7);
+  if (repeat === 'weekdays') {
+    const wd = parse(day).getDay();
+    return addDays(day, wd === 5 ? 3 : wd === 6 ? 2 : 1);
+  }
+  if (repeat === 'monthly') {
+    const d = parse(day);
+    const last = new Date(d.getFullYear(), d.getMonth() + 2, 0).getDate();
+    return iso(new Date(d.getFullYear(), d.getMonth() + 1, Math.min(d.getDate(), last)));
+  }
+  return null;
+}
 
 /** Подпись дедлайна относительно дня `day`: { text, late } */
 export function dueLabel(deadline, day) {

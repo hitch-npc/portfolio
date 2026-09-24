@@ -5,7 +5,7 @@
  */
 import { h, keepFocus, renderSheet, closeSheet, toast, sectionIcon, calm } from './ui.js';
 import { addDays, todayISO } from './dates.js';
-import { overdue } from './logic.js';
+import { overdue, settingsOf } from './logic.js';
 import * as store from './store.js';
 import { VERSION } from './version.js';
 import { ui, setRerender } from './views/common.js';
@@ -46,6 +46,8 @@ function route() {
 function render() {
   ui.day = todayISO();
   ui.tomorrow = addDays(ui.day, 1);
+  // «Уменьшить движение» из настроек приложения — поверх системной
+  document.documentElement.dataset.motion = settingsOf(store.getState()).motion;
   const r = route();
   keepFocus(() => {
     const node = ROUTES[r.name](r.arg);
@@ -104,6 +106,8 @@ function enter() {
 function onRoute() {
   ui.expanded = null;
   ui.confirm = null;
+  ui.select = null;
+  ui.query = '';
   closeSheet();
   window.scrollTo(0, 0);
   enter();
@@ -126,6 +130,10 @@ async function boot() {
     main.replaceChildren(h('p', { class: 'hint' }, 'Storage is unavailable. In Safari, private browsing blocks it.'));
     return;
   }
+
+  // экран при запуске — из настроек; ссылка на конкретный экран важнее
+  const start = settingsOf(store.getState()).start;
+  if (start !== 'today' && ROUTES[start] && /^#?\/?(today)?$/.test(location.hash)) location.replace(`#/${start}`);
 
   enter();
   if (route().name === 'today') focusInput();
