@@ -14,7 +14,7 @@
   <body>
     <h1>Haptics test · round 2</h1>
     <p class="info" id="info"></p>
-    <p>Tap each grey card with your finger — on the text, not on the edge. Write down the numbers you <b>felt</b>.</p>
+    <p>Tap cards 1–5 with your finger — on the text, not on the edge. Card 6 — slide, don't tap. Write down the numbers you <b>felt</b>.</p>
 
     <label class="card"><b>1</b> Visible switch — tap the switch itself <input type="checkbox" switch data-log="1"></label>
 
@@ -30,6 +30,11 @@
 
     <label class="card"><b>5</b> Card is a label, switch not drawn at all
       <input class="gone" type="checkbox" switch data-log="5"></label>
+
+    <div class="card card-tall">
+      <b>6</b> Slide your finger left and right across this card without lifting it
+      <input class="cover" type="checkbox" switch data-log="6" aria-label="Test 6">
+    </div>
 
     <input class="ghost" id="t4" type="checkbox" switch data-log="4">
     <p class="log" id="log">Nothing tapped yet</p>

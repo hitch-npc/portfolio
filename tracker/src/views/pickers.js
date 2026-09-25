@@ -2,7 +2,10 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sphereMark, pickerInput, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
+import {
+  h, icon, glyph, sphereMark, pickerInput, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm,
+  APPLE_TOUCH,
+} from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -63,19 +66,39 @@ export function menu(host, items, onPick, label) {
   document.addEventListener('pointerdown', outside, true);
 }
 
+/* Над клавиатурой iPhone (iOS 26+) плавает стеклянная панель «^ v ✓»: она
+   поверх страницы и из visualViewport не вычитается. Высота — по снимку
+   экрана с iOS 27, с запасом; API, чтобы её узнать, нет */
+const ACCESSORY_BAR = 64;
+
+/** Высота выреза сверху (островок, часы): меню под ним не заезжает. */
+function safeTop() {
+  const probe = h('div', { class: 'offscreen' });
+  probe.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)');
+  document.body.append(probe);
+  const px = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+  probe.remove();
+  return px;
+}
+
 /**
  * Меню — там, где его видно целиком: под якорем, а если снизу клавиатура или
  * панель вкладок — над всем полем (не поверх набираемого текста). Видимая
  * часть экрана — по visualViewport: клавиатура iOS страницу не сжимает.
+ * Пока на iPhone набирают текст, меню — над полем: поле с курсором iOS всегда
+ * держит на виду, а что под ним скрыто клавиатурой и панелью, надёжно не узнать.
  */
 function place(el, host) {
   const vv = globalThis.visualViewport;
   const nav = document.getElementById('nav')?.getBoundingClientRect().top ?? innerHeight;
-  const bottom = Math.min(vv ? vv.offsetTop + vv.height : innerHeight, nav) - 8;
-  const top = (vv?.offsetTop ?? 0) + 8;
+  // курсор в поле — клавиатура с панелью открыта (как iOS считает экран при
+  // ней, по размерам надёжно не понять: панель вкладок бывает видна над ней)
+  const typing = APPLE_TOUCH && document.activeElement?.matches('input, textarea');
+  const bottom = Math.min(vv ? vv.offsetTop + vv.height : innerHeight, nav) - (typing ? ACCESSORY_BAR : 0) - 8;
+  const top = (vv?.offsetTop ?? 0) + safeTop() + 8;
   const below = bottom - el.getBoundingClientRect().top;
   const above = host.getBoundingClientRect().top - 6 - top;
-  const up = el.scrollHeight > below && above > below;
+  const up = typing && above >= 120 ? true : el.scrollHeight > below && above > below;
   el.classList.toggle('is-up', up);
   el.style.maxHeight = `${Math.max(120, Math.floor(up ? above : below))}px`;
 }

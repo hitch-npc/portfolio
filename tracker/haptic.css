@@ -16,7 +16,11 @@
   }
 }
 
+/* долгое нажатие не выделяет текст — иначе системная вибрация выделения путает проверку */
 body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   margin: 0;
   padding: max(24px, env(safe-area-inset-top)) 16px 40px;
   background: var(--bg);
@@ -57,7 +61,11 @@ h1 {
   margin-left: auto;
 }
 
-/* 2: переключатель растянут на всю карточку и прозрачен — палец попадает в него */
+.card-tall {
+  min-height: 120px;
+}
+
+/* 2 и 6: переключатель растянут на всю карточку и прозрачен — палец попадает в него */
 .cover {
   position: absolute;
   inset: 0;

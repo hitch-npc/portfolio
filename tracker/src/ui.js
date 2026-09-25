@@ -232,7 +232,7 @@ export const glyph = (name) => svg('0 0 14 14', `<g fill="currentColor">${GLYPH_
 /* ── системный выбор даты и времени ──────────────────────────────────── */
 
 // iPhone и iPad (iPadOS называет себя Mac, но у него есть касания)
-const APPLE_TOUCH = typeof navigator !== 'undefined'
+export const APPLE_TOUCH = typeof navigator !== 'undefined'
   && (/iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
 
 /**
