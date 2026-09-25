@@ -5,12 +5,21 @@
  * инерции и встаёт точно на деление. Тап по линейке — переезд к тому
  * делению, стрелки клавиатуры — на одно деление.
  *
+ * Щелчок: из кода iOS 27 не вибрирует, щёлкает только переключатель
+ * <input switch>, когда палец перегоняет его ползунок на другую сторону.
+ * Поэтому на линейке лежит прозрачный переключатель: до касания — на всю
+ * линейку (палец точно начинает на нём), с первым движением сжимается до
+ * родного размера под пальцем и на каждом делении прыгает вбок — палец
+ * оказывается то на левой, то на правой его половине, и ползунок
+ * перещёлкивает сам. Проверено в лаборатории (режим E, src/views/lab.js).
+ *
  * onInput — значение меняется (для подписи рядом), onCommit — линейка
  * остановилась (для записи). Во время движения ничего не перерисовывается.
  */
-import { h, haptic, calm } from '../ui.js';
+import { h, calm } from '../ui.js';
 
 const TICK = 10; // px между делениями — как в CSS (.dial-tick)
+const JUMP = 0.3; // прыжок переключателя, доля его ширины: палец то на 20 %, то на 80 %
 
 const NICE = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9];
 
@@ -35,14 +44,18 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
   let idx = pos; // деление под стрелкой
   let raf = 0;
   let off = disabled;
+  let ride = null; // палец на переключателе: где линейка, его размер, сторона прыжка
 
   const track = h('div', { class: 'dial-track', 'aria-hidden': 'true' }, values.map((v) =>
     h('span', { class: ['dial-tick', isMajor(v) && 'is-major'] }, isMajor(v) && h('span', { class: 'dial-num' }, short(v)))));
   const needle = h('span', { class: 'dial-needle', 'aria-hidden': 'true' });
+  const sw = h('input', { class: 'dial-switch', type: 'checkbox', switch: true, tabindex: '-1', 'aria-hidden': 'true' });
+  // его переключение — только ради щелчка, дальше линейки не идёт
+  for (const type of ['click', 'input', 'change']) sw.addEventListener(type, (e) => e.stopPropagation());
   const el = h('div', {
     class: ['dial', disabled && 'is-off'], role: 'slider', tabindex: disabled ? '-1' : '0', 'aria-label': label,
     'aria-valuemin': String(values[0]), 'aria-valuemax': String(values[last]), 'aria-disabled': disabled ? 'true' : null,
-  }, track, needle);
+  }, track, needle, sw);
 
   const clamp = (p) => Math.max(0, Math.min(last, p));
   const paint = () => {
@@ -50,13 +63,26 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     el.setAttribute('aria-valuenow', String(values[idx]));
   };
 
+  /** Переключатель под пальцем; left/top, не transform — рамку WebKit берёт из вёрстки. */
+  function rideTo(x, y) {
+    if (!ride) return;
+    if (!ride.w) {
+      el.classList.add('is-riding');
+      const r = sw.getBoundingClientRect();
+      ride.w = r.width;
+      ride.h = r.height;
+    }
+    sw.style.setProperty('--sx', `${x - ride.left - ride.w / 2 + ride.side * JUMP * ride.w}px`);
+    sw.style.setProperty('--sy', `${y - ride.top - ride.h / 2}px`);
+  }
+
   function set(p, felt = false) {
     pos = p;
     const i = Math.round(clamp(p));
     if (i !== idx) {
       idx = i;
       onInput(values[i]);
-      if (felt) haptic();
+      if (felt && ride) ride.side = ride.side === 1 ? -1 : 1; // щелчок — на следующем rideTo
       if (!calm()) {
         needle.classList.remove('is-tick');
         void needle.offsetWidth; // перезапуск вздрагивания
@@ -99,10 +125,18 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     let prev = { x: x0, t: e.timeStamp };
     let v = 0; // px/мс
     let moved = 0;
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      /* палец уже отпущен */
+    // на переключателе палец и так «прилип» к нему (iOS); чужой захват
+    // событий мог бы отнять их у переключателя — как в лаборатории, без него
+    if (e.target === sw) {
+      const box = el.getBoundingClientRect();
+      ride = { left: box.left, top: box.top, side: 0 };
+    }
+    if (!ride || e.pointerType !== 'touch') {
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* палец уже отпущен */
+      }
     }
     el.classList.add('is-active');
     const move = (ev) => {
@@ -111,6 +145,7 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
       const raw = p0 - dx / TICK;
       // за краем — упругость, а не стена
       set(raw < 0 ? raw / 3 : raw > last ? last + (raw - last) / 3 : raw, true);
+      rideTo(ev.clientX, ev.clientY);
       const dt = Math.max(1, ev.timeStamp - prev.t);
       v = 0.7 * ((ev.clientX - prev.x) / dt) + 0.3 * v;
       prev = { x: ev.clientX, t: ev.timeStamp };
@@ -119,7 +154,8 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
-      el.classList.remove('is-active');
+      el.classList.remove('is-active', 'is-riding');
+      ride = null;
       if (moved < 4 && ev.type === 'pointerup') {
         // тап: к делению под пальцем
         const box = el.getBoundingClientRect();
