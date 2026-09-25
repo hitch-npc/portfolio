@@ -199,11 +199,13 @@ writeFileSync(join(ROOT, 'tracker', 'textures', 'grain.png'), png(GRAIN, grain(G
 writeFileSync(join(ROOT, 'tracker', 'textures', 'grain-dark.png'), png(GRAIN, grain(GRAIN, true)));
 console.log('✓ tracker/textures/grain.png, grain-dark.png');
 
+/* Сменился рисунок — меняется и имя файла: иконку по старому адресу
+   держат кэши (браузер, service worker, сам iOS), и новая не доходит. */
 const ICONS = [
-  { file: 'icon-180.png', size: 180, inset: 0.06 }, // iOS, домашний экран
-  { file: 'icon-192.png', size: 192, inset: 0.06 },
-  { file: 'icon-512.png', size: 512, inset: 0.06 },
-  { file: 'icon-maskable-512.png', size: 512, inset: 0.16 },
+  { file: 'logo-180.png', size: 180, inset: 0.06 }, // iOS, домашний экран
+  { file: 'logo-192.png', size: 192, inset: 0.06 },
+  { file: 'logo-512.png', size: 512, inset: 0.06 },
+  { file: 'logo-maskable-512.png', size: 512, inset: 0.16 },
 ];
 for (const { file, size, inset } of ICONS) {
   writeFileSync(join(OUT, file), png(size, draw(size, inset)));
