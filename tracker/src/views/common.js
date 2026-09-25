@@ -406,19 +406,23 @@ export function requestPlan(t, day, extra = {}) {
   const limit = dayLimit(store.getState());
   openSheet(() => {
     const { open } = dayTasks(store.getState(), day);
+    // день и красная метка «полон»; ниже — чему нужно место; у задач дня —
+    // знак замены; Cancel — чёрный, его не спутать с задачами
     return [
-      h('h2', { class: 'sheet-title' }, `${label} is full`),
-      h('p', { class: 'sheet-text' }, `${limit} a day is the limit (Settings). Replace one with “${t.title}”?`),
+      h('h2', { class: 'sheet-title full-title' }, label, h('span', { class: 'full-badge' }, `Full ${limit}/${limit}`)),
+      h('p', { class: 'full-for' },
+        h('span', { class: 'full-label' }, 'Make room for'),
+        h('span', { class: 'full-task' }, t.title)),
       h('ol', { class: 'replace-list' }, open.map((x, i) =>
         h('li', null, h('button', {
-          class: 'replace', type: 'button',
+          class: 'replace', type: 'button', 'aria-label': `Swap out ${x.title}`,
           onclick: () => {
             store.planTask(t.id, day, x.id, extra);
             closeSheet();
-            toast(`Planned for ${fmtDay(day)}`);
+            toast(`Swapped — “${x.title}” has no date now`);
           },
-        }, h('span', { class: 'replace-num' }, String(i + 1)), h('span', { class: 'replace-title' }, x.title))))),
-      h('button', { class: 'pill pill-action pill-wide', type: 'button', onclick: closeSheet }, 'Cancel'),
+        }, h('span', { class: 'replace-num' }, String(i + 1)), h('span', { class: 'replace-title' }, x.title), icon('swap', 20))))),
+      h('button', { class: 'pill pill-action pill-wide is-on', type: 'button', onclick: closeSheet }, 'Cancel'),
     ];
   });
 }

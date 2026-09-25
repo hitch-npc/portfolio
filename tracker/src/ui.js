@@ -146,6 +146,8 @@ const ICONS = {
   file: `<path d="M7 3h7l4 4v14H7z" ${S}/><path d="M14 3v4h4" ${S}/>`,
   search: `<circle cx="11" cy="11" r="6" ${S}/><path d="M15.5 15.5L20 20" ${S}/>`,
   share: `<path d="M12 15V4M8 8l4-4 4 4M7 11H5v9h14v-9h-2" ${S}/>`,
+  // замена: одна задача уходит, другая встаёт на её место
+  swap: `<path d="M5 8.5h13M15 5.5l3 3-3 3M19 15.5H6M9 12.5l-3 3 3 3" ${S}/>`,
   updown: `<path d="M8 10l4-4 4 4M8 14l4 4 4-4" ${S}/>`,
   minus: `<path d="M5 12h14" ${S}/>`,
   bell: `<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15z" ${S}/><path d="M10 21.5h4" ${S}/>`,
