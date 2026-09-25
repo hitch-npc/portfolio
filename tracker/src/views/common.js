@@ -2,7 +2,7 @@
  * Общее для экранов: шапка, строка задачи с раскрывающейся карточкой,
  * шторка «день полон — заменить одну из задач», выбор нескольких задач.
  */
-import { h, icon, glyph, autosize, entry, openSheet, closeSheet, toast, countUp, removeRow, haptic } from '../ui.js';
+import { h, icon, glyph, autosize, entry, pickerInput, openSheet, closeSheet, toast, countUp, removeRow, haptic } from '../ui.js';
 import { addDays, dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { PRIORITIES, REPEATS, STATUSES, activeSpheres, dayLimit, dayTasks } from '../logic.js';
 import * as store from '../store.js';
@@ -355,11 +355,8 @@ function taskCard(t) {
     field('Deadline',
       h('label', { class: 'date-wrap' },
         h('span', { class: 'pill' }, t.deadline ? fmtDay(t.deadline) : 'Set date'),
-        h('input', {
-          class: 'date', type: 'date', 'aria-label': 'Deadline', value: t.deadline ?? '',
-          onclick: (e) => { try { e.target.showPicker?.(); } catch { /* уже открыт системой */ } },
-          onchange: (e) => store.updateTask(t.id, { deadline: e.target.value || null }),
-        })),
+        pickerInput({ class: 'date', type: 'date', 'aria-label': 'Deadline', value: t.deadline ?? '' },
+          (v) => store.updateTask(t.id, { deadline: v }))),
       t.deadline && iconButton('close', 'Clear deadline', () => store.updateTask(t.id, { deadline: null }), '', 20)),
     field('Subtasks',
       t.subtasks.length > 0 && h('ul', { class: 'subs' }, t.subtasks.map((s) =>

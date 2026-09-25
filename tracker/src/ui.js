@@ -135,6 +135,9 @@ const ICONS = {
   upload: `<path d="M12 15V4M7 9l5-5 5 5M5 20h14" ${S}/>`,
   send: `<path d="M12 19V5M6 11l6-6 6 6" ${S}/>`,
   calendar: `<rect x="4" y="5" width="16" height="15" rx="3" ${S}/><path d="M4 10h16M8 3v4M16 3v4" ${S}/><g ${F}><circle cx="8.5" cy="14" r="1"/><circle cx="12" cy="14" r="1"/><circle cx="15.5" cy="14" r="1"/><circle cx="8.5" cy="17" r="1"/><circle cx="12" cy="17" r="1"/></g>`,
+  // залитый календарь — у кнопки даты в поле новой задачи: шапка и лист,
+  // между ними просвет, числа — дырочками
+  calendarFill: `<path ${F} fill-rule="evenodd" d="M7 5h10a3 3 0 0 1 3 3v1.4H4V8a3 3 0 0 1 3-3zM4 10.6h16V17a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3zM8.5 13a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zM8.5 16a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3.5 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/><path d="M8 3v4M16 3v4" ${S}/>`,
   clock: `<circle cx="12" cy="12" r="8" ${S}/><path d="M12 7v5l3 2" ${S}/>`,
   repeat: `<path d="M5 11V9a3 3 0 0 1 3-3h11M16 3l3 3-3 3M19 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3" ${S}/>`,
   flag: `<path d="M7 20.5v-17M7 4.5h11l-2.5 4 2.5 4H7" ${S}/>`,
@@ -184,6 +187,44 @@ const GLYPH_SVG = {
 };
 
 export const glyph = (name) => svg('0 0 14 14', `<g fill="currentColor">${GLYPH_SVG[name] ?? GLYPH_SVG.circle}</g>`, 'glyph');
+
+/* ── системный выбор даты и времени ──────────────────────────────────── */
+
+// iPhone и iPad (iPadOS называет себя Mac, но у него есть касания)
+const APPLE_TOUCH = typeof navigator !== 'undefined'
+  && (/iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+
+/**
+ * Поле системного выбора даты или времени (прозрачное поверх пилюли). На
+ * iPhone календарь открыт, пока поле в фокусе, и каждое касание дня или
+ * месяца меняет значение: сохранение сразу перерисовало бы экран, поле
+ * пересоздалось бы, и календарь закрылся бы на полпути. Поэтому там выбор
+ * сохраняется, когда календарь закрыли (поле отпустило фокус). В других
+ * браузерах выбор закрывается сам после выбора — там сразу.
+ * onPick(значение или null).
+ */
+export function pickerInput(props, onPick) {
+  let saved = props.value ?? '';
+  const commit = (el) => {
+    if (el.value === saved) return;
+    saved = el.value;
+    onPick(el.value || null);
+  };
+  return h('input', {
+    ...props,
+    onclick: (e) => {
+      try {
+        e.target.showPicker?.();
+      } catch {
+        /* уже открыт системой */
+      }
+    },
+    onchange: (e) => {
+      if (!APPLE_TOUCH || document.activeElement !== e.target) commit(e.target);
+    },
+    onblur: (e) => commit(e.target),
+  });
+}
 
 /**
  * Глиф сферы (без сферы — «Входящие»). В оформлении Colour — в кружке цвета
@@ -298,6 +339,7 @@ export async function copyText(text) {
 let sheetRender = null;
 let sheetRoot;
 let panel = null; // сама шторка: живёт, пока открыта, перерисовывается только содержимое
+let sheetBody = null; // её прокручиваемая часть: у рамки своё зерно, оно стоит, текст едет
 let closing = 0; // таймер ухода вниз
 let closedNow = false; // закрыта в этом же обработчике — следующая шторка сменит содержимое на месте
 
@@ -349,7 +391,7 @@ export function openSheet(render) {
   const swap = Boolean(panel);
   sheetRender = render;
   renderSheet();
-  if (swap) panel.scrollTop = 0;
+  if (swap) sheetBody.scrollTop = 0;
   if (swap && !calm()) {
     panel.classList.remove('is-swapping');
     void panel.offsetWidth; // перезапуск анимации содержимого
@@ -383,6 +425,7 @@ function finishClose() {
   clearTimeout(closing);
   closing = 0;
   panel = null;
+  sheetBody = null;
   sheetRoot.classList.remove('is-closing');
   sheetRoot.replaceChildren();
   sheetRoot.hidden = true;
@@ -399,12 +442,13 @@ function drawSheet() {
   }
   if (panel) {
     panel.classList.remove('is-swapping'); // проявление — один раз, не на каждый тап
-    panel.replaceChildren();
-    append(panel, [sheetRender()]);
+    sheetBody.replaceChildren();
+    append(sheetBody, [sheetRender()]);
     return;
   }
   sheetRoot.hidden = false;
-  panel = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }, sheetRender());
+  sheetBody = h('div', { class: 'sheet-body' }, sheetRender());
+  panel = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }, sheetBody);
   sheetRoot.replaceChildren(
     h('div', { class: 'sheet-scrim', onclick: closeSheet }),
     panel,

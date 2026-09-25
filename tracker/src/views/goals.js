@@ -6,7 +6,7 @@
  * к месяцу. Срок необязателен. Новая цель набирается с крутилками над
  * полем: число, текущее, шаг, единица и срок — до создания, без Enter.
  */
-import { h, icon, entry, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
+import { h, icon, entry, pickerInput, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
 import { addMonths, diffDays, fmtLong } from '../dates.js';
 import { autoStep, goalProgress, goalStep, goalsOverview, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
@@ -112,11 +112,8 @@ export function editGoal(id) {
         field('Deadline',
           h('label', { class: 'date-wrap' },
             h('span', { class: ['pill', g.deadline && 'is-on'] }, icon('calendar', 20), g.deadline ? fmtLong(g.deadline) : 'None'),
-            h('input', {
-              class: 'date', type: 'date', 'aria-label': 'Goal deadline', value: g.deadline ?? '',
-              onclick: (e) => { try { e.target.showPicker?.(); } catch { /* уже открыт */ } },
-              onchange: (e) => store.updateGoal(g.id, { deadline: e.target.value || null }),
-            })),
+            pickerInput({ class: 'date', type: 'date', 'aria-label': 'Goal deadline', value: g.deadline ?? '' },
+              (v) => store.updateGoal(g.id, { deadline: v }))),
           g.deadline && iconButton('close', 'Clear deadline', () => store.updateGoal(g.id, { deadline: null }), '', 20))),
       h('div', { class: 'sheet-actions' },
         pillButton(null, confirming ? 'Tap again to delete' : 'Delete goal', () => {
@@ -419,11 +416,7 @@ function goalComposer() {
       ...presets.map(([text, v]) => pick(d.deadline === v, text, () => setDue(v), `Deadline ${fmtLong(v)}`)),
     ], h('label', { class: ['pill', 'gd-chip', 'date-wrap', custom && 'is-on'] },
       icon('calendar', 18), h('span', null, 'Date'),
-      h('input', {
-        class: 'date', type: 'date', 'aria-label': 'Deadline date', value: d.deadline ?? '', min: today,
-        onclick: (e) => { try { e.target.showPicker?.(); } catch { /* уже открыт */ } },
-        onchange: (e) => setDue(e.target.value || null),
-      })));
+      pickerInput({ class: 'date', type: 'date', 'aria-label': 'Deadline date', value: d.deadline ?? '', min: today }, setDue)));
 
     sayHint();
     params.replaceChildren(

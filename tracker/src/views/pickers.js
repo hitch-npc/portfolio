@@ -2,7 +2,7 @@
  * Ввод и выбор: поле новой задачи с чипами (сфера, дата, приоритет),
  * всплывающее меню и шторка даты — быстрые дни, дата, время, повтор.
  */
-import { h, icon, glyph, sphereMark, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
+import { h, icon, glyph, sphereMark, pickerInput, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
 import * as store from '../store.js';
@@ -95,14 +95,6 @@ function overlay(pill, input) {
   return h('label', { class: 'date-wrap' }, pill, input);
 }
 
-const openPicker = (e) => {
-  try {
-    e.target.showPicker?.();
-  } catch {
-    /* уже открыт системой */
-  }
-};
-
 /* что будет, если выбранный день полон: зависит от того, кто открыл шторку */
 const FULL = {
   replace: 'Done will ask which task to replace.',
@@ -160,17 +152,11 @@ export function dateSheet(value, onDone, { current = null, title = 'Date', full:
         h('div', { class: 'row' },
           icon('calendar'), h('span', { class: 'row-label' }, 'Date'),
           overlay(h('span', { class: ['pill', draft.day && 'is-on'] }, draft.day ? fmtLong(draft.day) : 'None'),
-            h('input', {
-              class: 'date', type: 'date', 'aria-label': 'Date', value: draft.day ?? '',
-              onclick: openPicker, onchange: (e) => set({ day: e.target.value || null }),
-            }))),
+            pickerInput({ class: 'date', type: 'date', 'aria-label': 'Date', value: draft.day ?? '' }, (v) => set({ day: v })))),
         h('div', { class: ['row', !draft.day && 'is-off'] },
           icon('clock'), h('span', { class: 'row-label' }, 'Time'),
           draft.time && overlay(h('span', { class: 'pill' }, draft.time),
-            h('input', {
-              class: 'date', type: 'time', 'aria-label': 'Time', value: draft.time,
-              onclick: openPicker, onchange: (e) => set({ time: e.target.value || null }),
-            })),
+            pickerInput({ class: 'date', type: 'time', 'aria-label': 'Time', value: draft.time }, (v) => set({ time: v }))),
           switcher(Boolean(draft.time), 'Time', () => set({ time: draft.time ? null : '09:00' }), !draft.day)),
         h('div', { class: 'row' },
           icon('repeat'), h('span', { class: 'row-label' }, 'Repeat'),
@@ -291,7 +277,8 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     } else {
       toast(`Added to ${planned ? dayLabel(planned, ui.day) : st.spheres.find((s) => s.id === sid)?.name ?? 'Inbox'}`);
     }
-    Object.assign(d, { title: '', ...fresh() });
+    // после добавления всё по умолчанию: сфера экрана, день, без времени и приоритета
+    Object.assign(d, { title: '', sphereId, ...fresh() });
     input.value = '';
     send.classList.remove('is-ready');
     return store.createTask(title, {
@@ -328,7 +315,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     chips.replaceChildren(
       chip([glyph(sphere ? sphere.glyph : 'inbox'), h('span', null, sphere ? sphere.name : 'Inbox')], 'Sphere',
         () => menu(form, sphereItems(d.sphereId), (v) => { d.sphereId = v; refresh(); }, 'Sphere'), false, sphere?.color),
-      chip([icon('calendar', 20), h('span', null, when ?? 'No date')], 'Date', () => {
+      chip([icon('calendarFill', 20), h('span', null, when ?? 'No date')], 'Date', () => {
         dateSheet(d, (v) => {
           Object.assign(d, v);
           refresh();
