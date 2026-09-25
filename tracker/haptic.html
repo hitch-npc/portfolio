@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <!-- Временная проверка вибрации на iPhone: какой способ срабатывает. После проверки — удалить -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex">
+    <title>Haptics test</title>
+    <link rel="stylesheet" href="haptic.css">
+    <script type="module" src="haptic.js"></script>
+  </head>
+  <body>
+    <h1>Haptics test</h1>
+    <p class="info" id="info"></p>
+    <p>Tap each button. Write down the letters you <b>felt</b>.</p>
+    <button type="button" data-test="a"><b>A</b> Hidden switch in head (how the app does it now)</button>
+    <button type="button" data-test="b"><b>B</b> Hidden switch in the page</button>
+    <button type="button" data-test="c"><b>C</b> Permanent switch, input click</button>
+    <label class="real"><b>D</b> Tap this switch yourself <input type="checkbox" switch></label>
+    <button type="button" data-test="e"><b>E</b> navigator.vibrate</button>
+    <p class="log" id="log"></p>
+  </body>
+</html>

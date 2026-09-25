@@ -1,0 +1,71 @@
+:root {
+  --bg: #efece6;
+  --ink: #111111;
+  --muted: #6b6760;
+  --card: #e2ded6;
+  --r-card: 16px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121110;
+    --ink: #f2efe9;
+    --muted: #9a958c;
+    --card: #24221f;
+  }
+}
+
+body {
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) 16px 40px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/24px -apple-system, system-ui, sans-serif;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  line-height: 34px;
+}
+
+.info,
+.log {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+button,
+.real {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 56px;
+  margin: 0 0 10px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.real input {
+  margin-left: auto;
+}
+
+/* B и C: переключатель нарисован, но не виден */
+.ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
