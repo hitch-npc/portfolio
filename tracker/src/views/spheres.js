@@ -4,7 +4,7 @@
  * цвет (в оформлении Colour), архив, удаление (задачи уходят во «Входящие»). Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
-import { h, glyph, sphereMark, armed, haptic, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
+import { h, glyph, sphereMark, armed, withTick, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
 import { COLORS, GLYPHS, activeSpheres, settingsOf, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import {
@@ -87,10 +87,9 @@ function deleteRow(s) {
   const n = sphereTasks(store.getState(), s.id).open.length;
   const confirming = ui.confirm === `sphere-${s.id}`;
   const what = n ? `${n} open ${n === 1 ? 'task goes' : 'tasks go'} to All` : 'no open tasks in it';
-  return pillButton(null, confirming ? armed(`Tap again to delete — ${what}`) : 'Delete sphere', () => {
+  return withTick(pillButton(null, confirming ? armed(`Tap again to delete — ${what}`) : 'Delete sphere', () => {
     if (!confirming) {
       ui.confirm = `sphere-${s.id}`;
-      haptic();
       renderSheet();
       return;
     }
@@ -99,7 +98,7 @@ function deleteRow(s) {
     closeSheet();
     toast(moved ? `${s.name} deleted — ${moved} ${moved === 1 ? 'task' : 'tasks'} moved to All` : `${s.name} deleted`, { done: true });
     if (location.hash === `#/spheres/${s.id}`) location.hash = '#/spheres';
-  }, ['pill-wide', 'sphere-delete', confirming && 'is-confirming'].filter(Boolean).join(' '));
+  }, ['pill-wide', 'sphere-delete', confirming && 'is-confirming'].filter(Boolean).join(' ')));
 }
 
 /** Поиск по всем задачам: названия, заметки, подзадачи. */

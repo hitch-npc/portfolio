@@ -10,7 +10,7 @@
  * на сегодня, это настройка), места дня, отдельно — не сделанное
  * в прошлые дни и просроченные.
  */
-import { h, icon, sortable, swipeable, toast, flip, countUp, haptic, calm } from '../ui.js';
+import { h, icon, sortable, swipeable, toast, flip, countUp, withTick, calm } from '../ui.js';
 import { fmtDay } from '../dates.js';
 import { carriedOver, dayLimit, dayTasks, overdue, settingsOf } from '../logic.js';
 import * as store from '../store.js';
@@ -65,10 +65,11 @@ function drawChart(open, done) {
     want.forEach(([k, state, t], i) => {
       let el = shapes.get(k);
       if (!el) {
-        el = h('span', { class: 'shape', 'data-key': k });
+        // тап по пилюле ставит фокус в поле (клавиатура) — только прямо в нажатии
+        el = withTick(h('span', { class: 'shape', 'data-key': k }), { defer: false });
         shapes.set(k, el);
       }
-      el.className = `shape is-${state}`;
+      el.className = `shape has-tick is-${state}`; // has-tick — у пилюли щелчок (withTick)
       el.style.setProperty('--h', String(t ? HEIGHT[t.priority] ?? 0.62 : 0));
       el.style.setProperty('--i', String(i));
       if (chart.children[i] !== el) chart.insertBefore(el, chart.children[i] ?? null);
@@ -84,7 +85,6 @@ function drawChart(open, done) {
 function tapShape(e) {
   const el = e.target.closest('.shape');
   if (!el) return;
-  haptic();
   if (!calm()) {
     el.animate([
       { transform: 'scale(1, 1)' },

@@ -6,7 +6,7 @@
  * к месяцу. Срок необязателен. Новая цель набирается с крутилками над
  * полем: число, текущее, шаг, единица и срок — до создания, без Enter.
  */
-import { h, icon, armed, entry, pickerInput, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
+import { h, icon, armed, entry, pickerInput, openSheet, closeSheet, renderSheet, toast, withTick } from '../ui.js';
 import { addMonths, diffDays, fmtLong } from '../dates.js';
 import { autoStep, goalProgress, goalStep, goalsOverview, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
@@ -116,10 +116,9 @@ export function editGoal(id) {
               (v) => store.updateGoal(g.id, { deadline: v }))),
           g.deadline && iconButton('close', 'Clear deadline', () => store.updateGoal(g.id, { deadline: null }), '', 20))),
       h('div', { class: 'sheet-actions' },
-        pillButton(null, confirming ? armed('Tap again to delete') : 'Delete goal', () => {
+        withTick(pillButton(null, confirming ? armed('Tap again to delete') : 'Delete goal', () => {
           if (!confirming) {
             ui.confirm = `goal-${id}`;
-            haptic();
             renderSheet();
             return;
           }
@@ -127,7 +126,7 @@ export function editGoal(id) {
           store.deleteGoal(g.id);
           closeSheet();
           toast('Goal deleted', { done: true });
-        }, confirming ? 'is-confirming' : ''),
+        }, confirming ? 'is-confirming' : '')),
         pillButton(null, 'Done', () => { ui.confirm = null; closeSheet(); }, 'is-on')),
     ];
   });
@@ -202,14 +201,14 @@ function goalCard(goal) {
       p.kind === 'value' ? fraction(p.current, p.total, goal.unit) : fraction(p.done, p.total),
       meter(p.done, p.total)),
     p.kind === 'value' && h('div', { class: 'goal-bump' },
-      h('button', {
+      withTick(h('button', {
         class: 'bump', type: 'button', 'aria-label': `Minus ${num(step)}`, disabled: !p.current,
-        onclick: () => { haptic(); store.bumpGoal(goal.id, -step); },
-      }, icon('minus')),
-      h('button', {
+        onclick: () => store.bumpGoal(goal.id, -step),
+      }, icon('minus'))),
+      withTick(h('button', {
         class: 'bump bump-plus', type: 'button', 'aria-label': `Plus ${num(step)}`,
-        onclick: () => { haptic(); store.bumpGoal(goal.id, step); },
-      }, icon('plus'), h('span', null, num(step))),
+        onclick: () => store.bumpGoal(goal.id, step),
+      }, icon('plus'), h('span', null, num(step)))),
       h('button', {
         class: 'bump bump-step', type: 'button', 'aria-label': `Step ${num(step)} — change`,
         onclick: () => stepSheet(goal.id),

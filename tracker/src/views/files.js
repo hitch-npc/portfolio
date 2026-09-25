@@ -3,7 +3,7 @@
  * устройстве и никуда не уходит. Картинки видны миниатюрой, остальное —
  * значком с именем; тап открывает просмотр: открыть, поделиться, удалить.
  */
-import { h, icon, armed, haptic, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
+import { h, icon, armed, withTick, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
 import * as store from '../store.js';
 import { ui } from './common.js';
 
@@ -78,12 +78,11 @@ function preview(id) {
       h('div', { class: 'sheet-actions' },
         h('a', { class: 'pill pill-action', href: urlOf(f), target: '_blank', rel: 'noopener' }, 'Open'),
         h('button', { class: 'pill pill-action', type: 'button', onclick: () => share(f) }, 'Share'),
-        h('button', {
+        withTick(h('button', {
           class: ['pill', 'pill-action', confirming && 'is-confirming'], type: 'button',
           onclick: () => {
             if (!confirming) {
               ui.confirm = `file-${id}`;
-              haptic();
               renderSheet();
               return;
             }
@@ -93,7 +92,7 @@ function preview(id) {
             store.deleteFile(id);
             toast('File removed', { done: true });
           },
-        }, confirming ? armed('Sure?') : 'Delete')),
+        }, confirming ? armed('Sure?') : 'Delete'))),
     ];
   });
 }
