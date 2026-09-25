@@ -3,9 +3,10 @@
  * Трекер — иконки и зерно
  * ───────────────────────
  * Рисует PNG-иконки приложения: iOS берёт для домашнего экрана только PNG
- * (apple-touch-icon), SVG ему не годится. Рисунок — четыре глифа сфер
- * (круг, пилюля, квадрат, полоса) чернилами на фоне приложения. Красного
- * в иконке нет: акцент значит «требует внимания сейчас», и только это.
+ * (apple-touch-icon), SVG ему не годится. Рисунок — логотип 3_TRACK:
+ * композиция дня с экрана Today, собранная в квадрат, — красная пилюля
+ * (задача, которая сейчас), чёрная (следующая) и штрихованный круг (пустое
+ * место) на точечном поле в уголках-метках, как на чертеже.
  *
  * Ещё — плитки бумажного зерна (tracker/textures/grain.png; grain-dark.png —
  * для тёмной темы): крупинки с едва заметной прозрачностью, в три раза
@@ -27,45 +28,83 @@ const OUT = join(ROOT, 'tracker', 'icons');
 
 const BG = [0xdb, 0xd8, 0xd3];
 const INK = [0, 0, 0];
+const MUTED = [0x91, 0x8e, 0x8b];
+const ACCENT = [0xe5, 0x29, 0x28];
 
-/* Фигуры в единицах 0…1 от стороны иконки. inset — поле вокруг композиции:
-   у maskable-иконки система обрезает края, значимое должно лежать в круге 80 %. */
-function shapes(inset) {
+/* Логотип в единицах 0…1 от стороны иконки. inset — поле вокруг композиции:
+   у maskable-иконки система обрезает края, значимое должно лежать в круге 80 %.
+   Пропорции — почти как на Today: пилюля 0.575 : 1, круг — 0.4 её высоты
+   (штриховка крупнее: на домашнем экране иконка — 60 pt),
+   точки — шаг в шестую часть ширины пилюли. */
+function logo(inset) {
   const s = (v) => inset + v * (1 - 2 * inset);
-  const circle = (cx, cy, r) => (x, y) => (x - s(cx)) ** 2 + (y - s(cy)) ** 2 <= (r * (1 - 2 * inset)) ** 2;
-  const rect = (x0, y0, x1, y1) => (x, y) => x >= s(x0) && x <= s(x1) && y >= s(y0) && y <= s(y1);
+  const k = 1 - 2 * inset;
+  const inCircle = (cx, cy, r) => (x, y) => (x - s(cx)) ** 2 + (y - s(cy)) ** 2 <= (r * k) ** 2;
+  const inRect = (x0, y0, x1, y1) => (x, y) => x >= s(x0) && x <= s(x1) && y >= s(y0) && y <= s(y1);
   const pill = (x0, y0, x1, y1) => {
-    const r = (y1 - y0) / 2;
-    const a = circle(x0 + r, y0 + r, r);
-    const b = circle(x1 - r, y0 + r, r);
-    const m = rect(x0 + r, y0, x1 - r, y1);
+    const r = (x1 - x0) / 2;
+    const a = inCircle(x0 + r, y0 + r, r);
+    const b = inCircle(x0 + r, y1 - r, r);
+    const m = inRect(x0, y0 + r, x1, y1 - r);
     return (x, y) => a(x, y) || b(x, y) || m(x, y);
   };
-  return [
-    circle(0.3, 0.3, 0.17),
-    pill(0.53, 0.2, 0.87, 0.4),
-    rect(0.13, 0.57, 0.47, 0.87),
-    rect(0.53, 0.67, 0.87, 0.77),
-  ];
+  // уголки-метки
+  const F = 0.11; // от края
+  const ARM = 0.08;
+  const W = 0.016; // толщина
+  const marks = [];
+  for (const [cx, dx] of [[F, 1], [1 - F, -1]]) {
+    for (const [cy, dy] of [[F, 1], [1 - F, -1]]) {
+      const x0 = Math.min(cx, cx + dx * ARM), x1 = Math.max(cx, cx + dx * ARM);
+      const y0 = Math.min(cy, cy + dy * ARM), y1 = Math.max(cy, cy + dy * ARM);
+      marks.push(inRect(x0, Math.min(cy, cy + dy * W), x1, Math.max(cy, cy + dy * W)));
+      marks.push(inRect(Math.min(cx, cx + dx * W), y0, Math.max(cx, cx + dx * W), y1));
+    }
+  }
+  const PW = 0.21; // ширина пилюли
+  const PH = PW / 0.575;
+  const top = 0.5 - PH / 2;
+  const red = pill(0.155, top, 0.155 + PW, top + PH);
+  const black = pill(0.425, top, 0.425 + PW, top + PH);
+  const R = 0.075;
+  const hole = inCircle(0.845 - R, 0.5, R);
+  const PITCH = PW / 6;
+  const DOT = 0.0042;
+  const LINES = (2 * R * k) / 5.5; // штриховка: пять с половиной шагов на круг
+  return (x, y) => {
+    if (marks.some((m) => m(x, y))) return INK;
+    if (red(x, y)) return ACCENT;
+    if (black(x, y)) return INK;
+    if (hole(x, y)) {
+      // «/» — как repeating-linear-gradient(-45deg) у пустого места
+      const d = (x + y) / Math.SQRT2;
+      return (((d / LINES) % 1) + 1) % 1 < 0.28 ? MUTED : BG;
+    }
+    const u = (x - s(F)) / (PITCH * k), v = (y - s(F)) / (PITCH * k);
+    const end = (1 - 2 * F) / PITCH - 0.5;
+    if (u > 0.5 && v > 0.5 && u < end && v < end) {
+      const du = (u - Math.round(u)) * PITCH * k, dv = (v - Math.round(v)) * PITCH * k;
+      if (du * du + dv * dv <= (DOT * k) ** 2) return MUTED;
+    }
+    return BG;
+  };
 }
 
 function draw(size, inset) {
-  const figs = shapes(inset);
+  const paint = logo(inset);
   const px = Buffer.alloc(size * size * 4);
-  const N = 4;
+  const N = 6;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      let hit = 0;
+      const sum = [0, 0, 0];
       for (let sy = 0; sy < N; sy++) {
         for (let sx = 0; sx < N; sx++) {
-          const u = (x + (sx + 0.5) / N) / size;
-          const v = (y + (sy + 0.5) / N) / size;
-          if (figs.some((f) => f(u, v))) hit++;
+          const c = paint((x + (sx + 0.5) / N) / size, (y + (sy + 0.5) / N) / size);
+          for (let i = 0; i < 3; i++) sum[i] += c[i];
         }
       }
-      const k = hit / (N * N);
       const i = (y * size + x) * 4;
-      for (let c = 0; c < 3; c++) px[i + c] = Math.round(BG[c] * (1 - k) + INK[c] * k);
+      for (let c = 0; c < 3; c++) px[i + c] = Math.round(sum[c] / (N * N));
       px[i + 3] = 255;
     }
   }
