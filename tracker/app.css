@@ -38,6 +38,8 @@
   --sph-plum: #99728C;
   --sph-khaki: #DFD6A1;
   --on-sphere: #000000;
+  /* текст на красном (метка «день полон») */
+  --on-accent: #FFFFFF;
   /* зерно бумаги: тёмные крупинки; в тёмной теме — светлые */
   --grain: url('textures/grain.png');
 
@@ -90,6 +92,7 @@
   --nav-on: var(--ink);
   --nav-on-ink: var(--bg);
   --pop-ink: var(--ink);
+  --on-accent: #000000;
   --grain: url('textures/grain-dark.png');
 }
 
@@ -1594,6 +1597,52 @@ textarea:focus-visible {
 
 .sheet .pill-wide:not(.is-on) {
   background: var(--bg-card);
+}
+
+/* день полон: день и красная метка, ниже — чему нужно место */
+.full-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.full-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 26px;
+  letter-spacing: 0.02em;
+}
+
+.full-for {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 0;
+}
+
+.full-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+.full-task {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.replace > .icon {
+  flex: none;
 }
 
 .replace-list {
@@ -3345,6 +3394,8 @@ body:has(.select-bar) .toast {
 .back,
 .sheet-title,
 .sheet-bar-title,
+.full-badge,
+.full-label,
 .quick-label,
 .setting-label,
 .select-count,
