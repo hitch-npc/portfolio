@@ -217,8 +217,11 @@ a {
   color: inherit;
 }
 
+/* свои поля без системных отступов: у iPhone они крупнее, чем у Chrome, и
+   съедали место под текст там, где ширина поля — по тексту */
 input,
 textarea {
+  padding: 0;
   border: 0;
   background: transparent;
   outline: none;
@@ -2803,8 +2806,9 @@ body:has(.select-bar) .toast {
   margin: 0 0 12px;
 }
 
-.dial-readout {
-  width: auto;
+/* число шага: поле и его невидимая копия в одной клетке — поле ровно по числу */
+.dial-fit {
+  display: inline-grid;
   min-width: 0;
   max-width: 80%;
   font-size: 56px;
@@ -2812,6 +2816,26 @@ body:has(.select-bar) .toast {
   line-height: 1.1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+}
+
+.dial-fit > * {
+  grid-area: 1 / 1;
+}
+
+.dial-mirror {
+  visibility: hidden;
+  white-space: pre;
+}
+
+.dial-readout {
+  /* своя ширина поля («20 символов») не растягивает клетку: ширину задаёт копия */
+  width: 0;
+  min-width: 100%;
+  padding: 0;
+  text-align: left;
+  text-indent: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .dial-unit {
