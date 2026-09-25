@@ -4,7 +4,7 @@
  * дни позже завтра, «Входящие», сферы. Тап по задаче ставит её на завтра,
  * повторный — снимает; смахивание влево открывает «Delete».
  */
-import { h, glyph, sphereMark, icon, sortable, swipeable, removeRow, toast } from '../ui.js';
+import { h, glyph, sphereMark, icon, sortable, swipeable, removeRow, toast, withTick } from '../ui.js';
 import { dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { dayTasks, planGroups } from '../logic.js';
 import * as store from '../store.js';
@@ -17,13 +17,13 @@ function candidate(t, picked, spheres, showSphere, showDay) {
   const sphere = spheres.get(t.sphereId);
   const due = t.deadline ? dueLabel(t.deadline, ui.day) : null;
   return h('li', { class: 'pick-row', 'data-id': t.id, 'data-swipe': '' },
-    h('button', {
+    withTick(h('button', {
       class: 'swipe-action', type: 'button', 'aria-label': `Delete “${t.title}”`,
       onclick: (e) => removeRow(e.currentTarget.closest('li'), () => {
         store.deleteTask(t.id);
         toast('Task deleted', { done: true });
       }),
-    }, icon('close', 20), h('span', null, 'Delete')),
+    }, icon('close', 20), h('span', null, 'Delete'))),
     h('div', { class: 'swipe-body' }, h('button', {
     class: ['pick', num && 'is-on'], type: 'button', 'aria-pressed': String(Boolean(num)),
     onclick: () => (num ? store.unplanTask(t.id) : requestPlan(t, ui.tomorrow)),

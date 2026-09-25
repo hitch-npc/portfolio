@@ -3811,6 +3811,31 @@ body:has(.select-bar) .toast {
   transition: none !important;
 }
 
+/* ── щелчок на нажатие (withTick в src/ui.js) ─────────────────────────
+   Прозрачный label на всю кнопку со скрытым переключателем внутри: палец
+   нажимает label, iPhone щёлкает, click всплывает к кнопке. Опора для
+   label — relative, только если у кнопки нет своей позиции (:where — ноль
+   специфичности, любое правило с position главнее) */
+:where(.has-tick) {
+  position: relative;
+}
+
+.tick {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tick-switch {
+  display: none;
+}
+
+/* неактивная кнопка — без щелчка */
+:disabled > .tick {
+  display: none;
+}
+
 /* ── лаборатория вибрации (эксперимент, src/views/lab.js) ─────────────
    Дорожка степпера: заливка и риска — значение, пунктирный круг — где
    начинать жест (режимы A, C, E). Переключатель — настоящий, по умолчанию

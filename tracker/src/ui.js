@@ -746,7 +746,6 @@ export function swipeable(list) {
 /** Строка уходит влево и схлопывается, потом done() удаляет её из данных. */
 export function removeRow(row, done) {
   swiped = null;
-  haptic();
   if (calm()) {
     done();
     return;
@@ -866,6 +865,43 @@ export function sortable(list, onDrop, { hold = false } = {}) {
  * даёт системный отклик, когда его переключают. На других устройствах —
  * ничего. Работает только в ответ на касание.
  */
+/**
+ * Вибрация на нажатие (iPhone). iOS щёлкает только переключателем
+ * <input switch>, который переключил палец, — в том числе нажатием на его
+ * <label>; переключение из кода (click()) не щёлкает (iOS 27, проверено
+ * страницей haptic.html). Поэтому в кнопку кладётся прозрачный label на всю
+ * её площадь со скрытым переключателем внутри: палец попадает в label, iOS
+ * щёлкает, а click всплывает к кнопке как обычно — щелчок в тот же миг, что
+ * и отклик. Не для type="submit": label забрал бы нажатие у формы.
+ */
+export function withTick(el, { defer = true } = {}) {
+  const sw = h('input', { class: 'tick-switch', type: 'checkbox', switch: true, tabindex: '-1', 'aria-hidden': 'true' });
+  const label = h('label', { class: 'tick', 'aria-hidden': 'true' }, sw);
+  // переключение не должно второй раз дойти до кнопки
+  for (const type of ['click', 'input', 'change']) sw.addEventListener(type, (e) => e.stopPropagation());
+  if (defer) {
+    // Кнопка, которая перерисовывает себя (галочка, −/+, Delete), убрала бы
+    // label со страницы раньше, чем iOS переключит переключатель, — и щелчка
+    // нет. Поэтому нажатие в label сначала отдаётся iOS (переключение идёт
+    // сразу после события), а кнопка срабатывает следом, в следующей задаче.
+    // Клавиатура так не откроется — кнопкам, которые ставят фокус, defer: false
+    let replay = false;
+    el.addEventListener('click', (e) => {
+      if (replay || e.target !== label) return;
+      e.stopImmediatePropagation(); // не preventDefault: он отменил бы переключение
+      setTimeout(() => {
+        replay = true;
+        el.click();
+        replay = false;
+      });
+    }, true);
+  }
+  el.classList.add('has-tick');
+  el.append(label);
+  return el;
+}
+
+/** Щелчок из кода: на iOS 18 срабатывал, на iOS 27 — нет. Для жестов, где нажатия нет. */
 export function haptic() {
   try {
     const label = h('label', { class: 'haptic', 'aria-hidden': 'true' }, h('input', { type: 'checkbox', switch: true, tabindex: '-1' }));

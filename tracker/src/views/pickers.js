@@ -4,7 +4,7 @@
  */
 import {
   h, icon, glyph, sphereMark, pickerInput, sectionIcon, toast, openSheet, closeSheet, renderSheet, focusEnd, prioIcon, haptic, calm,
-  APPLE_TOUCH,
+  APPLE_TOUCH, withTick,
 } from '../ui.js';
 import { dayLabel, fmtLong, fmtShort, fmtWeekday, addDays, nextWeek } from '../dates.js';
 import { PRIORITIES, REPEATS, activeSpheres, dayLimit, isDayFull } from '../logic.js';
@@ -53,14 +53,14 @@ export function menu(host, items, onPick, label) {
   if (again) return;
   menuEl = h('div', { class: 'menu', role: 'menu', 'aria-label': label, 'data-label': label },
     items.map(([value, text, mark, on], i) => stagger(i,
-      h('button', {
+      withTick(h('button', {
         class: ['menu-item', on && 'is-on'], type: 'button', role: 'menuitemradio', 'aria-checked': String(Boolean(on)),
         onpointerdown: keep, onmousedown: keep,
-        onclick: () => { haptic(); closeMenu(); onPick(value); },
+        onclick: () => { closeMenu(); onPick(value); },
       },
         h('span', { class: 'menu-check' }, on && icon('check', 20)),
         h('span', { class: 'menu-mark' }, mark && (mark instanceof Node ? mark : mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
-        h('span', null, text)))));
+        h('span', null, text))))));
   host.append(menuEl);
   place(menuEl, host);
   document.addEventListener('pointerdown', outside, true);
@@ -346,11 +346,11 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
     if (d.prioOpen) {
       // приоритет выбирается прямо в поле: ни меню поверх текста, ни клавиатуры поверх меню
       chips.replaceChildren(h('div', { class: 'prio-pick', role: 'radiogroup', 'aria-label': 'Priority' },
-        PRIO_CHOICES.map(([v, text, level]) => h('button', {
+        PRIO_CHOICES.map(([v, text, level]) => withTick(h('button', {
           class: ['prio-opt', d.priority === v && 'is-on'], type: 'button', role: 'radio',
           'aria-checked': String(d.priority === v), onpointerdown: keep, onmousedown: keep,
           onclick: (e) => pickPrio(v, e.currentTarget),
-        }, prioIcon(level, 18), h('span', null, text)))));
+        }, prioIcon(level, 18), h('span', null, text))))));
       return;
     }
     chips.replaceChildren(
@@ -394,7 +394,6 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
   }
 
   function pickPrio(v, chosen) {
-    haptic();
     d.priority = v;
     const opts = [...chips.querySelectorAll('.prio-opt')];
     const done = () => {
