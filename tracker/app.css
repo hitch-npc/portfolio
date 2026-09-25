@@ -1452,8 +1452,16 @@ textarea:focus-visible {
 
 .sheet-scrim {
   position: absolute;
-  inset: 0;
+  /* с запасом за края: слой держится видимой части экрана и может на миг
+     отстать от неё — страница по краям всё равно под затемнением */
+  inset: -50vh 0;
   background: var(--scrim);
+  touch-action: none;
+}
+
+/* под открытой шторкой страница не пружинит */
+html:has(.sheet-layer:not([hidden])) {
+  overscroll-behavior: none;
 }
 
 .sheet {
