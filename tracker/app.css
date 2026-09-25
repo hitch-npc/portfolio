@@ -3837,8 +3837,8 @@ body:has(.select-bar) .toast {
 }
 
 /* ── лаборатория вибрации (эксперимент, src/views/lab.js) ─────────────
-   Дорожка степпера: заливка и риска — значение, пунктирный круг — где
-   начинать жест (режимы A, C, E). Переключатель — настоящий, по умолчанию
+   Дорожка степпера: заливка и риска — значение, пунктир — где начинать
+   жест (режим C). Переключатель — настоящий, по умолчанию
    прозрачный; не display: none и не pointer-events: none — палец должен
    попадать именно в него */
 .lab-controls {
@@ -3931,12 +3931,13 @@ body:has(.select-bar) .toast {
   font-variant-numeric: tabular-nums;
 }
 
+/* C: пунктир обводит переключатель, размер — из lab.js (--dw, --dh) */
 .lab-dot {
   top: 50%;
   left: 50%;
-  width: 60px;
-  height: 60px;
-  margin: -30px 0 0 -30px;
+  width: var(--dw, 80px);
+  height: var(--dh, 40px);
+  transform: translate(-50%, -50%);
   border: 2px dashed var(--ink-muted);
   border-radius: var(--r-pill);
 }
@@ -3952,20 +3953,31 @@ body:has(.select-bar) .toast {
   opacity: 1;
 }
 
-/* B: вся дорожка — один прозрачный переключатель */
-.is-b .lab-switch {
+/* B, а до первого движения и A, E: вся дорожка — один прозрачный
+   переключатель, палец точно начинает на нём */
+.is-a .lab-switch,
+.is-b .lab-switch,
+.is-e .lab-switch {
   inset: 0;
   width: 100%;
   height: 100%;
 }
 
-/* A, C, E: родного размера на круге; A и E едут за пальцем (--fx, --fy) */
-.is-a .lab-switch,
-.is-c .lab-switch,
-.is-e .lab-switch {
+/* A, E в жесте: родного размера под пальцем; место — из lab.js (--sx, --sy),
+   через left/top, без transform */
+.lab-track.is-riding .lab-switch {
+  inset: auto;
+  top: var(--sy, 0px);
+  left: var(--sx, 0px);
+  width: auto;
+  height: auto;
+}
+
+/* C: родного размера в центре */
+.is-c .lab-switch {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translate(var(--fx, 0px), var(--fy, 0px));
+  transform: translate(-50%, -50%);
 }
 
 .lab-panel {
