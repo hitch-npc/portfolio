@@ -142,8 +142,11 @@ export function stepSheet(id) {
     if (!g) return [];
     const step = goalStep(g);
     const auto = !(g.step > 0);
-    // единица — сразу за числом: цифры моноширинные, ширина по их числу
-    const fit = () => { value.style.width = `${Math.max(1, value.value.length) * 0.6 + 0.15}em`; };
+    // единица — сразу за числом. Ширина поля — ширина самого числа: под полем
+    // лежит его невидимая копия тем же шрифтом (без расчётов по «ширине цифры»:
+    // на iPhone у поля свои отступы, и число обрезалось)
+    const mirror = h('span', { class: 'dial-mirror', 'aria-hidden': 'true' });
+    const fit = () => { mirror.textContent = value.value || ' '; };
     const value = h('input', {
       class: 'dial-readout', type: 'text', inputmode: 'decimal', value: num(step), 'aria-label': 'Step',
       oninput: fit,
@@ -162,7 +165,7 @@ export function stepSheet(id) {
         h('h2', { class: 'sheet-bar-title' }, 'Step'),
         h('button', { class: 'pill pill-action is-on', type: 'button', onclick: closeSheet }, 'Done')),
       h('p', { class: 'sheet-text muted step-for' }, `− and + on “${g.title}” move by`),
-      h('div', { class: 'dial-head' }, (fit(), value), g.unit && h('span', { class: 'dial-unit' }, g.unit)),
+      h('div', { class: 'dial-head' }, h('span', { class: 'dial-fit' }, (fit(), mirror), value), g.unit && h('span', { class: 'dial-unit' }, g.unit)),
       dial({
         values: STEPS, value: step, label: 'Step',
         onInput: (v) => {
