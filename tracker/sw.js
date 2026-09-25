@@ -13,7 +13,9 @@ const CACHE = `tracker-${VERSION}`;
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(FILES))
+      // мимо HTTP-кэша: GitHub Pages разрешает держать файл 10 минут, и новая
+      // версия могла лечь в кэш со старыми файлами
+      .then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });
