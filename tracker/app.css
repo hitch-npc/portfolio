@@ -3810,3 +3810,178 @@ body:has(.select-bar) .toast {
   animation: none !important;
   transition: none !important;
 }
+
+/* ── лаборатория вибрации (эксперимент, src/views/lab.js) ─────────────
+   Дорожка степпера: заливка и риска — значение, пунктирный круг — где
+   начинать жест (режимы A, C, E). Переключатель — настоящий, по умолчанию
+   прозрачный; не display: none и не pointer-events: none — палец должен
+   попадать именно в него */
+.lab-controls {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.lab-guide {
+  margin: 0 4px 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+.lab-stage {
+  margin: 0 0 20px;
+}
+
+.lab-track {
+  --k: 0.5;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-alt);
+  border-radius: var(--r-card);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lab-track.is-v {
+  height: 340px;
+}
+
+.lab-track.is-h {
+  height: 150px;
+}
+
+.lab-fill,
+.lab-handle,
+.lab-value,
+.lab-dot {
+  position: absolute;
+  pointer-events: none;
+}
+
+.lab-fill {
+  left: 0;
+  bottom: 0;
+  background: var(--ink);
+  opacity: 0.1;
+}
+
+.is-v .lab-fill {
+  right: 0;
+  height: calc(var(--k) * 100%);
+}
+
+.is-h .lab-fill {
+  top: 0;
+  width: calc(var(--k) * 100%);
+}
+
+.lab-handle {
+  background: var(--ink);
+  border-radius: var(--r-pill);
+}
+
+.is-v .lab-handle {
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--k) * (100% - 4px));
+  height: 4px;
+}
+
+.is-h .lab-handle {
+  top: 16px;
+  bottom: 16px;
+  left: calc(var(--k) * (100% - 4px));
+  width: 4px;
+}
+
+.lab-value {
+  top: 12px;
+  left: 16px;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-dot {
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border: 2px dashed var(--ink-muted);
+  border-radius: var(--r-pill);
+}
+
+.lab-switch {
+  position: absolute;
+  margin: 0;
+  opacity: 0;
+  touch-action: none;
+}
+
+.lab-track.is-shown .lab-switch {
+  opacity: 1;
+}
+
+/* B: вся дорожка — один прозрачный переключатель */
+.is-b .lab-switch {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* A, C, E: родного размера на круге; A и E едут за пальцем (--fx, --fy) */
+.is-a .lab-switch,
+.is-c .lab-switch,
+.is-e .lab-switch {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translate(var(--fx, 0px), var(--fy, 0px));
+}
+
+.lab-panel {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.lab-row {
+  display: grid;
+  grid-template-columns: 9.5em minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.lab-row dt {
+  color: var(--ink-muted);
+}
+
+.lab-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.lab-log {
+  max-height: 60vh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  background: var(--bg-alt);
+  border-radius: var(--r-sm);
+  font: 11px/16px ui-monospace, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

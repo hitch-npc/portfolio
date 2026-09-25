@@ -15,6 +15,7 @@ import { spheresView, sphereView } from './views/spheres.js';
 import { goalsView } from './views/goals.js';
 import { briefView } from './views/brief.js';
 import { settingsView } from './views/settings.js';
+import { IOS_HAPTIC_EXPERIMENT, labView } from './views/lab.js';
 
 const ROUTES = {
   today: todayView,
@@ -23,7 +24,12 @@ const ROUTES = {
   goals: goalsView,
   brief: briefView,
   settings: settingsView,
+  // эксперимент с вибрацией: экран есть, только пока флаг включён
+  ...(IOS_HAPTIC_EXPERIMENT && { lab: labView }),
 };
+
+/** Глубина экрана: вкладки — 0, настройки — 1, лаборатория из них — 2. */
+const DEPTH = { settings: 1, lab: 2 };
 
 const TABS = [
   ['today', 'Today'],
@@ -151,7 +157,8 @@ function navigate(dir, update) {
 
 function onRoute() {
   const next = route().name;
-  const dir = next === 'settings' ? 'push' : shown === 'settings' ? 'pop' : 'tab';
+  const [to, from] = [DEPTH[next] ?? 0, DEPTH[shown] ?? 0];
+  const dir = to > from ? 'push' : to < from ? 'pop' : 'tab';
   shown = next;
   ui.expanded = null;
   ui.confirm = null;

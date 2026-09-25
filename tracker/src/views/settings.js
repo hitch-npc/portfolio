@@ -14,6 +14,7 @@ import {
 import { dayLimit, settingsOf } from '../logic.js';
 import * as store from '../store.js';
 import { VERSION } from '../version.js';
+import { IOS_HAPTIC_EXPERIMENT } from './lab.js';
 import { ui, header, pillButton } from './common.js';
 
 async function exportBackup() {
@@ -261,6 +262,13 @@ export function settingsView() {
       h('p', { class: 'setting-hint' },
         'Files: backup, JSON, CSV (columns title, sphere, status, priority, deadline, day, note), text or Markdown. ',
         'In a list, @today or @2026-10-01 plans the day, due:2026-10-05 sets a deadline, ! marks high priority.')),
+
+    IOS_HAPTIC_EXPERIMENT && [
+      h('h2', { class: 'label' }, 'Experiments'),
+      h('section', { class: 'block-alt' },
+        h('p', { class: 'block-text' }, 'Haptics lab: does iPhone tick on every step of one drag? A test screen with a debug log.'),
+        h('div', { class: 'stack' }, h('a', { class: 'pill pill-wide', href: '#/lab' }, 'Open haptics lab'))),
+    ],
 
     h('p', { class: 'version' }, `Version ${VERSION}`),
     // кредит шрифта: лицензия OFL его не требует, но автору — спасибо
