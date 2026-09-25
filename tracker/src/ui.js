@@ -151,6 +151,36 @@ const ICONS = {
   bell: `<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15z" ${S}/><path d="M10 21.5h4" ${S}/>`,
 };
 
+/* ── крестик, который на миг становится галочкой ─────────────────────── */
+
+const CROSS = 'M6 6L18 18M18 6L6 18';
+const TICK = 'M5 12.5L9.5 17M19 6.5L9.5 17'; // те же два отрезка: короткий и длинный штрих галочки
+
+/** Крестик «закрыть», который умеет стать галочкой (flashCheck): два отрезка перетекают. */
+export function closeCheckIcon() {
+  const el = svg('0 0 24 24', `<path d="${CROSS}" ${S}><animate attributeName="d" begin="indefinite" dur="1.1s" fill="remove"
+    values="${CROSS};${TICK};${TICK};${CROSS}" keyTimes="0;.3;.7;1" calcMode="spline"
+    keySplines=".3 0 .2 1;0 0 1 1;.4 0 .2 1"/></path>`, 'icon icon-close');
+  el.setAttribute('width', 24);
+  el.setAttribute('height', 24);
+  return el;
+}
+
+/**
+ * «Сохранено»: крестик плавно становится галочкой, замирает на полсекунды
+ * и возвращается. При «меньше движения» — галочка без перетекания.
+ */
+export function flashCheck(el) {
+  const path = el?.querySelector('path');
+  if (!path) return;
+  if (calm()) {
+    path.setAttribute('d', TICK);
+    setTimeout(() => path.setAttribute('d', CROSS), 700);
+    return;
+  }
+  path.querySelector('animate')?.beginElement();
+}
+
 /**
  * Иконка size×size без масштабирования: меньший размер — это обрезка поля
  * вокруг рисунка, а не уменьшение, так что 2 px остаются 2 px.

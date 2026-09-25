@@ -329,6 +329,26 @@ textarea:focus-visible {
   margin-right: -10px;
 }
 
+/* шапка настроек не уезжает при прокрутке: название и крестик всегда на месте.
+   Верхний отступ экрана переезжает в неё — под ней не видно уехавшего текста.
+   Над зерном страницы, со своим зерном: иначе оно ехало бы по стоящей шапке */
+.screen-settings > .head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: calc(-1 * (var(--safe-top) + 12px)) calc(-1 * var(--pad)) 12px;
+  padding: calc(var(--safe-top) + 22px) var(--pad) 10px;
+  background: var(--screen);
+}
+
+.screen-settings > .head::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--grain) 0 0 / 128px 128px;
+}
+
 .back {
   display: inline-flex;
   align-items: center;
@@ -1556,6 +1576,16 @@ textarea:focus-visible {
 .sheet-actions .pill {
   flex: 1;
   justify-content: center;
+}
+
+/* удалить сферу — отдельной строкой под Archive/Done: второй тап объясняет, что будет с задачами */
+.sphere-delete {
+  height: auto;
+  min-height: 44px;
+  margin-top: 8px;
+  padding-block: 10px;
+  white-space: normal;
+  text-align: center;
 }
 
 .sheet-actions .pill:not(.is-on) {
@@ -3364,18 +3394,20 @@ body:has(.select-bar) .toast {
   animation-name: vt-under-in;
 }
 
-/* шестерёнка поворачивается и становится крестиком — и обратно */
-::view-transition-old(corner),
-::view-transition-new(corner) {
+/* шестерёнка поворачивается и становится крестиком — и обратно; только при
+   входе в настройки и выходе. Смена оформления крестик не крутит: он сам
+   становится галочкой (flashCheck в ui.js) */
+:root:is([data-nav='push'], [data-nav='pop'])::view-transition-old(corner),
+:root:is([data-nav='push'], [data-nav='pop'])::view-transition-new(corner) {
   animation-duration: 0.46s;
   animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-::view-transition-old(corner) {
+:root:is([data-nav='push'], [data-nav='pop'])::view-transition-old(corner) {
   animation-name: vt-corner-out;
 }
 
-::view-transition-new(corner) {
+:root:is([data-nav='push'], [data-nav='pop'])::view-transition-new(corner) {
   animation-name: vt-corner-in;
 }
 

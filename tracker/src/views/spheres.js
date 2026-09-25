@@ -1,10 +1,10 @@
 /**
  * «Сферы» — папки для задач. Плитки: глиф, название, число активных задач.
  * Порядок — перетаскиванием за ручку; «⋯» открывает шторку: имя, глиф,
- * цвет (в оформлении Colour), архив. Архив задачи не удаляет, только убирает сферу с глаз.
+ * цвет (в оформлении Colour), архив, удаление (задачи уходят во «Входящие»). Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
-import { h, glyph, sphereMark, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, toast } from '../ui.js';
+import { h, glyph, sphereMark, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
 import { COLORS, GLYPHS, activeSpheres, settingsOf, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import {
@@ -37,6 +37,7 @@ function inboxTile(n) {
 }
 
 export function editSphere(id) {
+  ui.confirm = null;
   openSheet(() => {
     const s = store.getState().spheres.find((x) => x.id === id);
     if (!s) return [];
@@ -73,8 +74,31 @@ export function editSphere(id) {
             toast(`${s.name} archived — tasks kept`);
           }),
         pillButton(null, 'Done', closeSheet, 'is-on')),
+      deleteRow(s),
     ];
   });
+}
+
+/**
+ * Удалить сферу — двумя тапами: первый говорит, что станет с задачами
+ * (уйдут во «Входящие», не пропадут), второй удаляет.
+ */
+function deleteRow(s) {
+  const n = sphereTasks(store.getState(), s.id).open.length;
+  const confirming = ui.confirm === `sphere-${s.id}`;
+  const what = n ? `${n} open ${n === 1 ? 'task goes' : 'tasks go'} to Inbox` : 'no open tasks in it';
+  return pillButton(null, confirming ? `Tap again to delete — ${what}` : 'Delete sphere', () => {
+    if (!confirming) {
+      ui.confirm = `sphere-${s.id}`;
+      renderSheet();
+      return;
+    }
+    ui.confirm = null;
+    const moved = store.deleteSphere(s.id);
+    closeSheet();
+    toast(moved ? `${s.name} deleted — ${moved} ${moved === 1 ? 'task' : 'tasks'} moved to Inbox` : `${s.name} deleted`);
+    if (location.hash === `#/spheres/${s.id}`) location.hash = '#/spheres';
+  }, ['pill-wide', 'sphere-delete', confirming && 'is-confirming'].filter(Boolean).join(' '));
 }
 
 /** Поиск по всем задачам: названия, заметки, подзадачи. */
