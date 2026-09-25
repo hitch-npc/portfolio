@@ -9,12 +9,15 @@
  * сам WebKit, и пишем всё в лог (localStorage — переживает перезапуск).
  *
  * Режимы (где лежит переключатель):
- *   A — родного размера, едет за пальцем: всё время прямо под ним;
+ *   A — до касания растянут на всю дорожку (палец точно начинает на нём),
+ *       с первым движением сжимается до родного размера и едет за пальцем;
  *   B — растянут прозрачным на всю дорожку;
- *   C — родного размера, стоит в центре;
+ *   C — родного размера, стоит в центре (начинать внутри пунктира);
  *   D — переключателя нет (контроль);
  *   E — как A, но на каждом шаге прыгает вбок, и палец оказывается на
  *       другой его половине: вдруг WebKit сам «перещёлкнет» его под пальцем.
+ * Двигаем его через left/top, не transform: вдруг WebKit меряет рамку
+ * переключателя без трансформаций.
  *
  * Выключить — IOS_HAPTIC_EXPERIMENT = false: пропадут экран и вход в
  * Settings. Степперы приложения (крутилки целей, −/+) отсюда не зависят.
@@ -32,14 +35,14 @@ const MIN = 0;
 const MAX = 100;
 const START = 50;
 const STEP_PX = 12; // шаг значения — 12 точек пути пальца
-const JUMP_PX = 13; // E: прыжок вбок — четверть ширины переключателя
+const JUMP = 0.3; // E: сдвиг вбок, доля ширины — палец то на 20 %, то на 80 % переключателя
 
 const MODES = {
-  A: 'Put your finger on the dashed circle and drag. The switch rides along, always right under your finger.',
+  A: 'Put your finger anywhere on the track and drag. As soon as you move, a normal-size switch rides along right under your finger.',
   B: 'Put your finger anywhere on the track and drag. The whole track is one transparent switch.',
-  C: 'Put your finger on the dashed circle and drag. The switch stays in the centre at its normal size.',
+  C: 'Start inside the dashed outline — that is the switch — and drag. It stays in the centre at its normal size.',
   D: 'Put your finger anywhere on the track and drag. No switch here — the control: expect no ticks.',
-  E: 'Put your finger on the dashed circle and drag. On every step the switch jumps sideways under your finger.',
+  E: 'Put your finger anywhere on the track and drag. A normal-size switch rides under your finger and jumps sideways on every step.',
 };
 
 /* ── хранение ────────────────────────────────────────────────────────── */
@@ -136,11 +139,22 @@ function paintChanges() {
 
 /* ── жест ────────────────────────────────────────────────────────────── */
 
-/** A и E: переключатель держится под пальцем; E ещё и прыгает вбок. */
-function follow(dx, dy) {
+/**
+ * A и E: с первым движением переключатель сжимается до родного размера и
+ * держится под пальцем; E ещё и сдвинут вбок на JUMP ширины (g.jump = ±1).
+ */
+function ride(e) {
   if (!sw || !(opts.mode === 'A' || opts.mode === 'E')) return;
-  sw.style.setProperty('--fx', `${dx + (g?.jump ?? 0) * JUMP_PX}px`);
-  sw.style.setProperty('--fy', `${dy}px`);
+  if (!g.riding) {
+    g.riding = true;
+    track.classList.add('is-riding');
+    const r = sw.getBoundingClientRect();
+    g.w = r.width;
+    g.h = r.height;
+    log(`switch shrinks under the finger: ${px(r.width)}×${px(r.height)}`);
+  }
+  sw.style.setProperty('--sx', `${e.clientX - g.left - g.w / 2 + g.jump * JUMP * g.w}px`);
+  sw.style.setProperty('--sy', `${e.clientY - g.top - g.h / 2}px`);
 }
 
 /**
@@ -148,11 +162,9 @@ function follow(dx, dy) {
  * вызывается: A–C ждут, что сделает сам переключатель под пальцем, E
  * сдвигает его, чтобы палец оказался на другой половине.
  */
-function hapticPath(dx, dy) {
+function hapticPath() {
   if (opts.mode === 'D') return 'none (control)';
   if (opts.mode !== 'E') return 'no JS trigger — watching the native switch';
-  g.jump = g.jump === 1 ? -1 : 1;
-  follow(dx, dy);
   return `switch moved ${g.jump > 0 ? 'right' : 'left'}: finger now on its ${g.jump > 0 ? 'left' : 'right'} half`;
 }
 
@@ -163,8 +175,7 @@ function endGesture(e, kind) {
   setField('state', kind === 'pointercancel' ? 'cancelled' : 'idle');
   g = null;
   endedAt = performance.now();
-  sw?.style.setProperty('--fx', '0px');
-  sw?.style.setProperty('--fy', '0px');
+  track?.classList.remove('is-riding');
 }
 
 function bindTrack(el) {
@@ -174,9 +185,11 @@ function bindTrack(el) {
       log(`pointerdown ignored: finger ${e.pointerId} while ${g.id} is down`);
       return;
     }
-    g = { id: e.pointerId, x0: e.clientX, y0: e.clientY, v0: value, prev: value, moved: false, touchMoved: false, steps: 0, changes: 0, jump: 0 };
+    const box = el.getBoundingClientRect();
+    g = { id: e.pointerId, x0: e.clientX, y0: e.clientY, left: box.left, top: box.top, v0: value, prev: value, moved: false, touchMoved: false, riding: false, steps: 0, changes: 0, jump: 0 };
     setField('state', 'active');
     log(`pointerdown x=${px(e.clientX)} y=${px(e.clientY)} target=${who(e.target)} type=${e.pointerType} primary=${e.isPrimary} id=${e.pointerId}`);
+    if (sw && e.target !== sw) log('MISSED: the finger started off the switch — this drag does not count, start inside the dashed outline');
   });
 
   el.addEventListener('pointermove', (e) => {
@@ -187,16 +200,18 @@ function bindTrack(el) {
       g.moved = true;
       log(`pointermove (first) x=${px(e.clientX)} y=${px(e.clientY)} target=${who(e.target)} value=${value}`);
     }
-    follow(dx, dy);
     const along = opts.axis === 'v' ? -dy : dx; // вверх и вправо — больше
     const next = Math.min(MAX, Math.max(MIN, g.v0 + Math.round(along / STEP_PX)));
-    if (next === g.prev) return;
+    const stepped = next !== g.prev;
+    if (stepped && opts.mode === 'E') g.jump = g.jump === 1 ? -1 : 1;
+    ride(e);
+    if (!stepped) return;
     const from = g.prev;
     g.prev = next;
     g.steps += 1;
     value = next;
     paintValue();
-    const attempt = hapticPath(dx, dy);
+    const attempt = hapticPath();
     setField('step', `${from} → ${next}`);
     setField('attempt', `${clock()} — ${attempt}`);
     setField('target', who(e.target));
@@ -262,7 +277,6 @@ function pills(label, key, options) {
 
 function stage() {
   const hasSwitch = opts.mode !== 'D';
-  const onDot = opts.mode === 'A' || opts.mode === 'C' || opts.mode === 'E';
   sw = hasSwitch
     ? h('input', { class: 'lab-switch', id: 'iosHapticSwitch', type: 'checkbox', switch: true, tabindex: '-1', 'aria-hidden': 'true' })
     : null;
@@ -272,7 +286,7 @@ function stage() {
   h('div', { class: 'lab-fill' }),
   h('div', { class: 'lab-handle' }),
   h('output', { class: 'lab-value' }, String(value)),
-  onDot && h('span', { class: 'lab-dot', 'aria-hidden': 'true' }),
+  opts.mode === 'C' && h('span', { class: 'lab-dot', 'aria-hidden': 'true' }),
   sw);
   bindTrack(track);
   if (sw) bindSwitch(sw);
@@ -288,11 +302,15 @@ function paint() {
   stageEl.replaceChildren(stage());
   paintValue();
   setField('checked', sw ? (sw.checked ? 'on' : 'off') : 'none (mode D)');
-  // где переключатель на самом деле: WebKit мог не растянуть его (режим B)
+  // где переключатель на самом деле: WebKit мог не растянуть его (режим B);
+  // в C пунктир обводит ровно его — начинать жест надо внутри
   requestAnimationFrame(() => {
     if (!sw?.isConnected) return;
     const r = sw.getBoundingClientRect();
     log(`switch box ${px(r.width)}×${px(r.height)} at x=${px(r.left)} y=${px(r.top)}`);
+    const dot = track.querySelector('.lab-dot');
+    dot?.style.setProperty('--dw', `${r.width + 8}px`);
+    dot?.style.setProperty('--dh', `${r.height + 8}px`);
   });
 }
 
