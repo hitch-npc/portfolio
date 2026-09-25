@@ -4,7 +4,7 @@
  * цвет (в оформлении Colour), архив, удаление (задачи уходят во «Входящие»). Архив задачи не удаляет, только убирает сферу с глаз.
  * Задачи без сферы живут во «Входящих». Сверху — поиск по всем задачам.
  */
-import { h, glyph, sphereMark, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
+import { h, glyph, sphereMark, armed, haptic, icon, entry, sortableGrid, swipeable, openSheet, closeSheet, renderSheet, toast } from '../ui.js';
 import { COLORS, GLYPHS, activeSpheres, settingsOf, archivedSpheres, searchTasks, sphereCounts, sphereTasks } from '../logic.js';
 import * as store from '../store.js';
 import {
@@ -30,9 +30,9 @@ function sphereTile(s, count, { drag = true } = {}) {
 
 function inboxTile(n) {
   return h('li', { class: 'tile sphere-tile tile-inbox' },
-    h('a', { class: 'tile-cover', href: '#/spheres/inbox', 'aria-label': `Inbox, ${n} open` }),
+    h('a', { class: 'tile-cover', href: '#/spheres/inbox', 'aria-label': `All, ${n} open` }),
     h('span', { class: 'chip' }, glyph('inbox')),
-    h('span', { class: 'tile-name' }, 'Inbox'),
+    h('span', { class: 'tile-name' }, 'All'),
     h('span', { class: ['tile-count', !n && 'is-zero'] }, n));
 }
 
@@ -67,11 +67,11 @@ export function editSphere(id) {
         }, s.color === c && icon('check', 20)))),
       h('div', { class: 'sheet-actions' },
         s.archived
-          ? pillButton(null, 'Restore', () => { store.updateSphere(s.id, { archived: false }); closeSheet(); toast(`${s.name} restored`); })
+          ? pillButton(null, 'Restore', () => { store.updateSphere(s.id, { archived: false }); closeSheet(); toast(`${s.name} restored`, { done: true }); })
           : pillButton(null, 'Archive', () => {
             store.updateSphere(s.id, { archived: true });
             closeSheet();
-            toast(`${s.name} archived — tasks kept`);
+            toast(`${s.name} archived — tasks kept`, { done: true });
           }),
         pillButton(null, 'Done', closeSheet, 'is-on')),
       deleteRow(s),
@@ -86,17 +86,18 @@ export function editSphere(id) {
 function deleteRow(s) {
   const n = sphereTasks(store.getState(), s.id).open.length;
   const confirming = ui.confirm === `sphere-${s.id}`;
-  const what = n ? `${n} open ${n === 1 ? 'task goes' : 'tasks go'} to Inbox` : 'no open tasks in it';
-  return pillButton(null, confirming ? `Tap again to delete — ${what}` : 'Delete sphere', () => {
+  const what = n ? `${n} open ${n === 1 ? 'task goes' : 'tasks go'} to All` : 'no open tasks in it';
+  return pillButton(null, confirming ? armed(`Tap again to delete — ${what}`) : 'Delete sphere', () => {
     if (!confirming) {
       ui.confirm = `sphere-${s.id}`;
+      haptic();
       renderSheet();
       return;
     }
     ui.confirm = null;
     const moved = store.deleteSphere(s.id);
     closeSheet();
-    toast(moved ? `${s.name} deleted — ${moved} ${moved === 1 ? 'task' : 'tasks'} moved to Inbox` : `${s.name} deleted`);
+    toast(moved ? `${s.name} deleted — ${moved} ${moved === 1 ? 'task' : 'tasks'} moved to All` : `${s.name} deleted`, { done: true });
     if (location.hash === `#/spheres/${s.id}`) location.hash = '#/spheres';
   }, ['pill-wide', 'sphere-delete', confirming && 'is-confirming'].filter(Boolean).join(' '));
 }
@@ -160,7 +161,7 @@ export function sphereView(id) {
   if (!isInbox && !s) return h('section', { class: 'screen' }, backLink('#/spheres', 'Spheres'), h('p', { class: 'hint' }, 'This sphere no longer exists.'));
 
   const { open, done } = sphereTasks(st, isInbox ? null : s.id);
-  const name = isInbox ? 'Inbox' : s.name;
+  const name = isInbox ? 'All' : s.name;
   const scope = `sphere:${id}`;
   const sel = selecting(scope);
   if (ui.select && !sel) ui.select = null; // выбор остался с другого экрана

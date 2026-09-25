@@ -153,34 +153,42 @@ const ICONS = {
   bell: `<path d="M6 17v-6a6 6 0 0 1 12 0v6l1.5 2h-15z" ${S}/><path d="M10 21.5h4" ${S}/>`,
 };
 
+/**
+ * Подпись «взведённой» кнопки удаления (второй тап — удалить): поднимается
+ * на место прежней, кнопка заливается следом (.is-confirming в стилях).
+ */
+export const armed = (text) => h('span', { class: 'confirm-label' }, text);
+
 /* ── крестик, который на миг становится галочкой ─────────────────────── */
 
-const CROSS = 'M6 6L18 18M18 6L6 18';
-const TICK = 'M5 12.5L9.5 17M19 6.5L9.5 17'; // те же два отрезка: короткий и длинный штрих галочки
-
-/** Крестик «закрыть», который умеет стать галочкой (flashCheck): два отрезка перетекают. */
+/**
+ * Крестик «закрыть», который умеет на миг стать галочкой (flashCheck):
+ * крестик и галочка — две группы, анимации — в стилях (.is-saved).
+ */
 export function closeCheckIcon() {
-  const el = svg('0 0 24 24', `<path d="${CROSS}" ${S}><animate attributeName="d" begin="indefinite" dur="1.1s" fill="remove"
-    values="${CROSS};${TICK};${TICK};${CROSS}" keyTimes="0;.3;.7;1" calcMode="spline"
-    keySplines=".3 0 .2 1;0 0 1 1;.4 0 .2 1"/></path>`, 'icon icon-close');
+  const el = svg('0 0 24 24', `<g class="cc-x"><path d="M6 6L18 18M18 6L6 18" ${S}/></g>`
+    + `<path class="cc-v" d="M5 12.5L9.5 17L19 6.5" pathLength="1" ${S}/>`, 'icon icon-close icon-close-check');
   el.setAttribute('width', 24);
   el.setAttribute('height', 24);
   return el;
 }
 
+const SAVED_MS = 1250; // как .is-saved в стилях
+
 /**
- * «Сохранено»: крестик плавно становится галочкой, замирает на полсекунды
- * и возвращается. При «меньше движения» — галочка без перетекания.
+ * «Сохранено»: крестик с поворотом сжимается, галочка прорисовывается
+ * линией, кнопка чуть подпрыгивает (и лёгкая вибрация), галочка тает —
+ * крестик возвращается. При «меньше движения» — галочка без движения.
  */
 export function flashCheck(el) {
-  const path = el?.querySelector('path');
-  if (!path) return;
-  if (calm()) {
-    path.setAttribute('d', TICK);
-    setTimeout(() => path.setAttribute('d', CROSS), 700);
-    return;
-  }
-  path.querySelector('animate')?.beginElement();
+  if (!el?.classList.contains('icon-close-check')) return;
+  const cls = calm() ? 'is-saved-still' : 'is-saved';
+  el.classList.remove('is-saved', 'is-saved-still');
+  void el.getBoundingClientRect(); // с начала, если тапнули снова
+  el.classList.add(cls);
+  clearTimeout(el.savedTimer);
+  el.savedTimer = setTimeout(() => el.classList.remove(cls), calm() ? 700 : SAVED_MS);
+  setTimeout(haptic, calm() ? 0 : 430);
 }
 
 /**
@@ -211,7 +219,8 @@ const GLYPH_SVG = {
   pill: '<rect x="0.5" y="3.5" width="13" height="7" rx="3.5"/>',
   square: '<rect x="1.5" y="1.5" width="11" height="11"/>',
   bar: '<rect x="0.5" y="5" width="13" height="4"/>',
-  triangle: '<path d="M7 1l6.5 12H.5z"/>',
+  // треугольник поднят на 1: его «вес» внизу, и по центру рамки он кажется опущенным
+  triangle: '<path d="M7 0l6.5 12H.5z"/>',
   ring: '<path d="M7 1a6 6 0 1 1 0 12A6 6 0 0 1 7 1zm0 3.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z" fill-rule="evenodd"/>',
   half: '<path d="M1 10a6 6 0 0 1 12 0z"/>',
   diamond: '<path d="M7 .5L13.5 7 7 13.5.5 7z"/>',
@@ -343,12 +352,20 @@ export function autosize(el) {
 let toastEl;
 let toastTimer;
 
-export function toast(message) {
+/**
+ * Сообщение над панелью вкладок. done — удалось (удалено, заменено,
+ * добавлено): с галочкой в кружке, его видно сразу. Длинное — в две строки,
+ * а не обрезается. Новое сообщение поверх старого снова «впрыгивает».
+ */
+export function toast(message, { done = false } = {}) {
   toastEl ??= document.body.appendChild(h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }));
-  toastEl.textContent = message;
+  toastEl.replaceChildren(done && h('span', { class: 'toast-mark' }, icon('check', 20)), h('span', { class: 'toast-text' }, message));
+  toastEl.classList.toggle('is-done', done);
+  toastEl.classList.remove('is-on');
+  void toastEl.offsetWidth; // появление — с начала, даже если прошлое ещё видно
   toastEl.classList.add('is-on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), 2200);
+  toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), done ? 2400 : 2800);
 }
 
 /** Текст — в буфер обмена. false — не получилось. */
@@ -372,6 +389,7 @@ let sheetRender = null;
 let sheetRoot;
 let panel = null; // сама шторка: живёт, пока открыта, перерисовывается только содержимое
 let sheetBody = null; // её прокручиваемая часть: у рамки своё зерно, оно стоит, текст едет
+let morph = null; // идущее перетекание высоты шторки
 let closing = 0; // таймер ухода вниз
 let closedNow = false; // закрыта в этом же обработчике — следующая шторка сменит содержимое на месте
 
@@ -458,6 +476,7 @@ function finishClose() {
   closing = 0;
   panel = null;
   sheetBody = null;
+  morph = null;
   sheetRoot.classList.remove('is-closing');
   sheetRoot.replaceChildren();
   sheetRoot.hidden = true;
@@ -474,8 +493,16 @@ function drawSheet() {
   }
   if (panel) {
     panel.classList.remove('is-swapping'); // проявление — один раз, не на каждый тап
+    // высота шторки не прыгает: запоминаем, сколько было, и плавно
+    // перетекаем к новой (появилась подсказка, сменилось содержимое)
+    const from = panel.getBoundingClientRect().height;
+    morph?.cancel();
     sheetBody.replaceChildren();
     append(sheetBody, [sheetRender()]);
+    const to = panel.getBoundingClientRect().height;
+    morph = Math.abs(to - from) > 1 && !calm()
+      ? panel.animate([{ height: `${from}px` }, { height: `${to}px` }], { duration: 440, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' })
+      : null;
     return;
   }
   sheetRoot.hidden = false;

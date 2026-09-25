@@ -195,7 +195,7 @@ export function planImport(st, data, { uid, now = new Date() }) {
 
   function sphereFor(name, glyph, color) {
     const k = key(name);
-    if (!k || k === 'inbox' || k === 'входящие') return null;
+    if (!k || k === 'all' || k === 'inbox' || k === 'входящие') return null;
     if (spheres.has(k)) return spheres.get(k);
     const g = GLYPHS.includes(glyph) ? glyph : GLYPHS.find((x) => !used.has(x)) ?? GLYPHS[order % GLYPHS.length];
     used.add(g);
@@ -689,7 +689,7 @@ export function aiData(st) {
   return {
     spheres: st.spheres.map((s) => compact({ id: s.id, name: s.name, glyph: s.glyph, color: s.color, archived: s.archived || null })),
     tasks: st.tasks.filter((t) => !isDone(t)).map((t) => compact({
-      id: t.id, title: t.title, sphere: names.get(t.sphereId) ?? 'Inbox', status: t.status, day: t.day, time: t.time,
+      id: t.id, title: t.title, sphere: names.get(t.sphereId) ?? 'All', status: t.status, day: t.day, time: t.time,
       repeat: t.repeat && t.repeat !== 'none' ? t.repeat : null, priority: t.priority, deadline: t.deadline,
       note: t.note, subtasks: list(t.subtasks),
     })),
@@ -744,7 +744,7 @@ export function aiPrompt({ today, limit = 3, data = null }) {
     '### spheres — areas of life or work',
     '- name (required); glyph (optional): circle, pill, square, bar, triangle, ring, half or diamond;',
     `  color (optional): ${COLORS.slice(0, -1).join(', ')} or ${COLORS.at(-1)}.`,
-    '- A task may name a sphere that is not listed — it is created. No sphere → the task goes to Inbox.',
+    '- A task may name a sphere that is not listed — it is created. No sphere (or "All") → the task goes to All, the list without a sphere.',
     '',
     '### tasks',
     '- title (required) — short, starts with a verb',

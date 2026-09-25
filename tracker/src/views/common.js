@@ -2,7 +2,7 @@
  * Общее для экранов: шапка, строка задачи с раскрывающейся карточкой,
  * шторка «день полон — заменить одну из задач», выбор нескольких задач.
  */
-import { h, icon, glyph, autosize, entry, pickerInput, openSheet, closeSheet, toast, countUp, removeRow, haptic } from '../ui.js';
+import { h, icon, glyph, armed, autosize, entry, pickerInput, openSheet, closeSheet, toast, countUp, removeRow, haptic } from '../ui.js';
 import { addDays, dayLabel, dueLabel, fmtDay } from '../dates.js';
 import { PRIORITIES, REPEATS, STATUSES, activeSpheres, dayLimit, dayTasks } from '../logic.js';
 import * as store from '../store.js';
@@ -93,7 +93,7 @@ function meta(t, { showSphere = true, inDay = false } = {}) {
   const parts = [];
   const sphere = sphereOf(t);
   if (showSphere) {
-    parts.push(h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'));
+    parts.push(h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'All'));
   }
   if (t.day && t.status !== 'done') {
     const when = [!inDay && dayLabel(t.day, ui.day), t.time].filter(Boolean).join(' ');
@@ -124,7 +124,7 @@ function toggle(t) {
   haptic();
   ui.popped = t.status === 'done' ? null : t.id;
   const next = store.toggleDone(t.id);
-  if (next) toast(`Repeats — next ${dayLabel(next.day, ui.day)}`);
+  if (next) toast(`Repeats — next ${dayLabel(next.day, ui.day)}`, { done: true });
   setTimeout(() => { if (ui.popped === t.id) ui.popped = null; }, 600);
 }
 
@@ -218,7 +218,7 @@ export function selectBar(all) {
       act('next', 'Move', () => sphereSheet((sphereId) => {
         store.updateMany(ids, { sphereId });
         const s = store.getState().spheres.find((x) => x.id === sphereId);
-        done(`${n} → ${s ? s.name : 'Inbox'}`);
+        done(`${n} → ${s ? s.name : 'All'}`);
       }, `Move ${n}`)),
       act('close', deleting ? 'Sure?' : 'Delete', () => {
         if (!deleting) {
@@ -248,7 +248,7 @@ export function taskItem(t, opts = {}) {
       class: 'swipe-action', type: 'button', 'aria-label': `Delete “${t.title}”`,
       onclick: (e) => removeRow(e.currentTarget.closest('li'), () => {
         store.deleteTask(t.id);
-        toast('Task deleted');
+        toast('Task deleted', { done: true });
       }),
     }, icon('close', 20), h('span', null, 'Delete')),
     h('div', { class: 'swipe-body' }, h('div', { class: 'task-row' },
@@ -333,7 +333,7 @@ function taskCard(t) {
     onchange: (e) => store.updateTask(t.id, { note: e.target.value }),
   }));
 
-  const spheres = [[null, 'Inbox', 'inbox'], ...activeSpheres(store.getState()).map((s) => [s.id, s.name, s.glyph])];
+  const spheres = [[null, 'All', 'inbox'], ...activeSpheres(store.getState()).map((s) => [s.id, s.name, s.glyph])];
 
   return h('div', { class: 'card-edit' },
     !done && field('Date',
@@ -377,19 +377,20 @@ function taskCard(t) {
     note,
     h('div', { class: 'card-foot' },
       h('button', {
-        class: ['pill', 'pill-action', ui.confirm === t.id && 'is-on'], type: 'button',
+        class: ['pill', 'pill-action', ui.confirm === t.id && 'is-confirming'], type: 'button',
         onclick: () => {
           if (ui.confirm === t.id) {
             ui.confirm = null;
             ui.expanded = null;
             store.deleteTask(t.id);
-            toast('Task deleted');
+            toast('Task deleted', { done: true });
           } else {
             ui.confirm = t.id;
+            haptic();
             rerender();
           }
         },
-      }, ui.confirm === t.id ? 'Tap again to delete' : 'Delete'),
+      }, ui.confirm === t.id ? armed('Tap again to delete') : 'Delete'),
       h('button', { class: 'pill pill-action', type: 'button', onclick: collapse }, 'Close')));
 }
 
@@ -419,7 +420,7 @@ export function requestPlan(t, day, extra = {}) {
           onclick: () => {
             store.planTask(t.id, day, x.id, extra);
             closeSheet();
-            toast(`Swapped — “${x.title}” has no date now`);
+            toast(`Swapped — “${x.title}” has no date now`, { done: true });
           },
         }, h('span', { class: 'replace-num' }, String(i + 1)), h('span', { class: 'replace-title' }, x.title), icon('swap', 20))))),
       h('button', { class: 'pill pill-action pill-wide is-on', type: 'button', onclick: closeSheet }, 'Cancel'),

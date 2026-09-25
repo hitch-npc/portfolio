@@ -84,7 +84,7 @@ function importData(data) {
       `Replaces everything on this device (now ${plural(st.tasks.length, 'task')}).`,
     ], 'Replace all', async () => {
       await store.restore(backup);
-      toast('Backup restored');
+      toast('Backup restored', { done: true });
     });
     return;
   }
@@ -112,7 +112,7 @@ function importData(data) {
       await store.applyImport(plan);
       toast([
         s.tasks && `+${plural(s.tasks, 'task')}`, s.changed && `${s.changed} changed`, s.deleted.length && `${s.deleted.length} deleted`,
-      ].filter(Boolean).join(' · ') || 'Imported');
+      ].filter(Boolean).join(' · ') || 'Imported', { done: true });
     });
     return;
   }
@@ -168,7 +168,8 @@ function pasteSheet(ai = false) {
 async function copyPrompt(withData) {
   const st = store.getState();
   const prompt = aiPrompt({ today: ui.day, limit: dayLimit(st), data: withData ? aiData(st) : null });
-  toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
+  const copied = await copyText(prompt);
+  toast(copied ? 'Copied — paste it into the AI chat' : 'Could not copy', { done: copied });
 }
 
 /**
@@ -223,7 +224,8 @@ export function settingsView() {
     h('section', { class: 'block-alt settings' },
       choice('Style', 'palette', [['minimal', 'Minimal'], ['colour', 'Colour']],
         'Colour — every sphere gets its own colour: its tile and the tags on its tasks. Change it in the sphere’s ⋯ menu.', true),
-      choice('Theme', 'theme', [['light', 'Light'], ['dark', 'Dark']], null, true)),
+      choice('Theme', 'theme', [['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']],
+        'Auto — like this iPhone: dark when the system is dark.', true)),
 
     h('h2', { class: 'label' }, 'Planning'),
     h('section', { class: 'block-alt settings' },

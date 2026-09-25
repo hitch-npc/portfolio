@@ -125,6 +125,19 @@ body {
   line-height: 1.3;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* текст не выделяется и не зовёт «Скопировать» от случайного долгого
+     нажатия — долгое нажатие здесь перетаскивает задачи. Поля ввода — ниже */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* в полях — как обычно: каретка, выделение, вставка */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* экран не увеличивается ни двойным тапом, ни щипком: быстрые тапы по −/+
@@ -1680,31 +1693,70 @@ textarea:focus-visible {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 18px);
   z-index: 40;
-  max-width: calc(100% - 32px);
-  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(420px, calc(100% - 32px));
+  min-height: 48px;
+  padding: 10px 20px;
   background: var(--pop-bg);
   color: var(--pop-ink);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sheet);
   font-size: 15px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transform: translate(-50%, 8px);
+  line-height: 20px;
+  text-wrap: pretty;
+  transform: translate(-50%, 14px) scale(0.94);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  /* уходит быстро и тихо */
+  transition: opacity 0.2s ease, transform 0.25s ease;
 }
 
+.toast.is-done {
+  padding-left: 10px;
+}
+
+/* появляется с пружинкой снизу; галочка в кружке вписывается следом */
 .toast.is-on {
   opacity: 1;
-  transform: translate(-50%, 0);
+  transform: translate(-50%, 0) scale(1);
+  transition: opacity 0.2s ease, transform 0.5s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
-/* пока открыта шторка или панель выбора, тост — сверху, чтобы ничего не закрывать */
-body:has(.sheet-layer:not([hidden])) .toast,
+.toast-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  background: var(--pop-ink);
+  color: var(--pop-bg);
+}
+
+.toast-mark .icon path {
+  stroke-width: 2;
+}
+
+.toast.is-on .toast-mark {
+  animation: toast-mark 0.5s cubic-bezier(0.34, 1.6, 0.64, 1) 0.08s both;
+}
+
+@keyframes toast-mark {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* пока открыта шторка или панель выбора, тост — сверху, чтобы ничего не
+   закрывать. Уходящая шторка уже не в счёт: иначе тост после «заменить»
+   появлялся сверху и через миг прыгал вниз */
+body:has(.sheet-layer:not([hidden]):not(.is-closing)) .toast,
 body:has(.select-bar) .toast {
   top: calc(var(--safe-top) + 12px);
   bottom: auto;
@@ -2119,12 +2171,58 @@ body:has(.select-bar) .toast {
   background: var(--pop-bg);
   color: var(--pop-ink);
   border-radius: var(--r-card);
-  animation: rise 0.18s var(--ease) both;
+  /* раскрывается из кнопки: растёт от её угла с лёгкой пружиной, пункты —
+     лесенкой следом. Над полем (is-up) — растёт вверх */
+  transform-origin: 24px 0;
+  animation: menu-in 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.08) both;
+}
+
+.menu-item {
+  animation: menu-item-in 0.32s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 22ms + 40ms);
+}
+
+.menu.is-closing {
+  pointer-events: none;
+  animation: menu-out 0.16s ease-in both;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+  }
+}
+
+@keyframes menu-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 .menu.is-up {
   top: auto;
   bottom: calc(100% + 6px);
+  transform-origin: 24px 100%;
+}
+
+.menu.is-up .menu-item {
+  animation-name: menu-item-up;
+}
+
+@keyframes menu-item-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 /* место под глиф есть у каждого пункта — подписи в одну линию */
@@ -2295,6 +2393,17 @@ body:has(.select-bar) .toast {
 
 .switch:disabled {
   opacity: 0.4;
+}
+
+.sheet-note.is-appearing {
+  animation: note-in 0.44s cubic-bezier(0.32, 0.72, 0, 1) 0.08s both;
+}
+
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .sheet-note {
@@ -3137,7 +3246,10 @@ body:has(.select-bar) .toast {
 /* ── движение ───────────────────────────────────────────────────────── */
 
 /* вход на экран: всё мягко поднимается, графики вырастают по очереди */
-.is-entering .screen {
+/* настройки въезжают переходом (View Transitions) — подъём им не нужен; к тому
+   же на время подъёма экран становится отдельным слоем, и закреплённая шапка
+   оказывалась под зерном страницы — зерно в ней двоилось */
+.is-entering .screen:not(.screen-settings) {
   animation: rise 0.34s var(--ease) both;
 }
 
@@ -3322,6 +3434,13 @@ body:has(.select-bar) .toast {
   color: var(--on-sphere);
 }
 
+/* значок в кружке — 12px: разница с кружком (22, 20, 18) чётная, и центр
+   значка ровно в центре кружка, а не на полпикселя в сторону */
+:root[data-palette='colour'] .sc-mark[data-sc] > .glyph {
+  width: 12px;
+  height: 12px;
+}
+
 :root[data-palette='colour'] .title-glyph .sc-mark[data-sc] {
   width: 38px;
   height: 38px;
@@ -3375,6 +3494,179 @@ body:has(.select-bar) .toast {
 .color-pick:active {
   transform: scale(var(--press));
   transition: transform var(--press-in) var(--ease);
+}
+
+/* ── «сохранено»: крестик в шапке настроек на миг становится галочкой ──
+   Крестик с поворотом сжимается и гаснет, галочка прорисовывается линией
+   (как ставят рукой), в момент, когда дорисована, кнопка чуть подпрыгивает;
+   потом галочка тает, крестик возвращается обратным поворотом. 1.25 с */
+.icon-close-check {
+  overflow: visible;
+}
+
+.icon-close-check .cc-x,
+.icon-close-check .cc-v {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+
+.icon-close-check .cc-v {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+}
+
+.icon-close-check.is-saved {
+  animation: cc-pop 1.25s both;
+}
+
+.icon-close-check.is-saved .cc-x {
+  animation: cc-x 1.25s both;
+}
+
+.icon-close-check.is-saved .cc-v {
+  animation: cc-v 1.25s both;
+}
+
+/* «меньше движения»: просто галочка вместо крестика */
+.icon-close-check.is-saved-still .cc-x {
+  opacity: 0;
+}
+
+.icon-close-check.is-saved-still .cc-v {
+  stroke-dashoffset: 0;
+}
+
+@keyframes cc-x {
+  0% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  }
+
+  14% {
+    opacity: 0;
+    transform: rotate(60deg) scale(0.3);
+  }
+
+  80% {
+    opacity: 0;
+    transform: rotate(-60deg) scale(0.3);
+    animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cc-v {
+  0%,
+  12% {
+    opacity: 1;
+    stroke-dashoffset: 1;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1);
+  }
+
+  36%,
+  76% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+
+  88%,
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes cc-pop {
+  0%,
+  32% {
+    transform: none;
+  }
+
+  40% {
+    transform: scale(1.18);
+  }
+
+  52% {
+    transform: scale(0.95);
+  }
+
+  62%,
+  100% {
+    transform: none;
+  }
+}
+
+/* ── второй тап «удалить» ─────────────────────────────────────────────
+   Кнопка «взводится»: заливка бежит слева направо, новая подпись
+   поднимается на место прежней — видно, что следующий тап удалит */
+.is-confirming {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--bg);
+}
+
+.is-confirming::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--ink);
+  transform-origin: 0 50%;
+  animation: confirm-fill 0.42s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.confirm-label {
+  display: inline-block;
+  animation: confirm-label 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) 0.06s both;
+}
+
+@keyframes confirm-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes confirm-label {
+  from {
+    opacity: 0;
+    transform: translateY(80%);
+  }
+}
+
+/* ── описания ─────────────────────────────────────────────────────────
+   Пояснения под кнопками и настройками, подсказки на пустых экранах — один
+   кегль и ритм: 14/20, обычный вес, чуть разреженно. Тише заголовков и
+   кнопок, ровным серым блоком, без висячих коротких строк (text-wrap) */
+.hint,
+.hint-top,
+.setting-hint {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: 0.005em;
+  color: var(--ink-muted);
+  text-wrap: pretty;
+}
+
+/* вводный абзац в блоке настроек и текст шторок — на ступень крупнее, тем же ритмом */
+.block-text,
+.sheet-text {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
+  text-wrap: pretty;
+}
+
+.sheet-text.sheet-strong {
+  font-weight: 600;
 }
 
 /* ── капс ────────────────────────────────────────────────────────────── */

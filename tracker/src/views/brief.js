@@ -104,7 +104,8 @@ export function briefView() {
 
     pillButton('copy', 'Ask AI about my plans', async () => {
       const prompt = aiPrompt({ today: ui.day, limit: dayLimit(st), data: aiData(st) });
-      toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
+      const copied = await copyText(prompt);
+      toast(copied ? 'Copied — paste it into the AI chat' : 'Could not copy', { done: copied });
     }, 'is-on pill-wide pill-export'),
     h('p', { class: 'setting-hint ask-hint' },
       'Copies your open tasks, deadlines and goals with instructions. Paste them into ChatGPT, Claude or Gemini and ask — what to focus on, how to split a big task. ',
