@@ -12,14 +12,26 @@
     <script type="module" src="haptic.js"></script>
   </head>
   <body>
-    <h1>Haptics test</h1>
+    <h1>Haptics test · round 2</h1>
     <p class="info" id="info"></p>
-    <p>Tap each button. Write down the letters you <b>felt</b>.</p>
-    <button type="button" data-test="a"><b>A</b> Hidden switch in head (how the app does it now)</button>
-    <button type="button" data-test="b"><b>B</b> Hidden switch in the page</button>
-    <button type="button" data-test="c"><b>C</b> Permanent switch, input click</button>
-    <label class="real"><b>D</b> Tap this switch yourself <input type="checkbox" switch></label>
-    <button type="button" data-test="e"><b>E</b> navigator.vibrate</button>
-    <p class="log" id="log"></p>
+    <p>Tap each grey card with your finger — on the text, not on the edge. Write down the numbers you <b>felt</b>.</p>
+
+    <label class="card"><b>1</b> Visible switch — tap the switch itself <input type="checkbox" switch data-log="1"></label>
+
+    <div class="card">
+      <b>2</b> Invisible switch covering the card
+      <input class="cover" type="checkbox" switch data-log="2" aria-label="Test 2">
+    </div>
+
+    <label class="card"><b>3</b> Card is a label, hidden switch inside
+      <input class="ghost" type="checkbox" switch data-log="3"></label>
+
+    <label class="card" for="t4"><b>4</b> Card is a label, switch elsewhere on the page</label>
+
+    <label class="card"><b>5</b> Card is a label, switch not drawn at all
+      <input class="gone" type="checkbox" switch data-log="5"></label>
+
+    <input class="ghost" id="t4" type="checkbox" switch data-log="4">
+    <p class="log" id="log">Nothing tapped yet</p>
   </body>
 </html>
