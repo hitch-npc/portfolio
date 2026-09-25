@@ -2971,6 +2971,31 @@ body:has(.select-bar) .toast {
   }
 }
 
+/* прозрачный переключатель ради щелчка на делениях (dial.js): до касания —
+   на всю линейку, в жесте — родного размера под пальцем (--sx, --sy) */
+.dial-switch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  touch-action: none;
+  cursor: inherit;
+}
+
+.dial.is-riding .dial-switch {
+  inset: auto;
+  top: var(--sy, 0px);
+  left: var(--sx, 0px);
+  width: auto;
+  height: auto;
+}
+
+.dial.is-off .dial-switch {
+  display: none;
+}
+
 .dial.is-off {
   background: var(--hatch-fine);
   opacity: 0.45;
