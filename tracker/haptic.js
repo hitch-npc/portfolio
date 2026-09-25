@@ -4,13 +4,17 @@
  * (label.click, input.click) и navigator.vibrate — нет. Здесь — можно ли
  * спрятать переключатель под кнопку так, чтобы вибрация осталась:
  * 1 — видимый (контроль), 2 — невидимый поверх карточки, 3 — внутри
- * label, 4 — label for= на переключатель в другом месте, 5 — display: none.
+ * label, 4 — label for= на переключатель в другом месте, 5 — display: none,
+ * 6 — провести пальцем по невидимому (для крутилки: вибрирует ли при движении).
  */
 const log = document.getElementById('log');
 
+const times = {};
 for (const input of document.querySelectorAll('[data-log]')) {
   input.addEventListener('change', () => {
-    log.textContent = `${new Date().toLocaleTimeString()} — ${input.dataset.log}: switch toggled`;
+    const k = input.dataset.log;
+    times[k] = (times[k] ?? 0) + 1;
+    log.textContent = `${new Date().toLocaleTimeString()} — ${k}: switch toggled (${times[k]}×)`;
   });
 }
 
