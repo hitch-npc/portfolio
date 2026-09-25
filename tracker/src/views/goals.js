@@ -6,7 +6,7 @@
  * к месяцу. Срок необязателен. Новая цель набирается с крутилками над
  * полем: число, текущее, шаг, единица и срок — до создания, без Enter.
  */
-import { h, icon, entry, pickerInput, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
+import { h, icon, armed, entry, pickerInput, openSheet, closeSheet, renderSheet, toast, haptic } from '../ui.js';
 import { addMonths, diffDays, fmtLong } from '../dates.js';
 import { autoStep, goalProgress, goalStep, goalsOverview, isGoalDone } from '../logic.js';
 import * as store from '../store.js';
@@ -116,17 +116,18 @@ export function editGoal(id) {
               (v) => store.updateGoal(g.id, { deadline: v }))),
           g.deadline && iconButton('close', 'Clear deadline', () => store.updateGoal(g.id, { deadline: null }), '', 20))),
       h('div', { class: 'sheet-actions' },
-        pillButton(null, confirming ? 'Tap again to delete' : 'Delete goal', () => {
+        pillButton(null, confirming ? armed('Tap again to delete') : 'Delete goal', () => {
           if (!confirming) {
             ui.confirm = `goal-${id}`;
+            haptic();
             renderSheet();
             return;
           }
           ui.confirm = null;
           store.deleteGoal(g.id);
           closeSheet();
-          toast('Goal deleted');
-        }, confirming ? 'is-on' : ''),
+          toast('Goal deleted', { done: true });
+        }, confirming ? 'is-confirming' : ''),
         pillButton(null, 'Done', () => { ui.confirm = null; closeSheet(); }, 'is-on')),
     ];
   });
@@ -363,7 +364,7 @@ function goalComposer() {
     revealNow = null;
     input.blur();
     store.createGoal(title, fields);
-    toast(measured ? `Goal added — ${num(fields.current)}/${num(fields.target)}${fields.unit ? ` ${fields.unit}` : ''}` : 'Goal added — add steps to it');
+    toast(measured ? `Goal added — ${num(fields.current)}/${num(fields.target)}${fields.unit ? ` ${fields.unit}` : ''}` : 'Goal added — add steps to it', { done: true });
   }
 
   function fill() {

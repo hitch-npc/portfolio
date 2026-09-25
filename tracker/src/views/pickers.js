@@ -12,15 +12,30 @@ import { ui } from './common.js';
 
 let menuEl = null;
 
+/** Меню уходит коротким угасанием к якорю (при «меньше движения» — сразу). */
 function closeMenu() {
-  menuEl?.remove();
+  const el = menuEl;
   menuEl = null;
   document.removeEventListener('pointerdown', outside, true);
+  if (!el) return;
+  if (calm()) {
+    el.remove();
+    return;
+  }
+  el.classList.add('is-closing');
+  el.inert = true;
+  setTimeout(() => el.remove(), 160);
 }
 
 function outside(e) {
   if (menuEl && !menuEl.contains(e.target) && !e.target.closest?.('[data-menu-anchor]')) closeMenu();
 }
+
+/* пункты меню появляются лесенкой: номер пункта — в --i (стиль — через CSSOM: CSP) */
+const stagger = (i, el) => {
+  el.style.setProperty('--i', String(i));
+  return el;
+};
 
 /* кнопка не забирает фокус у поля ввода: клавиатура остаётся на месте */
 const keep = (e) => e.preventDefault();
@@ -34,7 +49,7 @@ export function menu(host, items, onPick, label) {
   closeMenu();
   if (again) return;
   menuEl = h('div', { class: 'menu', role: 'menu', 'aria-label': label, 'data-label': label },
-    items.map(([value, text, mark, on]) =>
+    items.map(([value, text, mark, on], i) => stagger(i,
       h('button', {
         class: ['menu-item', on && 'is-on'], type: 'button', role: 'menuitemradio', 'aria-checked': String(Boolean(on)),
         onpointerdown: keep, onmousedown: keep,
@@ -42,7 +57,7 @@ export function menu(host, items, onPick, label) {
       },
         h('span', { class: 'menu-check' }, on && icon('check', 20)),
         h('span', { class: 'menu-mark' }, mark && (mark instanceof Node ? mark : mark.startsWith('icon:') ? icon(mark.slice(5), 20) : glyph(mark))),
-        h('span', null, text))));
+        h('span', null, text)))));
   host.append(menuEl);
   place(menuEl, host);
   document.addEventListener('pointerdown', outside, true);
@@ -66,7 +81,7 @@ function place(el, host) {
 }
 
 const sphereItems = (current) => [
-  [null, 'Inbox', 'inbox', current == null],
+  [null, 'All', 'inbox', current == null],
   ...activeSpheres(store.getState()).map((s) => [s.id, s.name, sphereMark(s), current === s.id]),
 ];
 
@@ -112,6 +127,7 @@ const FULL = {
  */
 export function dateSheet(value, onDone, { current = null, title = 'Date', full: whenFull = 'replace', onReminder = null } = {}) {
   const draft = { day: value.day ?? null, time: value.time ?? null, repeat: value.repeat ?? null };
+  let wasFull = false; // подсказка «день полон» проявляется, когда появилась, а не на каждый тап
   const set = (patch) => {
     Object.assign(draft, patch);
     if (!draft.day) Object.assign(draft, { time: null, repeat: null });
@@ -129,6 +145,8 @@ export function dateSheet(value, onDone, { current = null, title = 'Date', full:
     ];
     const full = draft.day && draft.day !== current && isDayFull(st, draft.day);
     const limit = dayLimit(st);
+    const appear = full && !wasFull;
+    wasFull = Boolean(full);
 
     return [
       h('div', { class: 'sheet-bar' },
@@ -181,7 +199,7 @@ export function dateSheet(value, onDone, { current = null, title = 'Date', full:
             },
           }, 'Calendar', icon('chevron', 20)))),
 
-      full && h('p', { class: 'sheet-note' },
+      full && h('p', { class: ['sheet-note', appear && 'is-appearing'] },
         `${dayLabel(draft.day, today)} is full — ${limit} of ${limit} planned. ${FULL[whenFull]}`),
     ];
   });
@@ -275,7 +293,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
       toast(`${dayLabel(planned, ui.day)} is full — saved without a date`);
       planned = null;
     } else {
-      toast(`Added to ${planned ? dayLabel(planned, ui.day) : st.spheres.find((s) => s.id === sid)?.name ?? 'Inbox'}`);
+      toast(`Added to ${planned ? dayLabel(planned, ui.day) : st.spheres.find((s) => s.id === sid)?.name ?? 'All'}`, { done: true });
     }
     // после добавления всё по умолчанию: сфера экрана, день, без времени и приоритета
     Object.assign(d, { title: '', sphereId, ...fresh() });
@@ -313,7 +331,7 @@ export function composer(key, { sphereId = null, day = null, placeholder = 'Add 
       return;
     }
     chips.replaceChildren(
-      chip([glyph(sphere ? sphere.glyph : 'inbox'), h('span', null, sphere ? sphere.name : 'Inbox')], 'Sphere',
+      chip([glyph(sphere ? sphere.glyph : 'inbox'), h('span', null, sphere ? sphere.name : 'All')], 'Sphere',
         () => menu(form, sphereItems(d.sphereId), (v) => { d.sphereId = v; refresh(); }, 'Sphere'), false, sphere?.color),
       chip([icon('calendarFill', 20), h('span', null, when ?? 'No date')], 'Date', () => {
         dateSheet(d, (v) => {

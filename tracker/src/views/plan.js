@@ -21,7 +21,7 @@ function candidate(t, picked, spheres, showSphere, showDay) {
       class: 'swipe-action', type: 'button', 'aria-label': `Delete “${t.title}”`,
       onclick: (e) => removeRow(e.currentTarget.closest('li'), () => {
         store.deleteTask(t.id);
-        toast('Task deleted');
+        toast('Task deleted', { done: true });
       }),
     }, icon('close', 20), h('span', null, 'Delete')),
     h('div', { class: 'swipe-body' }, h('button', {
@@ -33,7 +33,7 @@ function candidate(t, picked, spheres, showSphere, showDay) {
       h('span', { class: 'task-title' }, t.title),
       h('span', { class: 'task-meta' },
         dotted([
-          showSphere && h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'Inbox'),
+          showSphere && h('span', { class: 'meta-sphere', 'data-sc': sphere?.color }, glyph(sphere ? sphere.glyph : 'inbox'), sphere ? sphere.name : 'All'),
           showDay && t.day && [dayLabel(t.day, ui.day), t.time].filter(Boolean).join(' '),
           t.status === 'doing' && 'In progress',
           due && h('span', { class: due.late ? 'is-late' : null }, due.text),
@@ -79,7 +79,7 @@ export function planView() {
   const groups = [
     group('Not done yet', null, g.carried, picked, spheres, true),
     group('Upcoming', null, g.upcoming, picked, spheres, true),
-    group('Inbox', glyph('inbox'), g.inbox, picked, spheres),
+    group('All', glyph('inbox'), g.inbox, picked, spheres),
     ...g.spheres.map((x) => group(x.sphere.name, sphereMark(x.sphere), x.tasks, picked, spheres)),
   ].filter(Boolean);
 

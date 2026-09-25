@@ -7,7 +7,8 @@
  */
 import * as db from './db.js';
 import {
-  DEFAULT_SETTINGS, DEFAULT_SPHERES, GLYPHS, COLORS, colorize, dayTasks, isDayFull, isDone, nextColor, timeSlot,
+  DEFAULT_SETTINGS, DEFAULT_SPHERES, STARTER_GOAL, STARTER_TASKS, GLYPHS, COLORS, colorize, dayTasks, isDayFull, isDone,
+  nextColor, timeSlot,
 } from './logic.js';
 import { addDays, diffDays, nextRepeat, todayISO } from './dates.js';
 
@@ -32,13 +33,26 @@ export async function load() {
   const saved = meta.find((m) => m.key === 'settings')?.value;
   Object.assign(state, { spheres, tasks, goals, files, settings: { ...DEFAULT_SETTINGS, ...saved } });
 
-  // первый запуск: стартовые сферы
+  // первый запуск: стартовые сферы, задачи-подсказки и цель-пример
   if (!meta.some((m) => m.key === 'seeded')) {
     state.spheres = DEFAULT_SPHERES.map(([name, glyph], order) => ({
       id: uid(), name, glyph, color: COLORS[order % COLORS.length], order, archived: false, createdAt: stamp(),
     }));
+    // подсказки — только в пустой трекер (данных нет — показать нечего)
+    if (!state.tasks.length && !state.goals.length) {
+      const today = todayISO();
+      state.tasks = STARTER_TASKS.map((x, i) => ({
+        id: uid(), title: x.title, sphereId: x.sphere == null ? null : state.spheres[x.sphere].id,
+        priority: null, deadline: null, status: 'todo',
+        subtasks: (x.subtasks ?? []).map((title) => ({ id: uid(), title, done: false })),
+        note: '', day: x.today ? today : null, dayOrder: i, time: null, repeat: null, createdAt: stamp(), doneAt: null,
+      }));
+      state.goals = [{ id: uid(), steps: [], deadline: null, createdAt: stamp(), order: 0, ...STARTER_GOAL }];
+    }
     await db.batch([
       ...state.spheres.map((value) => ({ store: 'spheres', value })),
+      ...state.tasks.map((value) => ({ store: 'tasks', value })),
+      ...state.goals.map((value) => ({ store: 'goals', value })),
       { store: 'meta', value: { key: 'seeded', value: true } },
     ]);
   }

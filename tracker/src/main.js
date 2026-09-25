@@ -43,18 +43,25 @@ function route() {
   return ROUTES[name] ? { name, arg } : { name: 'today', arg: undefined };
 }
 
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+let savedLook = null; // что уже лежит в localStorage для look.js
+
 function render() {
   ui.day = todayISO();
   ui.tomorrow = addDays(ui.day, 1);
   const set = settingsOf(store.getState());
   const root = document.documentElement;
+  // Auto — как на устройстве; меняется вместе с ним (слушатель в boot)
+  const theme = set.theme === 'auto' ? (darkQuery.matches ? 'dark' : 'light') : set.theme;
   // «Уменьшить движение» из настроек приложения — поверх системной
   root.dataset.motion = set.motion;
   // оформление: Minimal или Colour, светлая или тёмная тема. Копия — в localStorage
   // для look.js: он ставит тему до первой отрисовки, чтобы тёмная не мигала светлой
-  if (root.dataset.theme !== set.theme || root.dataset.palette !== set.palette) {
-    root.dataset.theme = set.theme;
-    root.dataset.palette = set.palette;
+  root.dataset.theme = theme;
+  root.dataset.palette = set.palette;
+  const look = `${set.theme}|${set.palette}`;
+  if (look !== savedLook) {
+    savedLook = look;
     try {
       localStorage.setItem('tracker-look', JSON.stringify({ theme: set.theme, palette: set.palette }));
     } catch {
@@ -71,7 +78,7 @@ function render() {
     renderSheet();
   }));
   // у экрана свой фон (вечернее планирование — серое), строка состояния — в тон; и в тон теме
-  const tone = `${r.name}|${set.theme}`;
+  const tone = `${r.name}|${theme}`;
   if (document.body.dataset.tone !== tone) {
     document.body.dataset.tone = tone;
     document.body.dataset.screen = r.name;
@@ -184,6 +191,9 @@ async function boot() {
   enter();
   if (shown === 'today') focusInput();
   window.addEventListener('hashchange', onRoute);
+
+  // тема Auto: устройство переключилось на тёмную или светлую — следом
+  darkQuery.addEventListener?.('change', () => render());
 
   // новый день, пока приложение открыто или свёрнуто
   const tick = () => { if (todayISO() !== ui.day) render(); };

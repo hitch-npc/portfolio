@@ -7,10 +7,11 @@ import { addDays } from './dates.js';
 /**
  * Настройки по умолчанию. dayLimit — сколько незавершённых задач помещается
  * в день (0 — без лимита). Оформление: palette — minimal (как было, без
- * цвета) или colour (у сфер свой цвет); у каждого — тема light или dark.
+ * цвета) или colour (у сфер свой цвет); у каждого — тема light, dark или
+ * auto (как на устройстве; по умолчанию — если тему не выбирали).
  */
 export const DEFAULT_SETTINGS = {
-  dayLimit: 3, addTo: 'today', motion: 'system', start: 'today', theme: 'light', palette: 'minimal',
+  dayLimit: 3, addTo: 'today', motion: 'system', start: 'today', theme: 'auto', palette: 'minimal',
 };
 
 export const settingsOf = (st) => ({ ...DEFAULT_SETTINGS, ...st.settings });
@@ -53,13 +54,30 @@ export function colorize(spheres) {
   return changed;
 }
 
+/**
+ * Первый запуск на новом устройстве: нейтральные сферы, несколько задач-
+ * подсказок и цель-пример — их выполняют, правят или смахивают, как любые.
+ * На устройстве, где трекер уже открывали, ничего не добавляется.
+ */
 export const DEFAULT_SPHERES = [
-  ['TTS', 'circle'],
-  ['CAELUM', 'pill'],
-  ['Career', 'triangle'],
-  ['Personal', 'square'],
-  ['Documents', 'bar'],
+  ['Work', 'square'],
+  ['Personal', 'circle'],
+  ['Health', 'triangle'],
+  ['Home', 'ring'],
+  ['Learning', 'pill'],
 ];
+
+/** Подсказки: sphere — номер в DEFAULT_SPHERES (null — без сферы), today — на сегодня. Сегодня — две: третье место свободно. */
+export const STARTER_TASKS = [
+  { title: 'Tap a task to open it — date, priority, notes', sphere: 1, today: true, subtasks: ['Tick a subtask like this one'] },
+  { title: 'Swipe a task left to delete it — try this one', sphere: 0, today: true },
+  { title: 'Each evening, plan tomorrow in the Plan tab', sphere: null },
+  { title: 'On Today, hold a task and drag it to reorder', sphere: null },
+  { title: 'Settings → Appearance: try Colour and Dark', sphere: null },
+];
+
+/** Цель-пример: − и + двигают прогресс на шаг. */
+export const STARTER_GOAL = { title: 'Read 12 books', target: 12, current: 2, unit: 'books', step: 1 };
 
 /** Повтор: сделанная задача ставит следующую на следующий день по правилу. */
 export const REPEATS = [

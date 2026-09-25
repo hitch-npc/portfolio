@@ -155,7 +155,7 @@ export function todayView() {
         h('h2', { class: 'label' }, 'Not done yet', h('span', { class: 'count' }, carried.length)),
         pillButton(null, 'Move to today', () => {
           const n = store.planMany(carried.map((t) => t.id), ui.day);
-          toast(n === carried.length ? `Moved ${n} to today` : n ? `Moved ${n} — today is full` : 'Today is full');
+          toast(n === carried.length ? `Moved ${n} to today` : n ? `Moved ${n} — today is full` : 'Today is full', { done: n === carried.length });
         }, 'pill-sm')),
       swipeable(h('ul', { class: 'tasks tasks-compact' }, carried.map((t) => taskItem(t))))),
     late.length > 0 && h('section', { class: 'block block-alt' },
