@@ -37,8 +37,8 @@ h1 {
   line-height: 20px;
 }
 
-button,
-.real {
+.card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -47,25 +47,39 @@ button,
   min-height: 56px;
   margin: 0 0 10px;
   padding: 12px 16px;
-  border: 0;
   border-radius: var(--r-card);
   background: var(--card);
-  color: inherit;
-  font: inherit;
-  text-align: left;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.real input {
+.card > input:not(.cover, .ghost, .gone) {
   margin-left: auto;
 }
 
-/* B и C: переключатель нарисован, но не виден */
+/* 2: переключатель растянут на всю карточку и прозрачен — палец попадает в него */
+.cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+
+/* 3 и 4: переключатель нарисован, но не виден и не ловит касания */
 .ghost {
   position: fixed;
   top: 0;
   left: 0;
   width: 1px;
   height: 1px;
+  margin: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+/* 5: не нарисован вовсе */
+.gone {
+  display: none;
 }
