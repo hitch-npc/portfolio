@@ -726,9 +726,9 @@ export function aiExample(today) {
 export function aiPrompt({ today, limit = 3, data = null }) {
   const json = (v) => JSON.stringify(v, null, 1);
   return [
-    '# Tracker — instructions for an AI assistant',
+    '# 3_TRACK — instructions for an AI assistant',
     '',
-    'I use "Tracker", a personal task app on my phone. It imports one JSON object. Help me fill it or change it:',
+    'I use "3_TRACK", a personal task app on my phone. It imports one JSON object. Help me fill it or change it:',
     'read my request at the end, ask me first if something important is unclear, then answer with a one-line',
     'summary and exactly one ```json code block. I copy your whole answer into the app (Settings → Paste AI answer);',
     'the app shows what will change, and I confirm.',

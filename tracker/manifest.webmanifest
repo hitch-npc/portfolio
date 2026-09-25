@@ -1,6 +1,6 @@
 {
-  "name": "Tracker",
-  "short_name": "Tracker",
+  "name": "3_TRACK",
+  "short_name": "3_TRACK",
   "description": "Personal task tracker. Works offline, data stays on the device.",
   "id": "./",
   "start_url": "./#/today",
