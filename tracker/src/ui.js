@@ -546,6 +546,26 @@ document.addEventListener('touchmove', (e) => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
 
+// Шторка открыта — страница под ней стоит. Палец на затемнении или на той
+// части шторки, которой нечего прокручивать, страницу не тянет: иначе фон
+// дёргается, а слой шторки не поспевает за экраном, и по краям видна страница.
+// Своё движение не трогаем: крутилка, поле, где сейчас печатают (каретка)
+let pin = false;
+document.addEventListener('touchstart', (e) => {
+  const t = e.target;
+  pin = Boolean(panel) && t instanceof Element && sheetRoot.contains(t) && !t.closest('.dial')
+    && !(t === document.activeElement && t.matches('input, textarea'));
+  for (let el = pin ? t : null; el && el !== sheetRoot; el = el.parentElement) {
+    const st = getComputedStyle(el);
+    const y = /auto|scroll/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 1;
+    const x = /auto|scroll/.test(st.overflowX) && el.scrollWidth > el.clientWidth + 1;
+    if (x || y) pin = false; // прокручивается сама; за край не выходит (overscroll-behavior)
+  }
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  if (pin && e.cancelable) e.preventDefault();
+}, { passive: false });
+
 const PRESSABLE = '.pill, .chip, .icon-btn, .check, .pick, .replace, .glyph-pick, .compose-chip, .compose-send, .quick-pick, .bump, .switch';
 const RELEASE_MS = 500;
 let pressed = null; // { el, at, from, start }
