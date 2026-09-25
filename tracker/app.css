@@ -38,6 +38,8 @@
   --sph-plum: #99728C;
   --sph-khaki: #DFD6A1;
   --on-sphere: #000000;
+  /* зерно бумаги: тёмные крупинки; в тёмной теме — светлые */
+  --grain: url('textures/grain.png');
 
   /* штриховка неактивного: крупная — для графиков, тонкая — для пустых мест дня */
   --hatch: repeating-linear-gradient(-45deg, var(--ink-muted) 0 2px, transparent 2px 7px);
@@ -88,6 +90,7 @@
   --nav-on: var(--ink);
   --nav-on-ink: var(--bg);
   --pop-ink: var(--ink);
+  --grain: url('textures/grain-dark.png');
 }
 
 /* ── основа ─────────────────────────────────────────────────────────── */
@@ -109,6 +112,7 @@ body[data-screen='plan'] {
 }
 
 body {
+  position: relative;
   margin: 0;
   min-height: 100dvh;
   background: var(--screen);
@@ -128,20 +132,26 @@ body {
   touch-action: pan-x pan-y;
 }
 
-/* бумажное зерно поверх всего экрана; касания проходят насквозь */
-body::after {
+/*
+ * Бумажное зерно — часть страницы, а не стекло поверх экрана: едет вместе с
+ * содержимым при прокрутке. Крупинки полупрозрачные: тёмная делает цвет под
+ * собой темнее того же тона. Лежит под плашкой вкладок и шторками — у них
+ * своё зерно, оно стоит вместе с ними. Касания проходят насквозь.
+ * Наложение обычное: soft-light пробовали — снимок для перехода между
+ * экранами готовился в 3–7 раз дольше.
+ */
+body::after,
+.tabs::after,
+.sheet::after {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 60;
   pointer-events: none;
-  background: url('textures/grain.png') 0 0 / 128px 128px;
+  background: var(--grain) 0 0 / 128px 128px;
 }
 
-/* на тёмном зерно — светлыми крупинками: та же плитка, вывернутая наизнанку */
-:root[data-theme='dark'] body::after {
-  filter: invert(1);
-  opacity: 0.7;
+body::after {
+  z-index: 9;
 }
 
 button,
@@ -1296,6 +1306,11 @@ textarea:focus-visible {
   pointer-events: auto;
 }
 
+.tabs::after {
+  z-index: 2;
+  border-radius: inherit;
+}
+
 .tab-indicator {
   position: absolute;
   top: 6px;
@@ -1404,16 +1419,28 @@ textarea:focus-visible {
 
 .sheet {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 560px;
   max-height: min(85dvh, calc(var(--vv-h, 100dvh) - 16px));
   margin: 0 auto;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 22px var(--pad) calc(16px + var(--safe-bottom));
+  overflow: hidden;
   background: var(--bg);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   animation: sheet-in var(--sheet-in) both;
+}
+
+/* рамка шторки стоит (и её зерно), прокручивается содержимое */
+.sheet-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 22px var(--pad) calc(16px + var(--safe-bottom));
+}
+
+.sheet::after {
+  z-index: 3;
 }
 
 /* выезжает целиком снизу; внутри тапы меняют только содержимое */
@@ -1424,7 +1451,7 @@ textarea:focus-visible {
 }
 
 /* одна шторка сменила другую (Дата → Календарь): содержимое проявляется */
-.sheet.is-swapping > * {
+.sheet.is-swapping > .sheet-body > * {
   animation: rise 0.36s var(--ease) both;
 }
 

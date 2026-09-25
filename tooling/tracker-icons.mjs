@@ -7,8 +7,9 @@
  * (круг, пилюля, квадрат, полоса) чернилами на фоне приложения. Красного
  * в иконке нет: акцент значит «требует внимания сейчас», и только это.
  *
- * Ещё — плитка бумажного зерна (tracker/textures/grain.png): тёмные и
- * светлые крупинки с едва заметной прозрачностью, в три раза плотнее экрана. Картинка, а не SVG-фильтр: политика
+ * Ещё — плитки бумажного зерна (tracker/textures/grain.png; grain-dark.png —
+ * для тёмной темы): крупинки с едва заметной прозрачностью, в три раза
+ * плотнее экрана. Картинка, а не SVG-фильтр: политика
  * безопасности страницы не пускает data:-адреса, а шум на лету дорог для телефона.
  *
  * Пакетов нет: пиксели считаются с суперсэмплингом 4×4, PNG собирается
@@ -116,7 +117,7 @@ function png(size, rgba) {
  */
 const GRAIN = 384;
 
-function grain(size) {
+function grain(size, dark = false) {
   let seed = 7;
   const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   let v = new Float32Array(size * size).map(() => rand() + rand() - 1);
@@ -136,14 +137,18 @@ function grain(size) {
   }
   const mean = v.reduce((a, b) => a + b, 0) / v.length;
   const sd = Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length);
+  // тёмная тема — наоборот: частые крупинки светлые, редкие тёмные, и чуть
+  // слабее (0.7): светлое на тёмном заметнее
+  const [often, rare, k] = dark ? [255, 0, 0.7] : [0, 255, 1];
   const px = Buffer.alloc(size * size * 4);
   for (let i = 0; i < v.length; i++) {
     const z = (v[i] - mean) / sd;
     if (z > 0.2) {
-      px[i * 4 + 3] = Math.min(22, Math.round((z - 0.2) * 11)); // тёмная крупинка
+      px.fill(often, i * 4, i * 4 + 3);
+      px[i * 4 + 3] = Math.round(k * Math.min(22, Math.round((z - 0.2) * 11)));
     } else if (z < -1.3) {
-      px.fill(255, i * 4, i * 4 + 3); // светлая — реже и слабее
-      px[i * 4 + 3] = Math.min(12, Math.round((-z - 1.3) * 10));
+      px.fill(rare, i * 4, i * 4 + 3); // реже и слабее
+      px[i * 4 + 3] = Math.round(k * Math.min(12, Math.round((-z - 1.3) * 10)));
     }
   }
   return px;
@@ -152,7 +157,8 @@ function grain(size) {
 mkdirSync(OUT, { recursive: true });
 mkdirSync(join(ROOT, 'tracker', 'textures'), { recursive: true });
 writeFileSync(join(ROOT, 'tracker', 'textures', 'grain.png'), png(GRAIN, grain(GRAIN)));
-console.log('✓ tracker/textures/grain.png');
+writeFileSync(join(ROOT, 'tracker', 'textures', 'grain-dark.png'), png(GRAIN, grain(GRAIN, true)));
+console.log('✓ tracker/textures/grain.png, grain-dark.png');
 
 const ICONS = [
   { file: 'icon-180.png', size: 180, inset: 0.06 }, // iOS, домашний экран
