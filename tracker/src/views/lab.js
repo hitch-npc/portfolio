@@ -155,6 +155,7 @@ function ride(e) {
   }
   sw.style.setProperty('--sx', `${e.clientX - g.left - g.w / 2 + g.jump * JUMP * g.w}px`);
   sw.style.setProperty('--sy', `${e.clientY - g.top - g.h / 2}px`);
+  void sw.offsetWidth; // вёрстка сразу — переключатель сверяет палец с рамкой в этом же касании
 }
 
 /**

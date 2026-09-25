@@ -74,6 +74,10 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     }
     sw.style.setProperty('--sx', `${x - ride.left - ride.w / 2 + ride.side * JUMP * ride.w}px`);
     sw.style.setProperty('--sy', `${y - ride.top - ride.h / 2}px`);
+    // вёрстка — сразу: переключатель сверяет палец со своей рамкой в этом же
+    // касании; со вчерашней рамкой при быстром движении вбок палец не
+    // перебегал на другую его половину, и щелчок пропадал
+    void sw.offsetWidth;
   }
 
   function set(p, felt = false) {
@@ -118,7 +122,11 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
 
   el.addEventListener('pointerdown', (e) => {
     if (off || e.button > 0) return;
-    e.preventDefault(); // фокус остаётся в поле названия, текст не выделяется
+    const onSwitch = e.target === sw && e.pointerType === 'touch';
+    // фокус остаётся в поле названия, текст не выделяется. Но не для пальца на
+    // переключателе: так на iPhone глохнет и он — щелчков не было (в
+    // лаборатории preventDefault нет); фокус на тап держит mousedown ниже
+    if (!onSwitch) e.preventDefault();
     cancelAnimationFrame(raf);
     const x0 = e.clientX;
     const p0 = pos;
@@ -131,7 +139,7 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
       const box = el.getBoundingClientRect();
       ride = { left: box.left, top: box.top, side: 0 };
     }
-    if (!ride || e.pointerType !== 'touch') {
+    if (!onSwitch) {
       try {
         el.setPointerCapture(e.pointerId);
       } catch {
@@ -170,6 +178,10 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
   });
+
+  // тап: iPhone шлёт mousedown, и его обычное действие — фокус на
+  // переключатель, клавиатура уехала бы
+  el.addEventListener('mousedown', (e) => e.preventDefault());
 
   el.addEventListener('keydown', (e) => {
     const by = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 5, PageDown: -5 }[e.key];
