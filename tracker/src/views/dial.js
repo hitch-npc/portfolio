@@ -9,16 +9,20 @@
  * <input switch>, когда палец перегоняет его ползунок на другую сторону.
  * Поэтому на линейке лежит прозрачный переключатель: до касания — на всю
  * линейку (палец точно начинает на нём), от касания — родного размера, а
- * на каждом делении прыгает вбок: палец оказывается то на левой, то на
- * правой его половине, и ползунок перещёлкивает сам. Найдено в лаборатории
- * (режим E, src/views/lab.js), правила — из WebKit (CheckboxInputType.cpp):
- *  - за пальцем переключатель следит только через 200 мс после касания;
- *  - тогда же точку касания он переводит в свои координаты, и от неё
- *    зависит первый перещёлк: если палец начал не на стороне ползунка,
- *    порог уезжает за край, и за весь жест — ни щелчка.
- * Отсюда: от касания и до HOLD переключатель стоит на месте, точка касания
- * в нём — на стороне ползунка (25 % выключен, 75 % включён); после — едет
- * за пальцем, палец на 20 % или 80 %, со стороной на каждом делении.
+ * на каждом делении, где стрелка вздрагивает, прыгает вбок: палец
+ * оказывается то на левой, то на правой его половине, и ползунок
+ * перещёлкивает сам. Найдено в лаборатории (режим E, src/views/lab.js),
+ * правила — из WebKit (CheckboxInputType.cpp):
+ *  - за пальцем переключатель следит только через 200 мс после касания —
+ *    раньше щелчков не бывает никак;
+ *  - тогда же он запоминает точку касания в своих координатах, и если она
+ *    не на стороне ползунка, первый перещёлк уезжает за край — за весь жест
+ *    ни щелчка. Точку он берёт от самого первого касания этого переключателя,
+ *    а не от нынешнего (так в коде WebKit), поэтому её место заранее не знаешь.
+ * Отсюда: при касании переключатель выключаем, и пока он не начал следить,
+ * держим его за правым краем линейки — любая точка касания левее, на
+ * стороне ползунка. Начал следить — палец на 20 % или 80 %, сторона
+ * меняется на каждом делении.
  *
  * onInput — значение меняется (для подписи рядом), onCommit — линейка
  * остановилась (для записи). Во время движения ничего не перерисовывается.
@@ -27,7 +31,7 @@ import { h, calm } from '../ui.js';
 
 const TICK = 10; // px между делениями — как в CSS (.dial-tick)
 const JUMP = 0.3; // прыжок переключателя, доля его ширины: палец то на 20 %, то на 80 %
-const HOLD = 280; // мс: WebKit начинает следить за пальцем через 200 мс, с запасом
+const HOLD = 210; // мс: WebKit начинает следить за пальцем через 200 мс после касания
 
 const NICE = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9];
 
@@ -52,7 +56,9 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
   let idx = pos; // деление под стрелкой
   let raf = 0;
   let off = disabled;
-  let ride = null; // палец на переключателе: где линейка, его размер, когда коснулся, сторона
+  let ride = null; // палец на переключателе: где линейка, его размер, сторона
+  let follows = false; // переключатель уже следит за пальцем
+  let hold = 0; // таймер: сработал — переключатель уже следит
 
   const track = h('div', { class: 'dial-track', 'aria-hidden': 'true' }, values.map((v) =>
     h('span', { class: ['dial-tick', isMajor(v) && 'is-major'] }, isMajor(v) && h('span', { class: 'dial-num' }, short(v)))));
@@ -84,26 +90,34 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     void sw.offsetWidth;
   }
 
-  /** Палец коснулся переключателя: родной размер, точка касания — на стороне ползунка. */
-  function grab(e) {
-    const box = el.getBoundingClientRect();
-    const on = sw.checked;
-    el.classList.add('is-riding');
-    const r = sw.getBoundingClientRect();
-    // side: +1 — палец на 20 %, −1 — на 80 %; начинает на стороне ползунка
-    ride = { left: box.left, top: box.top, w: r.width, h: r.height, t0: e.timeStamp, live: false, side: on ? -1 : 1 };
-    place(e.clientX, e.clientY, on ? 0.75 : 0.25);
+  /** За правым краем линейки: палец и любая точка касания — левее, у ползунка. */
+  function park(y) {
+    place(ride.left + ride.box + ride.w, y, 0);
   }
 
-  /** До HOLD переключатель стоит, где был при касании; дальше едет за пальцем. */
-  function rideTo(ev) {
-    if (!ride) return;
-    if (!ride.live) {
-      if (ev.timeStamp - ride.t0 < HOLD) return;
-      ride.live = true;
-    }
-    place(ev.clientX, ev.clientY, 0.5 - ride.side * JUMP);
+  /** Палец коснулся переключателя: выключен, родного размера, за краем. */
+  function grab(e) {
+    // из кода — только до касания: пока он следит за пальцем, это его сбивает
+    sw.checked = false;
+    const box = el.getBoundingClientRect();
+    el.classList.add('is-riding');
+    const r = sw.getBoundingClientRect();
+    // side: +1 — палец на 20 % (у ползунка), −1 — на 80 %
+    ride = { left: box.left, top: box.top, box: box.width, w: r.width, h: r.height, side: 1 };
+    park(e.clientY);
   }
+
+  /** Касание дошло до переключателя: через HOLD он уже следит за пальцем. */
+  sw.addEventListener('touchstart', () => {
+    // WebKit заводит свой таймер на 200 мс сразу после этого обработчика,
+    // наш — на 210; таймеры страницы срабатывают по сроку, так что наш —
+    // заведомо после него, даже если страница была занята
+    clearTimeout(hold);
+    follows = false;
+    hold = setTimeout(() => {
+      follows = true;
+    }, HOLD);
+  }, { passive: true });
 
   function set(p, felt = false) {
     pos = p;
@@ -111,7 +125,7 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
     if (i !== idx) {
       idx = i;
       onInput(values[i]);
-      if (felt && ride?.live) ride.side = -ride.side; // щелчок — на следующем rideTo
+      if (felt && ride && follows) ride.side = -ride.side; // щелчок — тут же, в move
       if (!calm()) {
         needle.classList.remove('is-tick');
         void needle.offsetWidth; // перезапуск вздрагивания
@@ -175,7 +189,7 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
       const raw = p0 - dx / TICK;
       // за краем — упругость, а не стена
       set(raw < 0 ? raw / 3 : raw > last ? last + (raw - last) / 3 : raw, true);
-      rideTo(ev);
+      if (ride) follows ? place(ev.clientX, ev.clientY, 0.5 - ride.side * JUMP) : park(ev.clientY);
       const dt = Math.max(1, ev.timeStamp - prev.t);
       v = 0.7 * ((ev.clientX - prev.x) / dt) + 0.3 * v;
       prev = { x: ev.clientX, t: ev.timeStamp };
@@ -185,6 +199,8 @@ export function dial({ values, value, label, onInput, onCommit = onInput, disabl
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       el.classList.remove('is-active', 'is-riding');
+      clearTimeout(hold);
+      follows = false;
       ride = null;
       if (moved < 4 && ev.type === 'pointerup') {
         // тап: к делению под пальцем
