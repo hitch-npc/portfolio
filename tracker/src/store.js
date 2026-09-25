@@ -341,6 +341,22 @@ export function reorderSpheres(ids) {
   persist(db.batch(ops));
 }
 
+/**
+ * Удалить сферу насовсем. Её задачи не удаляются — уходят во «Входящие».
+ * Возвращает, сколько задач переехало.
+ */
+export function deleteSphere(id) {
+  const moved = state.tasks.filter((t) => t.sphereId === id);
+  for (const t of moved) t.sphereId = null;
+  state.spheres = state.spheres.filter((s) => s.id !== id);
+  emit();
+  persist(db.batch([
+    ...moved.map((value) => ({ store: 'tasks', value })),
+    { store: 'spheres', id, remove: true },
+  ]));
+  return moved.length;
+}
+
 /* ── цели ────────────────────────────────────────────────────────────── */
 
 const findGoal = (id) => state.goals.find((g) => g.id === id);

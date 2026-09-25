@@ -7,7 +7,7 @@
  * где его нет — скачиванием. Импорт показывает, что изменится, и ждёт
  * подтверждения.
  */
-import { h, icon, openSheet, closeSheet, toast, autosize, copyText, calm } from '../ui.js';
+import { h, openSheet, closeSheet, toast, autosize, copyText, calm, closeCheckIcon, flashCheck } from '../ui.js';
 import {
   aiData, aiPrompt, backupName, detect, makeBackup, packFiles, planImport, readBackup, readImportText,
 } from '../io.js';
@@ -171,10 +171,17 @@ async function copyPrompt(withData) {
   toast((await copyText(prompt)) ? 'Copied — paste it into the AI chat' : 'Could not copy');
 }
 
-/** Смена оформления — наплывом старого экрана в новый; без View Transitions и при Fewer — сразу. */
+/**
+ * Смена оформления — наплывом старого экрана в новый (без View Transitions
+ * и при Fewer — сразу); потом крестик на миг становится галочкой: сохранено.
+ */
 function restyle(fn) {
-  if (document.startViewTransition && !calm()) document.startViewTransition(fn);
-  else fn();
+  const confirm = () => flashCheck(document.querySelector('.corner-btn svg'));
+  if (document.startViewTransition && !calm()) document.startViewTransition(fn).finished.finally(confirm);
+  else {
+    fn();
+    confirm();
+  }
 }
 
 /** Строка настройки: подпись и пилюли вариантов, выбранный — залит. smooth — сменить наплывом. */
@@ -210,7 +217,7 @@ export function settingsView() {
     // закрыть — там же, где была шестерёнка: палец уже знает это место
     header('Settings', null, h('a', {
       class: 'icon-btn corner-btn', href: '#/today', 'aria-label': 'Close settings', title: 'Close',
-    }, icon('close'))),
+    }, closeCheckIcon())),
 
     h('h2', { class: 'label' }, 'Appearance'),
     h('section', { class: 'block-alt settings' },
